@@ -33,10 +33,10 @@ public sealed class SoftwareRaycastRendererTests
         Assert.Multiple(() =>
         {
             Assert.That(pixels, Has.Length.EqualTo(16));
-            Assert.That(GetPixel(pixels, 0), Is.EqualTo(new byte[] { 45, 48, 55, 255 }));
+            Assert.That(GetPixel(pixels, 0), Is.EqualTo(new byte[] { 56, 56, 56, 255 }));
             Assert.That(GetPixel(pixels, 1), Is.Not.EqualTo(GetPixel(pixels, 0)));
             Assert.That(GetPixel(pixels, 2), Is.EqualTo(GetPixel(pixels, 1)));
-            Assert.That(GetPixel(pixels, 3), Is.EqualTo(new byte[] { 61, 57, 53, 255 }));
+            Assert.That(GetPixel(pixels, 3), Is.EqualTo(new byte[] { 113, 113, 113, 255 }));
         });
     }
 
@@ -61,6 +61,8 @@ public sealed class SoftwareRaycastRendererTests
         var textures = new WolfensteinWallTextures(pages, pages.Length);
         var paletteData = new byte[WolfensteinPalette.VgaDataLength];
         paletteData[7 * 3] = 63;
+        paletteData[(0x1D * 3) + 2] = 63;
+        paletteData[(0x19 * 3) + 1] = 63;
         var palette = WolfensteinPalette.FromVgaDac(paletteData);
         var pixels = new byte[16];
         var column = new WallColumn(2.0, 0.5, 1, WallSide.Vertical);
@@ -69,6 +71,8 @@ public sealed class SoftwareRaycastRendererTests
 
         Assert.That(GetPixel(pixels, 1), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
         Assert.That(GetPixel(pixels, 2), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
+        Assert.That(GetPixel(pixels, 0), Is.EqualTo(new byte[] { 0, 0, 255, 255 }));
+        Assert.That(GetPixel(pixels, 3), Is.EqualTo(new byte[] { 0, 255, 0, 255 }));
     }
 
     [Test]

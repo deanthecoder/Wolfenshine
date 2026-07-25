@@ -18,6 +18,8 @@ namespace Wolfenshine.Maps;
 /// </remarks>
 public sealed class WolfensteinMap
 {
+    // The original setup code replaces this marker with its neighboring area tile before play begins.
+    private const ushort AmbushTile = 106;
     // Original plane-zero values from this point onward identify walkable floor areas rather than structures.
     private const ushort FirstAreaTile = 107;
 
@@ -66,7 +68,7 @@ public sealed class WolfensteinMap
         if (x < 0 || x >= Width || y < 0 || y >= Height)
             return true;
         var tile = GetWall(x, y);
-        return tile > 0 && tile < FirstAreaTile;
+        return tile > 0 && tile < FirstAreaTile && tile != AmbushTile;
     }
 
     private ushort GetTile(IReadOnlyList<ushort> plane, int x, int y)

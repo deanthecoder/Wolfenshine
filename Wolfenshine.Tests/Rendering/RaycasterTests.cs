@@ -62,6 +62,23 @@ public sealed class RaycasterTests
     }
 
     [Test]
+    public void GivenAmbushMarkerCheckRayContinuesToWallBehindIt()
+    {
+        var map = CreateMap(19);
+        ((ushort[])map.Walls)[(1 * map.Width) + 2] = 106;
+        var camera = RaycastCamera.FromPlayerStart(map);
+        var columns = new WallColumn[1];
+
+        Raycaster.Cast(map, WolfensteinDoors.FromMap(map), camera, columns);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(columns[0].Tile, Is.EqualTo(1));
+            Assert.That(columns[0].Distance, Is.EqualTo(1.5).Within(0.0001));
+        });
+    }
+
+    [Test]
     public void GivenSymmetricRoomCheckRayDistancesAreSymmetric()
     {
         var map = CreateMap(19);

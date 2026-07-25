@@ -20,8 +20,10 @@ namespace Wolfenshine.Rendering;
 /// </remarks>
 public static class SoftwareRaycastRenderer
 {
-    private static readonly RgbaColor s_ceilingColor = new(45, 48, 55);
-    private static readonly RgbaColor s_floorColor = new(61, 57, 53);
+    private const byte CeilingPaletteIndex = 0x1D;
+    private const byte FloorPaletteIndex = 0x19;
+    private static readonly RgbaColor s_ceilingColor = new(56, 56, 56);
+    private static readonly RgbaColor s_floorColor = new(113, 113, 113);
     private static readonly RgbaColor s_doorColor = new(188, 142, 70);
     private static readonly RgbaColor[] s_wallColors =
     [
@@ -57,10 +59,12 @@ public static class SoftwareRaycastRenderer
                 nameof(pixels));
         }
 
-        // Establish the ceiling and floor first so wall drawing only needs to overwrite its vertical span.
+        // Establish the original E1M1 ceiling and Wolf3D floor colors before drawing walls over them.
+        var ceilingColor = palette == null ? s_ceilingColor : palette.GetColor(CeilingPaletteIndex);
+        var floorColor = palette == null ? s_floorColor : palette.GetColor(FloorPaletteIndex);
         for (var y = 0; y < height; y++)
         {
-            var background = y < height / 2 ? s_ceilingColor : s_floorColor;
+            var background = y < height / 2 ? ceilingColor : floorColor;
             for (var x = 0; x < width; x++)
                 WritePixel(pixels, width, x, y, background);
         }
