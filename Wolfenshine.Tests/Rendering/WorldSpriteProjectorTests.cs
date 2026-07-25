@@ -80,4 +80,21 @@ public sealed class WorldSpriteProjectorTests
             Assert.That(projected[0].SpriteNumber, Is.EqualTo(52));
         });
     }
+
+    [Test]
+    public void GivenSouthFacingGuardAndNegativeViewAngleCheckRotationWrapsWithinActorSprites()
+    {
+        WorldSprite[] sprites = [new(12.5, 17.5, 50, 3)];
+        var projected = new ProjectedWorldSprite[1];
+        var camera = new RaycastCamera(9.512, 18.667, 0.910, -0.416, 0.274, 0.600);
+
+        var count = WorldSpriteProjector.Project(sprites, camera, 320, 160, 200, projected);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(count, Is.EqualTo(1));
+            Assert.That(projected[0].SpriteNumber, Is.EqualTo(56));
+            Assert.That(projected[0].SpriteNumber, Is.InRange(50, 57));
+        });
+    }
 }

@@ -30,20 +30,26 @@ public sealed class GameSession
     private const double AngleScale = 20.0;
     private const double AttackFrameDuration = 6.0 / OriginalTicksPerSecond;
     private const int RenewedAmmo = 99;
+    private const double MinimumActorDistance = 1.0;
     private const double PlayerRadius = 0.2;
     private const double MaximumMovementStep = 0.1;
     private bool m_useWasDown;
     private bool m_attackWasDown;
     private int m_attackStep;
     private double m_attackTimeRemaining;
+    private readonly IReadOnlyList<WolfensteinActor> m_actors;
 
-    public GameSession(WolfensteinMap map, RaycastCamera camera)
+    public GameSession(
+        WolfensteinMap map,
+        RaycastCamera camera,
+        IReadOnlyList<WolfensteinActor> actors = null)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(camera);
         Map = map;
         Camera = camera;
         Doors = WolfensteinDoors.FromMap(map);
+        m_actors = actors ?? [];
     }
 
     public WolfensteinMap Map { get; }
@@ -119,11 +125,21 @@ public sealed class GameSession
         return true;
     }
 
-    private bool CanOccupy(double x, double y) =>
-        !IsSolid((int)Math.Floor(x - PlayerRadius), (int)Math.Floor(y - PlayerRadius)) &&
-        !IsSolid((int)Math.Floor(x + PlayerRadius), (int)Math.Floor(y - PlayerRadius)) &&
-        !IsSolid((int)Math.Floor(x - PlayerRadius), (int)Math.Floor(y + PlayerRadius)) &&
-        !IsSolid((int)Math.Floor(x + PlayerRadius), (int)Math.Floor(y + PlayerRadius));
+    private bool CanOccupy(double x, double y)
+    {
+        if (IsSolid((int)Math.Floor(x - PlayerRadius), (int)Math.Floor(y - PlayerRadius)) ||
+            IsSolid((int)Math.Floor(x + PlayerRadius), (int)Math.Floor(y - PlayerRadius)) ||
+            IsSolid((int)Math.Floor(x - PlayerRadius), (int)Math.Floor(y + PlayerRadius)) ||
+            IsSolid((int)Math.Floor(x + PlayerRadius), (int)Math.Floor(y + PlayerRadius)))
+        {
+            return false;
+        }
+
+        // Wolf3D uses an axis-aligned one-tile exclusion box around every shootable actor.
+        return m_actors.All(actor =>
+            Math.Abs(x - actor.X) > MinimumActorDistance ||
+            Math.Abs(y - actor.Y) > MinimumActorDistance);
+    }
 
     private bool IsSolid(int x, int y)
     {

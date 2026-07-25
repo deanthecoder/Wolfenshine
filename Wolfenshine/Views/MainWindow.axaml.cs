@@ -51,6 +51,15 @@ public sealed partial class MainWindow : Window
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+#if DEBUG
+        if (e.Key == Key.I)
+        {
+            if (DataContext is MainWindowViewModel viewModel)
+                viewModel.DumpDebugInfo();
+            e.Handled = true;
+            return;
+        }
+#endif
         e.Handled = SetKeyState(e.Key, true) || e.Handled;
     }
 

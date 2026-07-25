@@ -25,10 +25,10 @@ public sealed class WolfensteinGraphicsLoaderTests
     public void GivenLeastSignificantBitFirstCodesCheckHuffmanDataIsExpanded()
     {
         var dictionary = new (ushort Bit0, ushort Bit1)[255];
-        dictionary[^1] = ((ushort)'A', (ushort)'B');
+        dictionary[^1] = ('A', 'B');
 
         var expanded = WolfensteinGraphicsLoader.ExpandHuffman([0b00000110], dictionary, 4);
 
-        Assert.That(expanded, Is.EqualTo(new byte[] { (byte)'A', (byte)'B', (byte)'B', (byte)'A' }));
+        Assert.That(expanded, Is.EqualTo("ABBA"u8.ToArray()));
     }
 }

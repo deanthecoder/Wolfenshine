@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using DTC.Core.ViewModels;
+using DTC.Core;
 using Wolfenshine.Game;
 using Wolfenshine.Graphics;
 using Wolfenshine.Maps;
@@ -64,7 +65,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (SelectedMap != null)
         {
             m_camera = RaycastCamera.FromPlayerStart(SelectedMap);
-            m_gameSession = new GameSession(SelectedMap, m_camera);
+            m_gameSession = new GameSession(SelectedMap, m_camera, Actors);
             m_weaponSprite = sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? weaponSprite;
             UpdateHud();
         }
@@ -118,6 +119,49 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+#if DEBUG
+    public void DumpDebugInfo()
+    {
+        if (m_gameSession == null)
+        {
+            Logger.Instance.Info("Wolfenshine debug snapshot: no active game session.");
+            return;
+        }
+
+        Logger.Instance.Info(
+            $"Wolfenshine debug snapshot: map {SelectedMap.Slot} ({SelectedMap.Name}), " +
+            $"camera ({Camera.X:0.000}, {Camera.Y:0.000}), direction ({Camera.DirectionX:0.000}, {Camera.DirectionY:0.000}), " +
+            $"plane ({Camera.PlaneX:0.000}, {Camera.PlaneY:0.000}).");
+        Logger.Instance.Info(
+            $"Player weapon {m_gameSession.Weapon}, frame {m_gameSession.WeaponFrame}, " +
+            $"attacking {m_gameSession.IsAttacking}, ammo {m_gameSession.Ammo}.");
+        foreach (var door in m_gameSession.Doors.Items)
+        {
+            Logger.Instance.Info(
+                $"Door ({door.X}, {door.Y}), tile {door.Tile}, orientation {door.Orientation}, " +
+                $"open {door.OpenAmount:0.000}.");
+        }
+
+        foreach (var actor in Actors.OrderBy(actor => DistanceToCamera(actor.X, actor.Y)))
+        {
+            WorldSprite[] sprite = [actor.ToWorldSprite()];
+            var projected = new ProjectedWorldSprite[1];
+            var projectedCount = WorldSpriteProjector.Project(sprite, Camera, 320, 160, 200, projected);
+            var projection = projectedCount == 0
+                ? "not projected"
+                : $"sprite {projected[0].SpriteNumber}, screen x {projected[0].CenterX}, " +
+                  $"depth {projected[0].Depth:0.000}, size {projected[0].RenderedSize}";
+            var nearbyDecorations = StaticObjects
+                .Where(item => Math.Abs(item.X - actor.X) <= 2.0 && Math.Abs(item.Y - actor.Y) <= 2.0)
+                .Select(item => $"{item.SpriteNumber}@({item.X:0.0},{item.Y:0.0})");
+            Logger.Instance.Info(
+                $"Actor {actor.Type} at ({actor.X:0.0}, {actor.Y:0.0}), distance {DistanceToCamera(actor.X, actor.Y):0.000}, " +
+                $"direction {actor.Direction}, base sprite {actor.BaseSpriteNumber}, patrol {actor.IsPatrolling}, " +
+                $"ambush {actor.IsAmbush}; {projection}; nearby decorations [{string.Join(", ", nearbyDecorations)}].");
+        }
+    }
+#endif
+
     private void UpdateHud()
     {
         if (m_hudGraphics == null || m_gameSession == null ||
@@ -129,4 +173,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         m_hudAmmo = m_gameSession.Ammo;
         SetField(ref m_statusBar, m_hudGraphics.Render(m_hudWeapon, m_hudAmmo), nameof(StatusBar));
     }
+
+#if DEBUG
+    private double DistanceToCamera(double x, double y)
+    {
+        var deltaX = x - Camera.X;
+        var deltaY = y - Camera.Y;
+        return Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+    }
+#endif
 }

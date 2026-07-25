@@ -87,7 +87,9 @@ public static class WorldSpriteProjector
         var toCameraY = camera.Y - sprite.Y;
         var viewAngle = Math.Atan2(-toCameraY, toCameraX) * 180.0 / Math.PI;
         var facingAngle = sprite.FacingDirection * 90.0;
-        var relativeAngle = (viewAngle - facingAngle + 22.5 + 360.0) % 360.0;
+        var relativeAngle = NormalizeDegrees(viewAngle - facingAngle + 22.5);
         return sprite.SpriteNumber + (int)(relativeAngle / 45.0);
     }
+
+    private static double NormalizeDegrees(double angle) => ((angle % 360.0) + 360.0) % 360.0;
 }
