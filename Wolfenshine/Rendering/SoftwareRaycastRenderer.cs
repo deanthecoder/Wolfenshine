@@ -44,11 +44,21 @@ public static class SoftwareRaycastRenderer
         Span<byte> pixels,
         WolfensteinWallTextures wallTextures,
         WolfensteinPalette palette)
+        => Render(columns, height, height, pixels, wallTextures, palette);
+
+    public static void Render(
+        IReadOnlyList<WallColumn> columns,
+        int height,
+        int projectionHeight,
+        Span<byte> pixels,
+        WolfensteinWallTextures wallTextures,
+        WolfensteinPalette palette)
     {
         ArgumentNullException.ThrowIfNull(columns);
         if (columns.Count == 0)
             throw new ArgumentException("At least one wall column is required.", nameof(columns));
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(projectionHeight);
 
         var width = columns.Count;
         var requiredPixelBytes = checked(width * height * 4);
@@ -74,7 +84,7 @@ public static class SoftwareRaycastRenderer
         for (var x = 0; x < width; x++)
         {
             var column = columns[x];
-            var projectedHeight = height / Math.Max(column.Distance, 0.0001);
+            var projectedHeight = projectionHeight / Math.Max(column.Distance, 0.0001);
             var wallTop = (height - projectedHeight) * 0.5;
             var top = Math.Max(0, (int)Math.Floor(wallTop));
             var bottom = Math.Min(height, (int)Math.Ceiling(wallTop + projectedHeight));
@@ -181,6 +191,33 @@ public static class SoftwareRaycastRenderer
                         WritePixel(pixels, width, x, y, palette.GetColor(index));
                 }
             }
+        }
+    }
+
+    public static void DrawGraphic(
+        WolfensteinGraphic graphic,
+        WolfensteinPalette palette,
+        int left,
+        int top,
+        Span<byte> pixels,
+        int width,
+        int height)
+    {
+        ArgumentNullException.ThrowIfNull(graphic);
+        ArgumentNullException.ThrowIfNull(palette);
+        ArgumentOutOfRangeException.ThrowIfNegative(left);
+        ArgumentOutOfRangeException.ThrowIfNegative(top);
+        var expectedPixelBytes = checked(width * height * 4);
+        if (pixels.Length != expectedPixelBytes)
+            throw new ArgumentException($"The pixel buffer must contain exactly {expectedPixelBytes} bytes.", nameof(pixels));
+        if (left + graphic.Width > width || top + graphic.Height > height)
+            throw new ArgumentException("The graphic lies outside the target framebuffer.", nameof(graphic));
+
+        // UI pictures are opaque indexed images, so every source pixel replaces its framebuffer destination.
+        for (var y = 0; y < graphic.Height; y++)
+        {
+            for (var x = 0; x < graphic.Width; x++)
+                WritePixel(pixels, width, left + x, top + y, palette.GetColor(graphic.GetIndex(x, y)));
         }
     }
 

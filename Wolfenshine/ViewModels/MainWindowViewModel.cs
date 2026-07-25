@@ -41,7 +41,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         WolfensteinWallTextures wallTextures = null,
         WolfensteinPalette palette = null,
         WolfensteinSprite weaponSprite = null,
-        WolfensteinSpriteSet sprites = null)
+        WolfensteinSpriteSet sprites = null,
+        WolfensteinGraphic statusBar = null)
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(maps);
@@ -51,6 +52,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         Palette = palette;
         WeaponSprite = weaponSprite;
         Sprites = sprites;
+        StatusBar = statusBar;
         SelectedMap = maps.Maps.FirstOrDefault();
         StaticObjects = SelectedMap == null ? [] : WolfensteinStaticObjects.FromMap(SelectedMap);
         if (SelectedMap != null)
@@ -82,6 +84,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinPalette Palette { get; }
     public WolfensteinSprite WeaponSprite { get; }
     public WolfensteinSpriteSet Sprites { get; }
+    public WolfensteinGraphic StatusBar { get; }
     public IReadOnlyList<WorldSprite> StaticObjects { get; }
     public string StatusText { get; }
     public string DataErrorMessage { get; }

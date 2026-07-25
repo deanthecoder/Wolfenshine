@@ -31,6 +31,8 @@ public sealed class SoftwareViewport : Control
 {
     private const int ViewportWidth = 320;
     private const int ViewportHeight = 200;
+    private const int StatusBarHeight = 40;
+    private const int PlayViewHeight = ViewportHeight - StatusBarHeight;
     private WriteableBitmap m_bitmap;
     private readonly WallColumn[] m_columns = new WallColumn[ViewportWidth];
     private readonly byte[] m_pixels = new byte[ViewportWidth * ViewportHeight * 4];
@@ -54,6 +56,8 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinSpriteSet>(nameof(Sprites));
     public static readonly StyledProperty<IReadOnlyList<WorldSprite>> StaticObjectsProperty =
         AvaloniaProperty.Register<SoftwareViewport, IReadOnlyList<WorldSprite>>(nameof(StaticObjects));
+    public static readonly StyledProperty<WolfensteinGraphic> StatusBarProperty =
+        AvaloniaProperty.Register<SoftwareViewport, WolfensteinGraphic>(nameof(StatusBar));
 
     static SoftwareViewport() => AffectsRender<SoftwareViewport>(
         MapProperty,
@@ -63,7 +67,8 @@ public sealed class SoftwareViewport : Control
         PaletteProperty,
         WeaponSpriteProperty,
         SpritesProperty,
-        StaticObjectsProperty);
+        StaticObjectsProperty,
+        StatusBarProperty);
 
     public WolfensteinMap Map
     {
@@ -113,6 +118,12 @@ public sealed class SoftwareViewport : Control
         set => SetValue(StaticObjectsProperty, value);
     }
 
+    public WolfensteinGraphic StatusBar
+    {
+        get => GetValue(StatusBarProperty);
+        set => SetValue(StatusBarProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -127,7 +138,15 @@ public sealed class SoftwareViewport : Control
     {
         // Raycasting and shading produce the complete native-resolution image independently of Avalonia.
         Raycaster.Cast(Map, Doors, Camera, m_columns);
-        SoftwareRaycastRenderer.Render(m_columns, ViewportHeight, m_pixels, WallTextures, Palette);
+        var playViewPixels = m_pixels.AsSpan(0, ViewportWidth * PlayViewHeight * 4);
+        // The HUD clips the play view to 160 rows, but the original 200-row projection scale preserves its proportions.
+        SoftwareRaycastRenderer.Render(
+            m_columns,
+            PlayViewHeight,
+            ViewportHeight,
+            playViewPixels,
+            WallTextures,
+            Palette);
         if (Sprites != null && StaticObjects != null && Palette != null)
         {
             if (m_projectedSprites.Length != StaticObjects.Count)
@@ -136,6 +155,7 @@ public sealed class SoftwareViewport : Control
                 StaticObjects,
                 Camera,
                 ViewportWidth,
+                PlayViewHeight,
                 ViewportHeight,
                 m_projectedSprites);
             SoftwareRaycastRenderer.DrawWorldSprites(
@@ -143,9 +163,9 @@ public sealed class SoftwareViewport : Control
                 Sprites,
                 Palette,
                 m_columns,
-                m_pixels,
+                playViewPixels,
                 ViewportWidth,
-                ViewportHeight);
+                PlayViewHeight);
         }
         if (WeaponSprite != null && Palette != null)
         {
@@ -153,12 +173,14 @@ public sealed class SoftwareViewport : Control
                 WeaponSprite,
                 Palette,
                 ViewportWidth / 2,
-                ViewportHeight,
-                ViewportHeight + 1,
-                m_pixels,
+                PlayViewHeight,
+                PlayViewHeight + 1,
+                playViewPixels,
                 ViewportWidth,
-                ViewportHeight);
+                PlayViewHeight);
         }
+        if (StatusBar != null && Palette != null)
+            SoftwareRaycastRenderer.DrawGraphic(StatusBar, Palette, 0, PlayViewHeight, m_pixels, ViewportWidth, ViewportHeight);
 
         // The viewport size never changes, so retain its native bitmap and update only the locked pixel memory.
         m_bitmap ??= new WriteableBitmap(

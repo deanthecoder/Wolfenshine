@@ -6,7 +6,7 @@ A modern C# reimplementation of Wolfenstein 3D, beginning with a faithful 320×2
 
 ## Status
 
-Wolfenshine currently loads and decompresses all 60 maps from the original six-episode data, locates the E1M1 player start, and provides arrow-key navigation through a textured 320×200 software-raycast view using the original indexed wall art, static world objects, ready-pistol sprite, and VGA palette. The native image is presented at the original 4:3 display aspect ratio, accounting for Mode 13h's non-square pixels. Space opens ordinary sliding doors. Actors, locked doors, automatic door closing, and wider gameplay are not implemented yet.
+Wolfenshine currently loads and decompresses all 60 maps from the original six-episode data, locates the E1M1 player start, and provides arrow-key navigation through a textured 320×160 software-raycast view above the original 320×40 status bar. It uses the original indexed wall art, static world objects, ready-pistol sprite, HUD artwork, and VGA palette. The complete 320×200 native image is presented at the original 4:3 display aspect ratio, accounting for Mode 13h's non-square pixels. Space opens ordinary sliding doors. Actors, locked doors, automatic door closing, and wider gameplay are not implemented yet.
 
 ## Building
 
@@ -95,6 +95,8 @@ Each ordinary wall tile selects a pair of pages: one for east/west-facing walls 
 Wolfenshine retains the textures as 8-bit palette indices. `GAMEPAL.OBJ` contains 256 RGB triplets using the VGA DAC's 0–63 channel range; these are expanded to 8-bit RGB values when the palette loads. The software renderer resolves each texture index through that palette while writing its reusable RGBA framebuffer. Keeping indexed textures as the canonical representation preserves the original data and leaves palette swaps or a future GPU palette lookup straightforward.
 
 The E1M1 ceiling uses palette index `0x1D`; the original VGA clear routine uses `0x19` for the floor. Wolfenshine resolves both through the same loaded palette rather than approximating their RGB colors.
+
+`VGADICT.WL6` contains the Huffman tree used to expand `VGAGRAPH.WL6`, while `VGAHEAD.WL6` supplies its 24-bit chunk offsets. Picture chunk zero expands to a width/height table. Wolfenshine identifies the 320×40 status bar from those dimensions instead of relying on a generated chunk number: it is chunk 95 in the current v1.1 data but chunk 86 in the later GOODTIMES source configuration. Pictures are stored in four VGA planes and converted to row-major palette indices after expansion.
 
 Sprite pages use a column/post format. Each column lists its opaque vertical runs and their palette-index data, so transparency is structural rather than represented by a reserved color. The final 20 sprite pages before the sound boundary contain the four weapons' five animation frames; this allows weapon frames to be located without hard-coding version-specific absolute sprite numbers.
 

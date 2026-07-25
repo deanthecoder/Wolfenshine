@@ -31,6 +31,7 @@
                                     WeaponSprite="{Binding WeaponSprite}"
                                     Sprites="{Binding Sprites}"
                                     StaticObjects="{Binding StaticObjects}"
+                                    StatusBar="{Binding StatusBar}"
                                     RenderOptions.BitmapInterpolationMode="LowQuality" />
 
             <StackPanel IsVisible="{Binding !HasGameData}"

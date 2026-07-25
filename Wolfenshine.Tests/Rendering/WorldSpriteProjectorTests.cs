@@ -44,4 +44,20 @@ public sealed class WorldSpriteProjectorTests
             Assert.That(projected[0].CenterX, Is.EqualTo(160));
         });
     }
+
+    [Test]
+    public void GivenClippedViewportCheckIndependentProjectionHeightControlsSpriteScale()
+    {
+        var camera = new RaycastCamera(2.5, 3.5, 0.0, -1.0, 0.66, 0.0);
+        WorldSprite[] sprites = [new(2.5, 1.375, 1)];
+        var projected = new ProjectedWorldSprite[1];
+
+        var count = WorldSpriteProjector.Project(sprites, camera, 320, 160, 200, projected);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(count, Is.EqualTo(1));
+            Assert.That(projected[0].RenderedSize, Is.EqualTo(100));
+        });
+    }
 }

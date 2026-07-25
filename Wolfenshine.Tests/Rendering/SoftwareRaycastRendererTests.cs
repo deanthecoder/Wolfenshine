@@ -52,6 +52,21 @@ public sealed class SoftwareRaycastRendererTests
     }
 
     [Test]
+    public void GivenClippedViewCheckIndependentProjectionHeightControlsWallScale()
+    {
+        var column = new WallColumn(2.0, 0.5, 1, WallSide.Vertical);
+        var pixels = new byte[16];
+
+        SoftwareRaycastRenderer.Render(new[] { column }, 4, 8, pixels, null, null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(GetPixel(pixels, 0), Is.EqualTo(GetPixel(pixels, 1)));
+            Assert.That(GetPixel(pixels, 3), Is.EqualTo(GetPixel(pixels, 1)));
+        });
+    }
+
+    [Test]
     public void GivenIndexedWallCheckPaletteColorIsRendered()
     {
         var pages = Enumerable.Range(0, 8)
@@ -121,6 +136,25 @@ public sealed class SoftwareRaycastRendererTests
             Assert.That(GetPixel(pixels, 1), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
             Assert.That(GetPixel(pixels, 2), Is.EqualTo(new byte[] { 11, 11, 11, 11 }));
             Assert.That(GetPixel(pixels, 3), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
+        });
+    }
+
+    [Test]
+    public void GivenIndexedGraphicCheckItIsCompositedAtRequestedPosition()
+    {
+        var graphic = new WolfensteinGraphic(2, 1, new byte[] { 7, 8 });
+        var paletteData = new byte[WolfensteinPalette.VgaDataLength];
+        paletteData[7 * 3] = 63;
+        paletteData[(8 * 3) + 1] = 63;
+        var palette = WolfensteinPalette.FromVgaDac(paletteData);
+        var pixels = new byte[3 * 2 * 4];
+
+        SoftwareRaycastRenderer.DrawGraphic(graphic, palette, 1, 1, pixels, 3, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(GetPixel(pixels, 4), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
+            Assert.That(GetPixel(pixels, 5), Is.EqualTo(new byte[] { 0, 255, 0, 255 }));
         });
     }
 

@@ -28,11 +28,21 @@ public static class WorldSpriteProjector
         int viewportWidth,
         int viewportHeight,
         Span<ProjectedWorldSprite> projectedSprites)
+        => Project(sprites, camera, viewportWidth, viewportHeight, viewportHeight, projectedSprites);
+
+    public static int Project(
+        IReadOnlyList<WorldSprite> sprites,
+        RaycastCamera camera,
+        int viewportWidth,
+        int viewportHeight,
+        int projectionHeight,
+        Span<ProjectedWorldSprite> projectedSprites)
     {
         ArgumentNullException.ThrowIfNull(sprites);
         ArgumentNullException.ThrowIfNull(camera);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(viewportWidth);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(viewportHeight);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(projectionHeight);
         if (projectedSprites.Length < sprites.Count)
             throw new ArgumentException("The projected-sprite buffer is too small.", nameof(projectedSprites));
 
@@ -54,7 +64,7 @@ public static class WorldSpriteProjector
                 continue;
 
             var centerX = (int)Math.Round((viewportWidth * 0.5) * (1.0 + (cameraX / depth)));
-            var renderedSize = Math.Max(1, (int)Math.Round(viewportHeight / depth));
+            var renderedSize = Math.Max(1, (int)Math.Round(projectionHeight / depth));
             var halfSize = renderedSize / 2;
             if (centerX + halfSize < 0 || centerX - halfSize >= viewportWidth)
                 continue;

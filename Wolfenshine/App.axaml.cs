@@ -43,13 +43,15 @@ public sealed class App : Application
                 var wallTextures = WolfensteinVSwapLoader.LoadWallTextures(resources);
                 var sprites = WolfensteinVSwapLoader.LoadSprites(resources);
                 var palette = WolfensteinPaletteLoader.Load(resources);
+                var statusBar = WolfensteinGraphicsLoader.LoadStatusBar(resources);
                 viewModel = new MainWindowViewModel(
                     resources,
                     maps,
                     wallTextures,
                     palette,
                     sprites.PistolReady,
-                    sprites);
+                    sprites,
+                    statusBar);
                 Logger.Instance.Info(
                     $"Loaded {viewModel.StaticObjects.Count} static world objects for {viewModel.SelectedMap.Name}.");
             }
