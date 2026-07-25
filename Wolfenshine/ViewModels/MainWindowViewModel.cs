@@ -62,7 +62,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
         StatusText = SelectedMap == null
             ? "Wolfenstein 3D data loaded, but it contains no maps"
-            : $"{SelectedMap.Name} · arrows move and turn · Space opens doors";
+            : $"{SelectedMap.Name} · arrows move and turn · Shift runs · Space opens doors";
     }
 
     public MainWindowViewModel(WolfensteinDataNotFoundException exception)

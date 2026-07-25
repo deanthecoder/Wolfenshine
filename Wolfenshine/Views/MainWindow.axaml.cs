@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
     private bool m_turnLeft;
     private bool m_turnRight;
     private bool m_use;
+    private bool m_run;
 
     public MainWindow()
     {
@@ -84,7 +85,7 @@ public sealed partial class MainWindow : Window
             return;
         viewModel.UpdateGame(
             elapsedSeconds,
-            new PlayerInput(m_moveForward, m_moveBackward, m_turnLeft, m_turnRight, m_use));
+            new PlayerInput(m_moveForward, m_moveBackward, m_turnLeft, m_turnRight, m_use, m_run));
     }
 
     private bool SetKeyState(Key key, bool isDown)
@@ -106,6 +107,10 @@ public sealed partial class MainWindow : Window
             case Key.Space:
                 m_use = isDown;
                 return true;
+            case Key.LeftShift:
+            case Key.RightShift:
+                m_run = isDown;
+                return true;
             default:
                 return false;
         }
@@ -118,5 +123,6 @@ public sealed partial class MainWindow : Window
         m_turnLeft = false;
         m_turnRight = false;
         m_use = false;
+        m_run = false;
     }
 }

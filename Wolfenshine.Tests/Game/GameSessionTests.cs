@@ -32,7 +32,31 @@ public sealed class GameSessionTests
 
         Assert.That(changed, Is.True);
         Assert.That(session.Camera.X, Is.EqualTo(2.5).Within(0.0001));
-        Assert.That(session.Camera.Y, Is.EqualTo(2.2).Within(0.0001));
+        Assert.That(session.Camera.Y, Is.EqualTo(1.93924).Within(0.0001));
+    }
+
+    [Test]
+    public void GivenRunInputCheckPlayerMovesAtTwiceWalkingSpeed()
+    {
+        var walkingSession = CreateSession();
+        var runningSession = CreateSession();
+
+        walkingSession.Update(0.1, new PlayerInput(true, false, false, false));
+        runningSession.Update(0.1, new PlayerInput(true, false, false, false, false, true));
+
+        var walkingDistance = 2.5 - walkingSession.Camera.Y;
+        var runningDistance = 2.5 - runningSession.Camera.Y;
+        Assert.That(runningDistance, Is.EqualTo(walkingDistance * 2.0).Within(0.0001));
+    }
+
+    [Test]
+    public void GivenBackwardInputCheckOriginalReducedSpeedIsUsed()
+    {
+        var session = CreateSession();
+
+        session.Update(0.1, new PlayerInput(false, true, false, false));
+
+        Assert.That(session.Camera.Y, Is.EqualTo(2.87384).Within(0.0001));
     }
 
     [Test]
@@ -40,7 +64,7 @@ public sealed class GameSessionTests
     {
         var session = CreateSession();
 
-        session.Update(0.75, new PlayerInput(false, false, false, true));
+        session.Update(36.0 / 49.0, new PlayerInput(false, false, false, true));
 
         Assert.That(session.Camera.DirectionX, Is.EqualTo(1.0).Within(0.0001));
         Assert.That(session.Camera.DirectionY, Is.EqualTo(0.0).Within(0.0001));

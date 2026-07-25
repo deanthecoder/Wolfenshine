@@ -21,4 +21,5 @@ public readonly record struct PlayerInput(
     bool MoveBackward,
     bool TurnLeft,
     bool TurnRight,
-    bool Use = false);
+    bool Use = false,
+    bool Run = false);

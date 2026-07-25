@@ -21,8 +21,13 @@ namespace Wolfenshine.Game;
 /// </remarks>
 public sealed class GameSession
 {
-    private const double MovementSpeed = 3.0;
-    private const double RotationSpeed = Math.PI * 2.0 / 3.0;
+    private const double OriginalTicksPerSecond = 70.0;
+    private const double FixedUnitsPerTile = 65536.0;
+    private const double WalkInput = 35.0;
+    private const double RunInput = 70.0;
+    private const double ForwardMovementScale = 150.0;
+    private const double BackwardMovementScale = 100.0;
+    private const double AngleScale = 20.0;
     private const double PlayerRadius = 0.2;
     private const double MaximumMovementStep = 0.1;
     private bool m_useWasDown;
@@ -64,14 +69,19 @@ public sealed class GameSession
 
         if (turn != 0.0)
         {
-            var angle = turn * RotationSpeed * elapsedSeconds;
+            var inputScale = input.Run ? RunInput : WalkInput;
+            var degreesPerSecond = inputScale * OriginalTicksPerSecond / AngleScale;
+            var angle = turn * degreesPerSecond * Math.PI / 180.0 * elapsedSeconds;
             (directionX, directionY) = Rotate(directionX, directionY, angle);
             (planeX, planeY) = Rotate(planeX, planeY, angle);
         }
 
         if (movement != 0.0)
         {
-            var distance = movement * MovementSpeed * elapsedSeconds;
+            var inputScale = input.Run ? RunInput : WalkInput;
+            var movementScale = movement > 0.0 ? ForwardMovementScale : BackwardMovementScale;
+            var tilesPerSecond = inputScale * movementScale * OriginalTicksPerSecond / FixedUnitsPerTile;
+            var distance = movement * tilesPerSecond * elapsedSeconds;
             var stepCount = Math.Max(1, (int)Math.Ceiling(Math.Abs(distance) / MaximumMovementStep));
             var stepDistance = distance / stepCount;
             for (var step = 0; step < stepCount; step++)
