@@ -36,7 +36,7 @@ The `.WL6` suffix identifies data for the full six-episode edition. The sharewar
 |---|---|
 | `AUDIOHED.WL6` | An offset table locating audio chunks within `AUDIOT.WL6`. |
 | `AUDIOT.WL6` | PC-speaker effects, AdLib effects, and music data. Digitized sound samples are stored in `VSWAP.WL6`. |
-| `MAPHEAD.WL6` | Contains the RLEW compression tag and offsets to level headers within `GAMEMAPS.WL6`. |
+| `MAPHEAD.WL6` | Contains the RLEW compression tag and a table reserving 100 level-header offsets within `GAMEMAPS.WL6`. Wolfenstein 3D uses the first 60 slots; unused slots within that range contain `0xFFFFFFFF`. |
 | `GAMEMAPS.WL6` | Contains the level headers and compressed map planes describing walls, objects, actors, and areas. Map planes use Carmack compression followed by RLEW compression. |
 | `VGADICT.WL6` | The Huffman dictionary used to decompress chunks from `VGAGRAPH.WL6`. |
 | `VGAHEAD.WL6` | A table of 24-bit offsets locating graphics chunks within `VGAGRAPH.WL6`. |
@@ -46,6 +46,21 @@ The `.WL6` suffix identifies data for the full six-episode edition. The sharewar
 `CONFIG.WL6` is generated configuration state rather than a required asset. `WOLF3D.EXE` is useful as a behavioural reference but is not loaded by Wolfenshine.
 
 The current private development data is the full six-episode June 1992 v1.1 release. The released source tree defaults to the later `GOODTIMES` v1.4 configuration, so resource readers must avoid assuming that version-specific chunk identifiers are universal.
+
+#### Map container layout
+
+`MAPHEAD.WL6` begins with a 16-bit RLEW tag followed by 100 little-endian 32-bit offsets. Wolfenstein 3D reads the first 60 map slots; `0xFFFFFFFF` marks a sparse slot within that range.
+
+Each offset locates a 38-byte map header in `GAMEMAPS.WL6`:
+
+| Field | Size | Notes |
+|---|---:|---|
+| Plane offsets | 3 × 4 bytes | Absolute offsets within `GAMEMAPS.WL6`. |
+| Plane lengths | 3 × 2 bytes | Compressed byte lengths. |
+| Width and height | 2 × 2 bytes | The original Wolfenstein 3D maps are 64 × 64 tiles. |
+| Name | 16 bytes | Null-terminated DOS ASCII. |
+
+The game loads plane 0 (walls and areas) and plane 1 (actors, objects, and level information). Each plane starts with its Carmack-expanded byte length. Carmack expansion produces an RLEW stream whose first word is its final expanded byte length; expanding that stream produces `width × height` 16-bit tile values in row-major order.
 
 ## License
 

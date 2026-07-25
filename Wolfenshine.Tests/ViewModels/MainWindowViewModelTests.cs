@@ -8,7 +8,9 @@
 //
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
+using DTC.Core;
 using NUnit.Framework;
+using Wolfenshine.Maps;
 using Wolfenshine.Resources;
 using Wolfenshine.ViewModels;
 
@@ -50,5 +52,22 @@ public sealed class MainWindowViewModelTests
         Assert.That(viewModel.HasGameData, Is.False);
         Assert.That(viewModel.StatusText, Does.Contain("not found"));
         Assert.That(viewModel.DataErrorMessage, Does.Contain("VSWAP.WL6"));
+    }
+
+    [Test]
+    public void GivenLoadedMapsCheckFirstMapIsSelected()
+    {
+        var map = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var resources = WolfensteinResources.Load(directory);
+
+        var viewModel = new MainWindowViewModel(resources, mapSet);
+
+        Assert.That(viewModel.SelectedMap, Is.SameAs(map));
+        Assert.That(viewModel.StatusText, Does.Contain("E1M1"));
     }
 }

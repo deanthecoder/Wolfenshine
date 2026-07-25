@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using DTC.Core.ViewModels;
+using Wolfenshine.Maps;
 using Wolfenshine.Resources;
 
 namespace Wolfenshine.ViewModels;
@@ -28,11 +29,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
     }
 
-    public MainWindowViewModel(WolfensteinResources resources)
+    public MainWindowViewModel(WolfensteinResources resources, WolfensteinMapSet maps)
     {
         ArgumentNullException.ThrowIfNull(resources);
+        ArgumentNullException.ThrowIfNull(maps);
         Resources = resources;
-        StatusText = $"Wolfenstein 3D data loaded from {resources.Directory.FullName}";
+        Maps = maps;
+        SelectedMap = maps.Maps.FirstOrDefault();
+        StatusText = SelectedMap == null
+            ? "Wolfenstein 3D data loaded, but it contains no maps"
+            : $"{SelectedMap.Name} · map slot {SelectedMap.Slot} · {maps.Maps.Count} maps loaded";
     }
 
     public MainWindowViewModel(WolfensteinDataNotFoundException exception)
@@ -46,6 +52,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public string Title => "Wolfenshine";
     public WolfensteinResources Resources { get; }
+    public WolfensteinMapSet Maps { get; }
+    public WolfensteinMap SelectedMap { get; }
     public string StatusText { get; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;

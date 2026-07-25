@@ -12,6 +12,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using DTC.Core;
+using Wolfenshine.Maps;
 using Wolfenshine.Resources;
 using Wolfenshine.ViewModels;
 using Wolfenshine.Views;
@@ -37,7 +38,9 @@ public sealed class App : Application
             MainWindowViewModel viewModel;
             try
             {
-                viewModel = new MainWindowViewModel(WolfensteinResourceLocator.LoadDefault());
+                var resources = WolfensteinResourceLocator.LoadDefault();
+                var maps = WolfensteinMapLoader.Load(resources);
+                viewModel = new MainWindowViewModel(resources, maps);
             }
             catch (WolfensteinDataNotFoundException exception)
             {
