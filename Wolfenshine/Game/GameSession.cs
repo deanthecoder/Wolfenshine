@@ -25,6 +25,7 @@ public sealed class GameSession
     private const double RotationSpeed = Math.PI * 2.0 / 3.0;
     private const double PlayerRadius = 0.2;
     private const double MaximumMovementStep = 0.1;
+    private bool m_useWasDown;
 
     public GameSession(WolfensteinMap map, RaycastCamera camera)
     {
@@ -32,21 +33,26 @@ public sealed class GameSession
         ArgumentNullException.ThrowIfNull(camera);
         Map = map;
         Camera = camera;
+        Doors = WolfensteinDoors.FromMap(map);
     }
 
     public WolfensteinMap Map { get; }
     public RaycastCamera Camera { get; private set; }
+    public WolfensteinDoors Doors { get; }
 
     public bool Update(double elapsedSeconds, PlayerInput input)
     {
         if (!double.IsFinite(elapsedSeconds) || elapsedSeconds < 0.0)
             throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
-        if (elapsedSeconds == 0.0)
-            return false;
+
+        var changed = Doors.Update(elapsedSeconds);
+        if (input.Use && !m_useWasDown)
+            changed |= OpenDoorAhead();
+        m_useWasDown = input.Use;
 
         var turn = (input.TurnRight ? 1.0 : 0.0) - (input.TurnLeft ? 1.0 : 0.0);
         var movement = (input.MoveForward ? 1.0 : 0.0) - (input.MoveBackward ? 1.0 : 0.0);
-        if (turn == 0.0 && movement == 0.0)
+        if ((elapsedSeconds == 0.0 || turn == 0.0 && movement == 0.0) && !changed)
             return false;
 
         var x = Camera.X;
@@ -80,15 +86,39 @@ public sealed class GameSession
             }
         }
 
+        // A fresh snapshot also publishes door-only animation changes to the viewport binding.
         Camera = new RaycastCamera(x, y, directionX, directionY, planeX, planeY);
         return true;
     }
 
     private bool CanOccupy(double x, double y) =>
-        !Map.IsSolid((int)Math.Floor(x - PlayerRadius), (int)Math.Floor(y - PlayerRadius)) &&
-        !Map.IsSolid((int)Math.Floor(x + PlayerRadius), (int)Math.Floor(y - PlayerRadius)) &&
-        !Map.IsSolid((int)Math.Floor(x - PlayerRadius), (int)Math.Floor(y + PlayerRadius)) &&
-        !Map.IsSolid((int)Math.Floor(x + PlayerRadius), (int)Math.Floor(y + PlayerRadius));
+        !IsSolid((int)Math.Floor(x - PlayerRadius), (int)Math.Floor(y - PlayerRadius)) &&
+        !IsSolid((int)Math.Floor(x + PlayerRadius), (int)Math.Floor(y - PlayerRadius)) &&
+        !IsSolid((int)Math.Floor(x - PlayerRadius), (int)Math.Floor(y + PlayerRadius)) &&
+        !IsSolid((int)Math.Floor(x + PlayerRadius), (int)Math.Floor(y + PlayerRadius));
+
+    private bool IsSolid(int x, int y)
+    {
+        var door = Doors.Get(x, y);
+        return door == null ? Map.IsSolid(x, y) : !door.IsFullyOpen;
+    }
+
+    private bool OpenDoorAhead()
+    {
+        // Follow a short use ray so slightly angled players can still operate the door they are facing.
+        for (var distance = 0.25; distance <= 1.5; distance += 0.1)
+        {
+            var x = (int)Math.Floor(Camera.X + (Camera.DirectionX * distance));
+            var y = (int)Math.Floor(Camera.Y + (Camera.DirectionY * distance));
+            var door = Doors.Get(x, y);
+            if (door != null)
+                return door.Open();
+            if (Map.IsSolid(x, y))
+                return false;
+        }
+
+        return false;
+    }
 
     private static (double X, double Y) Rotate(double x, double y, double angle)
     {

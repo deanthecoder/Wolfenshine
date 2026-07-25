@@ -48,7 +48,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
         StatusText = SelectedMap == null
             ? "Wolfenstein 3D data loaded, but it contains no maps"
-            : $"{SelectedMap.Name} · arrows move and turn · {maps.Maps.Count} maps loaded";
+            : $"{SelectedMap.Name} · arrows move and turn · Space opens doors";
     }
 
     public MainWindowViewModel(WolfensteinDataNotFoundException exception)
@@ -65,6 +65,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinMapSet Maps { get; }
     public WolfensteinMap SelectedMap { get; }
     public RaycastCamera Camera => m_camera;
+    public WolfensteinDoors Doors => m_gameSession?.Doors;
     public string StatusText { get; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;

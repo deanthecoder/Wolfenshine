@@ -11,14 +11,13 @@
 namespace Wolfenshine.Game;
 
 /// <summary>
-/// Captures the movement controls held during one game-loop update.
+/// Identifies the center plane occupied by a sliding door.
 /// </summary>
 /// <remarks>
-/// Platform-specific key handling is translated into this renderer-independent game input.
+/// Original even-numbered door tiles are vertical; odd-numbered door tiles are horizontal.
 /// </remarks>
-public readonly record struct PlayerInput(
-    bool MoveForward,
-    bool MoveBackward,
-    bool TurnLeft,
-    bool TurnRight,
-    bool Use = false);
+public enum DoorOrientation
+{
+    Vertical,
+    Horizontal
+}

@@ -15,6 +15,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Wolfenshine.Maps;
+using Wolfenshine.Game;
 using Wolfenshine.Rendering;
 
 namespace Wolfenshine.Views;
@@ -39,8 +40,10 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinMap>(nameof(Map));
     public static readonly StyledProperty<RaycastCamera> CameraProperty =
         AvaloniaProperty.Register<SoftwareViewport, RaycastCamera>(nameof(Camera));
+    public static readonly StyledProperty<WolfensteinDoors> DoorsProperty =
+        AvaloniaProperty.Register<SoftwareViewport, WolfensteinDoors>(nameof(Doors));
 
-    static SoftwareViewport() => AffectsRender<SoftwareViewport>(MapProperty, CameraProperty);
+    static SoftwareViewport() => AffectsRender<SoftwareViewport>(MapProperty, CameraProperty, DoorsProperty);
 
     public WolfensteinMap Map
     {
@@ -54,10 +57,16 @@ public sealed class SoftwareViewport : Control
         set => SetValue(CameraProperty, value);
     }
 
+    public WolfensteinDoors Doors
+    {
+        get => GetValue(DoorsProperty);
+        set => SetValue(DoorsProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        if (Map == null || Camera == null)
+        if (Map == null || Doors == null || Camera == null)
             return;
         if (!ReferenceEquals(m_renderedMap, Map) || !ReferenceEquals(m_renderedCamera, Camera))
             RenderFrame();
@@ -67,7 +76,7 @@ public sealed class SoftwareViewport : Control
     private void RenderFrame()
     {
         // Raycasting and shading produce the complete native-resolution image independently of Avalonia.
-        Raycaster.Cast(Map, Camera, m_columns);
+        Raycaster.Cast(Map, Doors, Camera, m_columns);
         SoftwareRaycastRenderer.Render(m_columns, ViewportHeight, m_pixels);
 
         // The viewport size never changes, so retain its native bitmap and update only the locked pixel memory.

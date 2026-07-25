@@ -8,6 +8,7 @@
 //
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
+using Wolfenshine.Game;
 using Wolfenshine.Maps;
 
 namespace Wolfenshine.Rendering;
@@ -20,10 +21,17 @@ namespace Wolfenshine.Rendering;
 /// </remarks>
 public static class Raycaster
 {
-    public static void Cast(WolfensteinMap map, RaycastCamera camera, Span<WallColumn> columns)
+    public static void Cast(
+        WolfensteinMap map,
+        WolfensteinDoors doors,
+        RaycastCamera camera,
+        Span<WallColumn> columns)
     {
         ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(doors);
         ArgumentNullException.ThrowIfNull(camera);
+        if (!ReferenceEquals(map, doors.Map))
+            throw new ArgumentException("The door collection belongs to a different map.", nameof(doors));
         if (columns.IsEmpty)
             throw new ArgumentException("At least one output column is required.", nameof(columns));
 
@@ -33,13 +41,14 @@ public static class Raycaster
             var cameraX = (2.0 * (column + 0.5) / columns.Length) - 1.0;
             var rayDirectionX = camera.DirectionX + (camera.PlaneX * cameraX);
             var rayDirectionY = camera.DirectionY + (camera.PlaneY * cameraX);
-            columns[column] = CastRay(map, camera, rayDirectionX, rayDirectionY);
+            columns[column] = CastRay(map, doors, camera, rayDirectionX, rayDirectionY);
         }
 
     }
 
     private static WallColumn CastRay(
         WolfensteinMap map,
+        WolfensteinDoors doors,
         RaycastCamera camera,
         double rayDirectionX,
         double rayDirectionY)
@@ -78,6 +87,13 @@ public static class Raycaster
 
             if (mapX < 0 || mapX >= map.Width || mapY < 0 || mapY >= map.Height)
                 throw new InvalidDataException("A ray left the map without hitting an enclosing wall.");
+            var door = doors.Get(mapX, mapY);
+            if (door != null)
+            {
+                if (TryHitDoor(door, camera, rayDirectionX, rayDirectionY, out var doorColumn))
+                    return doorColumn;
+                continue;
+            }
             if (map.IsSolid(mapX, mapY))
             {
                 tile = map.GetWall(mapX, mapY);
@@ -95,5 +111,49 @@ public static class Raycaster
             : camera.X + (distance * rayDirectionX);
         var textureU = wallPosition - Math.Floor(wallPosition);
         return new WallColumn(distance, textureU, tile, side);
+    }
+
+    private static bool TryHitDoor(
+        WolfensteinDoor door,
+        RaycastCamera camera,
+        double rayDirectionX,
+        double rayDirectionY,
+        out WallColumn column)
+    {
+        column = default;
+        if (door.IsFullyOpen)
+            return false;
+
+        double distance;
+        double slideCoordinate;
+        WallSide side;
+        if (door.Orientation == DoorOrientation.Vertical)
+        {
+            if (rayDirectionX == 0.0)
+                return false;
+            distance = (door.X + 0.5 - camera.X) / rayDirectionX;
+            var hitY = camera.Y + (distance * rayDirectionY);
+            if (distance <= 0.0 || (int)Math.Floor(hitY) != door.Y)
+                return false;
+            slideCoordinate = hitY - Math.Floor(hitY);
+            side = WallSide.Vertical;
+        }
+        else
+        {
+            if (rayDirectionY == 0.0)
+                return false;
+            distance = (door.Y + 0.5 - camera.Y) / rayDirectionY;
+            var hitX = camera.X + (distance * rayDirectionX);
+            if (distance <= 0.0 || (int)Math.Floor(hitX) != door.X)
+                return false;
+            slideCoordinate = hitX - Math.Floor(hitX);
+            side = WallSide.Horizontal;
+        }
+
+        // The panel retracts toward increasing texture coordinates, exposing more of the doorway as it moves.
+        if (slideCoordinate < door.OpenAmount)
+            return false;
+        column = new WallColumn(distance, slideCoordinate - door.OpenAmount, door.Tile, side);
+        return true;
     }
 }

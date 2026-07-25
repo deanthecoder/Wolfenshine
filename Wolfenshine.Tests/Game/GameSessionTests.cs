@@ -69,6 +69,20 @@ public sealed class GameSessionTests
         Assert.That(session.Camera, Is.SameAs(originalCamera));
     }
 
+    [Test]
+    public void GivenUseInputCheckDoorAheadOpensAndBecomesPassable()
+    {
+        var session = CreateDoorSession();
+
+        session.Update(0.01, new PlayerInput(false, false, false, false, true));
+        session.Update(1.0, new PlayerInput(false, false, false, false, true));
+        session.Update(0.5, new PlayerInput(true, false, false, false));
+
+        Assert.That(session.Doors.Items, Has.Count.EqualTo(1));
+        Assert.That(session.Doors.Items[0].IsFullyOpen, Is.True);
+        Assert.That(session.Camera.Y, Is.LessThan(2.2));
+    }
+
     private static GameSession CreateSession()
     {
         const int size = 5;
@@ -84,6 +98,27 @@ public sealed class GameSessionTests
         var objects = new ushort[size * size];
         objects[(2 * size) + 2] = 19;
         var map = new WolfensteinMap(0, "Test Map", size, size, walls, objects);
+        return new GameSession(map, RaycastCamera.FromPlayerStart(map));
+    }
+
+    private static GameSession CreateDoorSession()
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        for (var i = 0; i < size; i++)
+        {
+            walls[i] = 1;
+            walls[((size - 1) * size) + i] = 1;
+            walls[i * size] = 1;
+            walls[(i * size) + size - 1] = 1;
+        }
+
+        walls[(2 * size) + 1] = 1;
+        walls[(2 * size) + 2] = 91;
+        walls[(2 * size) + 3] = 1;
+        var objects = new ushort[size * size];
+        objects[(3 * size) + 2] = 19;
+        var map = new WolfensteinMap(0, "Door Map", size, size, walls, objects);
         return new GameSession(map, RaycastCamera.FromPlayerStart(map));
     }
 }

@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using NUnit.Framework;
+using Wolfenshine.Game;
 using Wolfenshine.Maps;
 using Wolfenshine.Rendering;
 
@@ -48,7 +49,7 @@ public sealed class RaycasterTests
         var camera = RaycastCamera.FromPlayerStart(map);
 
         var columns = new WallColumn[1];
-        Raycaster.Cast(map, camera, columns);
+        Raycaster.Cast(map, WolfensteinDoors.FromMap(map), camera, columns);
         var column = columns[0];
 
         Assert.Multiple(() =>
@@ -67,10 +68,28 @@ public sealed class RaycasterTests
         var camera = RaycastCamera.FromPlayerStart(map);
 
         var columns = new WallColumn[5];
-        Raycaster.Cast(map, camera, columns);
+        Raycaster.Cast(map, WolfensteinDoors.FromMap(map), camera, columns);
 
         Assert.That(columns[0].Distance, Is.EqualTo(columns[^1].Distance).Within(0.0001));
         Assert.That(columns[1].Distance, Is.EqualTo(columns[^2].Distance).Within(0.0001));
+    }
+
+    [Test]
+    public void GivenOpeningDoorCheckExposedRaysContinueThroughDoorway()
+    {
+        var map = CreateDoorMap();
+        var camera = RaycastCamera.FromPlayerStart(map);
+        var doors = WolfensteinDoors.FromMap(map);
+        var columns = new WallColumn[1];
+        Raycaster.Cast(map, doors, camera, columns);
+        var closedDistance = columns[0].Distance;
+        doors.Items[0].Open();
+        doors.Update(0.6);
+
+        Raycaster.Cast(map, doors, camera, columns);
+
+        Assert.That(closedDistance, Is.EqualTo(1.0).Within(0.0001));
+        Assert.That(columns[0].Distance, Is.GreaterThan(2.0));
     }
 
     private static WolfensteinMap CreateMap(ushort playerMarker)
@@ -88,5 +107,25 @@ public sealed class RaycasterTests
         var objects = new ushort[size * size];
         objects[(2 * size) + 2] = playerMarker;
         return new WolfensteinMap(0, "Test Map", size, size, walls, objects);
+    }
+
+    private static WolfensteinMap CreateDoorMap()
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        for (var i = 0; i < size; i++)
+        {
+            walls[i] = 1;
+            walls[((size - 1) * size) + i] = 1;
+            walls[i * size] = 1;
+            walls[(i * size) + size - 1] = 1;
+        }
+
+        walls[(2 * size) + 1] = 1;
+        walls[(2 * size) + 2] = 91;
+        walls[(2 * size) + 3] = 1;
+        var objects = new ushort[size * size];
+        objects[(3 * size) + 2] = 19;
+        return new WolfensteinMap(0, "Door Map", size, size, walls, objects);
     }
 }

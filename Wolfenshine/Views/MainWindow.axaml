@@ -24,6 +24,7 @@
           <Grid>
             <local:SoftwareViewport IsVisible="{Binding HasGameData}"
                                     Map="{Binding SelectedMap}"
+                                    Doors="{Binding Doors}"
                                     Camera="{Binding Camera}"
                                     RenderOptions.BitmapInterpolationMode="LowQuality" />
 
