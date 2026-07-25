@@ -22,23 +22,10 @@
                 Height="{Binding NativeViewportHeight}"
                 Background="#20242B">
           <Grid>
-            <Grid IsVisible="{Binding HasGameData}">
-              <local:MapPreview Map="{Binding SelectedMap}" Margin="2" />
-              <Border VerticalAlignment="Top" HorizontalAlignment="Center"
-                      Margin="0,5" Padding="5,2" Background="#CC08090B">
-                <StackPanel Spacing="1">
-                  <TextBlock Text="WOLFENSHINE"
-                             HorizontalAlignment="Center"
-                             FontSize="8"
-                             FontWeight="Bold"
-                             Foreground="#D7D9DC" />
-                  <TextBlock Text="{Binding SelectedMap.Name}"
-                             HorizontalAlignment="Center"
-                             FontSize="5"
-                             Foreground="#858B94" />
-                </StackPanel>
-              </Border>
-            </Grid>
+            <local:SoftwareViewport IsVisible="{Binding HasGameData}"
+                                    Map="{Binding SelectedMap}"
+                                    Camera="{Binding Camera}"
+                                    RenderOptions.BitmapInterpolationMode="LowQuality" />
 
             <StackPanel IsVisible="{Binding !HasGameData}"
                         Width="280"

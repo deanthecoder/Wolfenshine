@@ -68,6 +68,7 @@ public sealed class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel(resources, mapSet);
 
         Assert.That(viewModel.SelectedMap, Is.SameAs(map));
+        Assert.That(viewModel.Camera, Is.Not.Null);
         Assert.That(viewModel.StatusText, Does.Contain("E1M1"));
     }
 }

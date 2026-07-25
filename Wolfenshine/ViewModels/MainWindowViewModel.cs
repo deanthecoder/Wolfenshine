@@ -10,6 +10,7 @@
 
 using DTC.Core.ViewModels;
 using Wolfenshine.Maps;
+using Wolfenshine.Rendering;
 using Wolfenshine.Resources;
 
 namespace Wolfenshine.ViewModels;
@@ -36,9 +37,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         Resources = resources;
         Maps = maps;
         SelectedMap = maps.Maps.FirstOrDefault();
+        Camera = SelectedMap == null ? null : RaycastCamera.FromPlayerStart(SelectedMap);
         StatusText = SelectedMap == null
             ? "Wolfenstein 3D data loaded, but it contains no maps"
-            : $"{SelectedMap.Name} · map slot {SelectedMap.Slot} · {maps.Maps.Count} maps loaded";
+            : $"{SelectedMap.Name} · flat-color software raycaster · {maps.Maps.Count} maps loaded";
     }
 
     public MainWindowViewModel(WolfensteinDataNotFoundException exception)
@@ -54,6 +56,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinResources Resources { get; }
     public WolfensteinMapSet Maps { get; }
     public WolfensteinMap SelectedMap { get; }
+    public RaycastCamera Camera { get; }
     public string StatusText { get; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;
