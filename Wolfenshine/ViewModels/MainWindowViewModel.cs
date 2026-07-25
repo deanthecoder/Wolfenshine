@@ -26,7 +26,12 @@ namespace Wolfenshine.ViewModels;
 public sealed class MainWindowViewModel : ViewModelBase
 {
     private readonly GameSession m_gameSession;
+    private readonly WolfensteinHudGraphics m_hudGraphics;
     private RaycastCamera m_camera;
+    private WolfensteinSprite m_weaponSprite;
+    private WolfensteinGraphic m_statusBar;
+    private PlayerWeapon m_hudWeapon;
+    private int m_hudAmmo = -1;
 
     public MainWindowViewModel()
         : this(new WolfensteinDataNotFoundException(
@@ -42,7 +47,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         WolfensteinPalette palette = null,
         WolfensteinSprite weaponSprite = null,
         WolfensteinSpriteSet sprites = null,
-        WolfensteinGraphic statusBar = null)
+        WolfensteinHudGraphics hudGraphics = null)
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(maps);
@@ -50,19 +55,20 @@ public sealed class MainWindowViewModel : ViewModelBase
         Maps = maps;
         WallTextures = wallTextures;
         Palette = palette;
-        WeaponSprite = weaponSprite;
         Sprites = sprites;
-        StatusBar = statusBar;
+        m_hudGraphics = hudGraphics;
         SelectedMap = maps.Maps.FirstOrDefault();
         StaticObjects = SelectedMap == null ? [] : WolfensteinStaticObjects.FromMap(SelectedMap);
         if (SelectedMap != null)
         {
             m_camera = RaycastCamera.FromPlayerStart(SelectedMap);
             m_gameSession = new GameSession(SelectedMap, m_camera);
+            m_weaponSprite = sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? weaponSprite;
+            UpdateHud();
         }
         StatusText = SelectedMap == null
             ? "Wolfenstein 3D data loaded, but it contains no maps"
-            : $"{SelectedMap.Name} · arrows move and turn · Shift runs · Space opens doors";
+            : $"{SelectedMap.Name} · arrows move and turn · Shift runs · Ctrl fires · 1–4 select weapons · Space opens doors";
     }
 
     public MainWindowViewModel(WolfensteinDataNotFoundException exception)
@@ -82,9 +88,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinDoors Doors => m_gameSession?.Doors;
     public WolfensteinWallTextures WallTextures { get; }
     public WolfensteinPalette Palette { get; }
-    public WolfensteinSprite WeaponSprite { get; }
+    public WolfensteinSprite WeaponSprite => m_weaponSprite;
     public WolfensteinSpriteSet Sprites { get; }
-    public WolfensteinGraphic StatusBar { get; }
+    public WolfensteinGraphic StatusBar => m_statusBar;
     public IReadOnlyList<WorldSprite> StaticObjects { get; }
     public string StatusText { get; }
     public string DataErrorMessage { get; }
@@ -97,6 +103,26 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {
         if (m_gameSession?.Update(elapsedSeconds, input) == true)
+        {
             SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
+            if (Sprites != null)
+            {
+                var sprite = Sprites.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame);
+                SetField(ref m_weaponSprite, sprite, nameof(WeaponSprite));
+            }
+            UpdateHud();
+        }
+    }
+
+    private void UpdateHud()
+    {
+        if (m_hudGraphics == null || m_gameSession == null ||
+            m_hudWeapon == m_gameSession.Weapon && m_hudAmmo == m_gameSession.Ammo)
+        {
+            return;
+        }
+        m_hudWeapon = m_gameSession.Weapon;
+        m_hudAmmo = m_gameSession.Ammo;
+        SetField(ref m_statusBar, m_hudGraphics.Render(m_hudWeapon, m_hudAmmo), nameof(StatusBar));
     }
 }

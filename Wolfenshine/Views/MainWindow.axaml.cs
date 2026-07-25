@@ -34,6 +34,8 @@ public sealed partial class MainWindow : Window
     private bool m_turnRight;
     private bool m_use;
     private bool m_run;
+    private bool m_attack;
+    private PlayerWeapon? m_weaponSelection;
 
     public MainWindow()
     {
@@ -85,7 +87,16 @@ public sealed partial class MainWindow : Window
             return;
         viewModel.UpdateGame(
             elapsedSeconds,
-            new PlayerInput(m_moveForward, m_moveBackward, m_turnLeft, m_turnRight, m_use, m_run));
+            new PlayerInput(
+                m_moveForward,
+                m_moveBackward,
+                m_turnLeft,
+                m_turnRight,
+                m_use,
+                m_run,
+                m_attack,
+                m_weaponSelection));
+        m_weaponSelection = null;
     }
 
     private bool SetKeyState(Key key, bool isDown)
@@ -111,6 +122,22 @@ public sealed partial class MainWindow : Window
             case Key.RightShift:
                 m_run = isDown;
                 return true;
+            case Key.LeftCtrl:
+            case Key.RightCtrl:
+                m_attack = isDown;
+                return true;
+            case Key.D1 when isDown:
+                m_weaponSelection = PlayerWeapon.Knife;
+                return true;
+            case Key.D2 when isDown:
+                m_weaponSelection = PlayerWeapon.Pistol;
+                return true;
+            case Key.D3 when isDown:
+                m_weaponSelection = PlayerWeapon.MachineGun;
+                return true;
+            case Key.D4 when isDown:
+                m_weaponSelection = PlayerWeapon.Chaingun;
+                return true;
             default:
                 return false;
         }
@@ -124,5 +151,7 @@ public sealed partial class MainWindow : Window
         m_turnRight = false;
         m_use = false;
         m_run = false;
+        m_attack = false;
+        m_weaponSelection = null;
     }
 }

@@ -11,17 +11,12 @@
 namespace Wolfenshine.Game;
 
 /// <summary>
-/// Captures the movement controls held during one game-loop update.
+/// Identifies the four player weapons in their original selection and sprite order.
 /// </summary>
-/// <remarks>
-/// Platform-specific key handling is translated into this renderer-independent game input.
-/// </remarks>
-public readonly record struct PlayerInput(
-    bool MoveForward,
-    bool MoveBackward,
-    bool TurnLeft,
-    bool TurnRight,
-    bool Use = false,
-    bool Run = false,
-    bool Attack = false,
-    PlayerWeapon? WeaponSelection = null);
+public enum PlayerWeapon
+{
+    Knife,
+    Pistol,
+    MachineGun,
+    Chaingun
+}

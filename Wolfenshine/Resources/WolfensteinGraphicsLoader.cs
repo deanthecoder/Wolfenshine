@@ -26,13 +26,13 @@ public static class WolfensteinGraphicsLoader
     private const int FirstPictureChunk = 3;
     private const int StatusBarWidth = 320;
     private const int StatusBarHeight = 40;
-    private const int PistolPictureOffset = 6;
+    private const int FirstWeaponPictureOffset = 5;
     private const int NoKeyPictureOffset = 9;
     private const int BlankDigitPictureOffset = 12;
     private const int ZeroDigitPictureOffset = 13;
     private const int HealthyFacePictureOffset = 23;
 
-    public static WolfensteinGraphic LoadStatusBar(WolfensteinResources resources)
+    public static WolfensteinHudGraphics LoadHudGraphics(WolfensteinResources resources)
     {
         ArgumentNullException.ThrowIfNull(resources);
         var dictionary = ReadDictionary(resources);
@@ -54,19 +54,17 @@ public static class WolfensteinGraphicsLoader
             var chunk = FirstPictureChunk + picture;
             var pictures = ReadPictureTable(pictureTableData);
             var statusBar = ReadPicture(reader, offsets, dictionary, pictures, chunk);
-            var indices = CopyIndices(statusBar);
-            DrawPicture(indices, ReadPicture(reader, offsets, dictionary, pictures, chunk + HealthyFacePictureOffset), 17 * 8, 4);
-            DrawPicture(indices, ReadPicture(reader, offsets, dictionary, pictures, chunk + PistolPictureOffset), 32 * 8, 8);
             var noKey = ReadPicture(reader, offsets, dictionary, pictures, chunk + NoKeyPictureOffset);
-            DrawPicture(indices, noKey, 30 * 8, 4);
-            DrawPicture(indices, noKey, 30 * 8, 20);
-            DrawNumber(reader, offsets, dictionary, pictures, indices, chunk, 2, 16, 2, 1);
-            DrawNumber(reader, offsets, dictionary, pictures, indices, chunk, 6, 16, 6, 0);
-            DrawNumber(reader, offsets, dictionary, pictures, indices, chunk, 14, 16, 1, 3);
-            DrawNumber(reader, offsets, dictionary, pictures, indices, chunk, 21, 16, 3, 100);
-            DrawNumber(reader, offsets, dictionary, pictures, indices, chunk, 27, 16, 2, 8);
-            Logger.Instance.Info($"Loaded and populated {width} x {height} status bar from VGAGRAPH chunk {chunk}.");
-            return new WolfensteinGraphic(width, height, indices);
+            var blankDigit = ReadPicture(reader, offsets, dictionary, pictures, chunk + BlankDigitPictureOffset);
+            var weaponIcons = Enumerable.Range(FirstWeaponPictureOffset, 4)
+                .Select(relativeChunk => ReadPicture(reader, offsets, dictionary, pictures, chunk + relativeChunk))
+                .ToArray();
+            var digits = Enumerable.Range(ZeroDigitPictureOffset, 10)
+                .Select(relativeChunk => ReadPicture(reader, offsets, dictionary, pictures, chunk + relativeChunk))
+                .ToArray();
+            var healthyFace = ReadPicture(reader, offsets, dictionary, pictures, chunk + HealthyFacePictureOffset);
+            Logger.Instance.Info($"Loaded {width} x {height} HUD graphics from VGAGRAPH chunk {chunk}.");
+            return new WolfensteinHudGraphics(statusBar, weaponIcons, noKey, blankDigit, digits, healthyFace);
         }
 
         throw new InvalidDataException("VGAGRAPH.WL6 does not contain a 320 x 40 status-bar picture.");
@@ -212,48 +210,4 @@ public static class WolfensteinGraphicsLoader
         return new WolfensteinGraphic(width, height, ConvertPlanarToRowMajor(planarIndices, width, height));
     }
 
-    private static byte[] CopyIndices(WolfensteinGraphic graphic)
-    {
-        var indices = new byte[graphic.Width * graphic.Height];
-        for (var y = 0; y < graphic.Height; y++)
-        {
-            for (var x = 0; x < graphic.Width; x++)
-                indices[(y * graphic.Width) + x] = graphic.GetIndex(x, y);
-        }
-        return indices;
-    }
-
-    private static void DrawPicture(Span<byte> destination, WolfensteinGraphic source, int left, int top)
-    {
-        if (left < 0 || top < 0 || left + source.Width > StatusBarWidth || top + source.Height > StatusBarHeight)
-            throw new InvalidDataException("A status-bar picture lies outside the 320 x 40 HUD.");
-        for (var y = 0; y < source.Height; y++)
-        {
-            for (var x = 0; x < source.Width; x++)
-                destination[((top + y) * StatusBarWidth) + left + x] = source.GetIndex(x, y);
-        }
-    }
-
-    private static void DrawNumber(
-        BinaryReader reader,
-        IReadOnlyList<int> offsets,
-        IReadOnlyList<(ushort Bit0, ushort Bit1)> dictionary,
-        IReadOnlyList<(int Width, int Height)> pictures,
-        Span<byte> destination,
-        int statusBarChunk,
-        int x,
-        int y,
-        int width,
-        int value)
-    {
-        var text = value.ToString();
-        var sourceIndex = Math.Max(0, text.Length - width);
-        for (var position = 0; position < width; position++)
-        {
-            var padding = position < width - Math.Min(width, text.Length);
-            var pictureOffset = padding ? BlankDigitPictureOffset : ZeroDigitPictureOffset + text[sourceIndex++] - '0';
-            var picture = ReadPicture(reader, offsets, dictionary, pictures, statusBarChunk + pictureOffset);
-            DrawPicture(destination, picture, (x + position) * 8, y);
-        }
-    }
 }

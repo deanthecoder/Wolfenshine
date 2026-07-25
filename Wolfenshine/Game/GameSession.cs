@@ -28,9 +28,14 @@ public sealed class GameSession
     private const double ForwardMovementScale = 150.0;
     private const double BackwardMovementScale = 100.0;
     private const double AngleScale = 20.0;
+    private const double AttackFrameDuration = 6.0 / OriginalTicksPerSecond;
+    private const int RenewedAmmo = 99;
     private const double PlayerRadius = 0.2;
     private const double MaximumMovementStep = 0.1;
     private bool m_useWasDown;
+    private bool m_attackWasDown;
+    private int m_attackStep;
+    private double m_attackTimeRemaining;
 
     public GameSession(WolfensteinMap map, RaycastCamera camera)
     {
@@ -44,6 +49,10 @@ public sealed class GameSession
     public WolfensteinMap Map { get; }
     public RaycastCamera Camera { get; private set; }
     public WolfensteinDoors Doors { get; }
+    public PlayerWeapon Weapon { get; private set; } = PlayerWeapon.Pistol;
+    public int WeaponFrame { get; private set; }
+    public int Ammo { get; private set; } = 8;
+    public bool IsAttacking { get; private set; }
 
     public bool Update(double elapsedSeconds, PlayerInput input)
     {
@@ -54,6 +63,7 @@ public sealed class GameSession
         if (input.Use && !m_useWasDown)
             changed |= OpenDoorAhead();
         m_useWasDown = input.Use;
+        changed |= UpdateWeapon(elapsedSeconds, input);
 
         var turn = (input.TurnRight ? 1.0 : 0.0) - (input.TurnLeft ? 1.0 : 0.0);
         var movement = (input.MoveForward ? 1.0 : 0.0) - (input.MoveBackward ? 1.0 : 0.0);
@@ -135,5 +145,75 @@ public sealed class GameSession
         var cosine = Math.Cos(angle);
         var sine = Math.Sin(angle);
         return ((x * cosine) - (y * sine), (x * sine) + (y * cosine));
+    }
+
+    private bool UpdateWeapon(double elapsedSeconds, PlayerInput input)
+    {
+        var changed = false;
+        if (!IsAttacking && input.WeaponSelection is { } selection && selection != Weapon)
+        {
+            Weapon = selection;
+            WeaponFrame = 0;
+            changed = true;
+        }
+
+        if (!IsAttacking && input.Attack && !m_attackWasDown)
+        {
+            IsAttacking = true;
+            m_attackStep = 0;
+            WeaponFrame = 1;
+            m_attackTimeRemaining = AttackFrameDuration;
+            changed = true;
+        }
+        m_attackWasDown = input.Attack;
+
+        if (!IsAttacking || elapsedSeconds == 0.0)
+            return changed;
+        m_attackTimeRemaining -= elapsedSeconds;
+        while (IsAttacking && m_attackTimeRemaining <= 0.0)
+        {
+            changed = true;
+            switch (m_attackStep)
+            {
+                case 0:
+                    SetAttackStep(1);
+                    break;
+                case 1:
+                    FireCurrentWeapon();
+                    SetAttackStep(2);
+                    break;
+                case 2 when Weapon == PlayerWeapon.MachineGun && input.Attack:
+                    SetAttackStep(1);
+                    break;
+                case 2 when Weapon == PlayerWeapon.Chaingun:
+                    FireCurrentWeapon();
+                    SetAttackStep(input.Attack ? 1 : 3);
+                    break;
+                case 2:
+                    SetAttackStep(3);
+                    break;
+                default:
+                    IsAttacking = false;
+                    WeaponFrame = 0;
+                    break;
+            }
+        }
+        return changed;
+    }
+
+    private void SetAttackStep(int step)
+    {
+        m_attackStep = step;
+        WeaponFrame = step + 1;
+        m_attackTimeRemaining += AttackFrameDuration;
+    }
+
+    private void FireCurrentWeapon()
+    {
+        if (Weapon == PlayerWeapon.Knife)
+            return;
+        Ammo--;
+        if (Ammo <= 0)
+            Ammo = RenewedAmmo;
     }
 }

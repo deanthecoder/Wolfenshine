@@ -8,6 +8,8 @@
 //
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
+using Wolfenshine.Game;
+
 namespace Wolfenshine.Graphics;
 
 /// <summary>
@@ -19,7 +21,7 @@ namespace Wolfenshine.Graphics;
 public sealed class WolfensteinSpriteSet
 {
     private const int WeaponSpriteCount = 20;
-    private const int PistolReadyWeaponOffset = 5;
+    private const int WeaponFrameCount = 5;
     private readonly IReadOnlyList<WolfensteinSprite> m_sprites;
 
     public WolfensteinSpriteSet(IReadOnlyList<WolfensteinSprite> sprites)
@@ -31,7 +33,14 @@ public sealed class WolfensteinSpriteSet
     }
 
     public int Count => m_sprites.Count;
-    public WolfensteinSprite PistolReady => Get(Count - WeaponSpriteCount + PistolReadyWeaponOffset);
+    public WolfensteinSprite PistolReady => GetWeaponFrame(PlayerWeapon.Pistol, 0);
+
+    public WolfensteinSprite GetWeaponFrame(PlayerWeapon weapon, int frame)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(frame, WeaponFrameCount - 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(frame);
+        return Get(Count - WeaponSpriteCount + ((int)weapon * WeaponFrameCount) + frame);
+    }
 
     public WolfensteinSprite Get(int spriteNumber)
     {

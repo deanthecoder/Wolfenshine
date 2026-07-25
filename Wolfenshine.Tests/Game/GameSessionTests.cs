@@ -60,6 +60,48 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenWeaponSelectionCheckAllWeaponsAreImmediatelyAvailable()
+    {
+        var session = CreateSession();
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, WeaponSelection: PlayerWeapon.Chaingun));
+
+        Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.Chaingun));
+        Assert.That(session.WeaponFrame, Is.Zero);
+    }
+
+    [Test]
+    public void GivenPistolAttackCheckOriginalFramesAdvanceAndAmmoIsConsumed()
+    {
+        var session = CreateSession();
+        session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+
+        session.Update(6.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
+        Assert.That(session.WeaponFrame, Is.EqualTo(2));
+
+        session.Update(6.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.WeaponFrame, Is.EqualTo(3));
+            Assert.That(session.Ammo, Is.EqualTo(7));
+        });
+    }
+
+    [Test]
+    public void GivenSandboxAmmoReachesZeroCheckItIsRenewed()
+    {
+        var session = CreateSession();
+        for (var shot = 0; shot < 8; shot++)
+        {
+            session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+            session.Update(0.4, new PlayerInput(false, false, false, false, Attack: true));
+            session.Update(0.0, default);
+        }
+
+        Assert.That(session.Ammo, Is.EqualTo(99));
+    }
+
+    [Test]
     public void GivenRightTurnCheckPlayerRotatesClockwise()
     {
         var session = CreateSession();
