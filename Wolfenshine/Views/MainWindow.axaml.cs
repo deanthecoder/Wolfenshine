@@ -35,6 +35,7 @@ public sealed partial class MainWindow : Window
     private bool m_use;
     private bool m_run;
     private bool m_attack;
+    private bool m_strafe;
     private PlayerWeapon? m_weaponSelection;
 
     public MainWindow()
@@ -95,7 +96,8 @@ public sealed partial class MainWindow : Window
                 m_use,
                 m_run,
                 m_attack,
-                m_weaponSelection));
+                m_weaponSelection,
+                m_strafe));
         m_weaponSelection = null;
     }
 
@@ -122,9 +124,13 @@ public sealed partial class MainWindow : Window
             case Key.RightShift:
                 m_run = isDown;
                 return true;
-            case Key.LeftCtrl:
-            case Key.RightCtrl:
+            case Key.LWin:
+            case Key.RWin:
                 m_attack = isDown;
+                return true;
+            case Key.LeftAlt:
+            case Key.RightAlt:
+                m_strafe = isDown;
                 return true;
             case Key.D1 when isDown:
                 m_weaponSelection = PlayerWeapon.Knife;
@@ -152,6 +158,7 @@ public sealed partial class MainWindow : Window
         m_use = false;
         m_run = false;
         m_attack = false;
+        m_strafe = false;
         m_weaponSelection = null;
     }
 }

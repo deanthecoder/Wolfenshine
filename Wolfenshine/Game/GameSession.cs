@@ -65,9 +65,11 @@ public sealed class GameSession
         m_useWasDown = input.Use;
         changed |= UpdateWeapon(elapsedSeconds, input);
 
-        var turn = (input.TurnRight ? 1.0 : 0.0) - (input.TurnLeft ? 1.0 : 0.0);
+        var horizontal = (input.TurnRight ? 1.0 : 0.0) - (input.TurnLeft ? 1.0 : 0.0);
+        var turn = input.Strafe ? 0.0 : horizontal;
+        var strafe = input.Strafe ? horizontal : 0.0;
         var movement = (input.MoveForward ? 1.0 : 0.0) - (input.MoveBackward ? 1.0 : 0.0);
-        if ((elapsedSeconds == 0.0 || turn == 0.0 && movement == 0.0) && !changed)
+        if ((elapsedSeconds == 0.0 || turn == 0.0 && movement == 0.0 && strafe == 0.0) && !changed)
             return false;
 
         var x = Camera.X;
@@ -86,21 +88,27 @@ public sealed class GameSession
             (planeX, planeY) = Rotate(planeX, planeY, angle);
         }
 
-        if (movement != 0.0)
+        if (movement != 0.0 || strafe != 0.0)
         {
             var inputScale = input.Run ? RunInput : WalkInput;
             var movementScale = movement > 0.0 ? ForwardMovementScale : BackwardMovementScale;
-            var tilesPerSecond = inputScale * movementScale * OriginalTicksPerSecond / FixedUnitsPerTile;
-            var distance = movement * tilesPerSecond * elapsedSeconds;
-            var stepCount = Math.Max(1, (int)Math.Ceiling(Math.Abs(distance) / MaximumMovementStep));
-            var stepDistance = distance / stepCount;
+            var forwardDistance = movement * inputScale * movementScale * OriginalTicksPerSecond /
+                                  FixedUnitsPerTile * elapsedSeconds;
+            var strafeDistance = strafe * inputScale * ForwardMovementScale * OriginalTicksPerSecond /
+                                 FixedUnitsPerTile * elapsedSeconds;
+            var moveX = (directionX * forwardDistance) - (directionY * strafeDistance);
+            var moveY = (directionY * forwardDistance) + (directionX * strafeDistance);
+            var distance = Math.Sqrt((moveX * moveX) + (moveY * moveY));
+            var stepCount = Math.Max(1, (int)Math.Ceiling(distance / MaximumMovementStep));
+            var stepX = moveX / stepCount;
+            var stepY = moveY / stepCount;
             for (var step = 0; step < stepCount; step++)
             {
                 // Resolve each axis independently so the player slides naturally along nearby walls.
-                var nextX = x + (directionX * stepDistance);
+                var nextX = x + stepX;
                 if (CanOccupy(nextX, y))
                     x = nextX;
-                var nextY = y + (directionY * stepDistance);
+                var nextY = y + stepY;
                 if (CanOccupy(x, nextY))
                     y = nextY;
             }
