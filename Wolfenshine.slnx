@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="DTC.Core/DTC.Core/DTC.Core.csproj" />
+  <Project Path="Wolfenshine/Wolfenshine.csproj" />
+  <Project Path="Wolfenshine.Tests/Wolfenshine.Tests.csproj" />
+</Solution>

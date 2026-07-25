@@ -11,6 +11,9 @@
 *.sln.docstates
 *.env
 
+# Local reference source and original game data.
+/local/
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

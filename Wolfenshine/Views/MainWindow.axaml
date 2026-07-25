@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Wolfenshine.ViewModels"
+        x:Class="Wolfenshine.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        mc:Ignorable="d"
+        d:DesignWidth="960"
+        d:DesignHeight="640"
+        Title="{Binding Title}"
+        Width="960"
+        Height="640"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+  <Grid RowDefinitions="*,Auto" Background="#111318">
+    <Border Grid.Row="0" Margin="24" Background="#08090B" BorderBrush="#343942" BorderThickness="1">
+      <Viewbox Stretch="Uniform">
+        <Border Width="{Binding NativeViewportWidth}"
+                Height="{Binding NativeViewportHeight}"
+                Background="#20242B">
+          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
+            <TextBlock Text="WOLFENSHINE"
+                       HorizontalAlignment="Center"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Foreground="#D7D9DC" />
+            <TextBlock Text="320 × 200 software viewport"
+                       HorizontalAlignment="Center"
+                       FontSize="7"
+                       Foreground="#858B94" />
+          </StackPanel>
+        </Border>
+      </Viewbox>
+    </Border>
+
+    <Border Grid.Row="1" Background="#1A1E24" BorderBrush="#343942" BorderThickness="0,1,0,0" Padding="12,7">
+      <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#AEB4BC" />
+    </Border>
+  </Grid>
+</Window>
