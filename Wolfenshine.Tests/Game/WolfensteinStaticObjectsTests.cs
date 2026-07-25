@@ -41,4 +41,21 @@ public sealed class WolfensteinStaticObjectsTests
             new WorldSprite(1.5, 0.5, 49)
         }));
     }
+
+    [TestCase(26)] // Floor lamp.
+    [TestCase(31)] // Tree.
+    [TestCase(58)] // Barrel.
+    public void GivenSolidSceneryMarkerCheckMovementIsBlocked(int marker)
+    {
+        Assert.That(WolfensteinStaticObjects.BlocksMovement((ushort)marker), Is.True);
+    }
+
+    [TestCase(23)] // Puddle.
+    [TestCase(27)] // Chandelier.
+    [TestCase(47)] // Food.
+    [TestCase(70)] // Vines.
+    public void GivenNonSolidSceneryMarkerCheckMovementIsAllowed(int marker)
+    {
+        Assert.That(WolfensteinStaticObjects.BlocksMovement((ushort)marker), Is.False);
+    }
 }

@@ -144,7 +144,9 @@ public sealed class GameSession
     private bool IsSolid(int x, int y)
     {
         var door = Doors.Get(x, y);
-        return door == null ? Map.IsSolid(x, y) : !door.IsFullyOpen;
+        if (door != null)
+            return !door.IsFullyOpen;
+        return Map.IsSolid(x, y) || WolfensteinStaticObjects.BlocksMovement(Map.GetObject(x, y));
     }
 
     private bool OpenDoorAhead()

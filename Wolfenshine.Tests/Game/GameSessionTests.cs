@@ -151,6 +151,16 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenBlockingDecorationAheadCheckPlayerCannotWalkThroughItsTile()
+    {
+        var session = CreateSessionWithObject(31);
+
+        session.Update(1.0, new PlayerInput(true, false, false, false));
+
+        Assert.That(session.Camera.Y, Is.EqualTo(2.2).Within(0.11));
+    }
+
+    [Test]
     public void GivenNoInputCheckCameraIsUnchanged()
     {
         var session = CreateSession();
@@ -231,5 +241,24 @@ public sealed class GameSessionTests
         objects[(2 * size) + 2] = 19;
         var map = new WolfensteinMap(0, "Actor Collision", size, size, walls, objects);
         return new GameSession(map, RaycastCamera.FromPlayerStart(map), new[] { actor });
+    }
+
+    private static GameSession CreateSessionWithObject(ushort marker)
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        for (var i = 0; i < size; i++)
+        {
+            walls[i] = 1;
+            walls[((size - 1) * size) + i] = 1;
+            walls[i * size] = 1;
+            walls[(i * size) + size - 1] = 1;
+        }
+
+        var objects = new ushort[size * size];
+        objects[(2 * size) + 2] = 19;
+        objects[(1 * size) + 2] = marker;
+        var map = new WolfensteinMap(0, "Decoration Collision", size, size, walls, objects);
+        return new GameSession(map, RaycastCamera.FromPlayerStart(map));
     }
 }

@@ -24,6 +24,12 @@ public static class WolfensteinStaticObjects
     private const ushort LastMarker = 70;
     private const int FirstStaticSprite = 2;
 
+    // These indices correspond to entries carrying the original `block` flag in statinfo[].
+    private static readonly HashSet<ushort> BlockingMarkers =
+    [
+        24, 25, 26, 28, 30, 31, 33, 34, 35, 36, 39, 40, 41, 45, 58, 59, 60, 62, 63, 68, 69
+    ];
+
     public static IReadOnlyList<WorldSprite> FromMap(WolfensteinMap map)
     {
         ArgumentNullException.ThrowIfNull(map);
@@ -43,4 +49,9 @@ public static class WolfensteinStaticObjects
         }
         return objects;
     }
+
+    /// <summary>
+    /// Determines whether a plane-one marker represents solid scenery.
+    /// </summary>
+    public static bool BlocksMovement(ushort marker) => BlockingMarkers.Contains(marker);
 }
