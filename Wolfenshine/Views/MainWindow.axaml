@@ -26,6 +26,8 @@
                                     Map="{Binding SelectedMap}"
                                     Doors="{Binding Doors}"
                                     Camera="{Binding Camera}"
+                                    WallTextures="{Binding WallTextures}"
+                                    Palette="{Binding Palette}"
                                     RenderOptions.BitmapInterpolationMode="LowQuality" />
 
             <StackPanel IsVisible="{Binding !HasGameData}"

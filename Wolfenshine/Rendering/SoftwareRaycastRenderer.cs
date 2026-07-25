@@ -8,20 +8,22 @@
 //
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
+using Wolfenshine.Graphics;
+
 namespace Wolfenshine.Rendering;
 
 /// <summary>
 /// Converts wall-column raycast results into an RGBA software framebuffer.
 /// </summary>
 /// <remarks>
-/// This first renderer uses flat colors while preserving the same column data needed for indexed textures later.
+/// Indexed textures resolve through a palette at draw time, while flat colors remain available for diagnostics.
 /// </remarks>
 public static class SoftwareRaycastRenderer
 {
-    private static readonly RgbColor s_ceilingColor = new(45, 48, 55);
-    private static readonly RgbColor s_floorColor = new(61, 57, 53);
-    private static readonly RgbColor s_doorColor = new(188, 142, 70);
-    private static readonly RgbColor[] s_wallColors =
+    private static readonly RgbaColor s_ceilingColor = new(45, 48, 55);
+    private static readonly RgbaColor s_floorColor = new(61, 57, 53);
+    private static readonly RgbaColor s_doorColor = new(188, 142, 70);
+    private static readonly RgbaColor[] s_wallColors =
     [
         new(145, 63, 57),
         new(74, 111, 148),
@@ -32,6 +34,14 @@ public static class SoftwareRaycastRenderer
     ];
 
     public static void Render(IReadOnlyList<WallColumn> columns, int height, Span<byte> pixels)
+        => Render(columns, height, pixels, null, null);
+
+    public static void Render(
+        IReadOnlyList<WallColumn> columns,
+        int height,
+        Span<byte> pixels,
+        WolfensteinWallTextures wallTextures,
+        WolfensteinPalette palette)
     {
         ArgumentNullException.ThrowIfNull(columns);
         if (columns.Count == 0)
@@ -55,38 +65,54 @@ public static class SoftwareRaycastRenderer
                 WritePixel(pixels, width, x, y, background);
         }
 
-        // Project each unit-height wall from its perpendicular distance and shade its grid orientation.
+        var useTextures = wallTextures != null && palette != null;
+        // Project each unit-height wall and either sample its indexed page or apply a diagnostic flat color.
         for (var x = 0; x < width; x++)
         {
             var column = columns[x];
-            var wallHeight = Math.Min(height, (int)Math.Round(height / Math.Max(column.Distance, 0.0001)));
-            var top = Math.Max(0, (height - wallHeight) / 2);
-            var bottom = Math.Min(height, top + wallHeight);
-            var color = column.Tile is >= 90 and <= 101
-                ? s_doorColor
-                : s_wallColors[column.Tile % s_wallColors.Length];
-            if (column.Side == WallSide.Horizontal)
-                color = color.Scale(0.68);
+            var projectedHeight = height / Math.Max(column.Distance, 0.0001);
+            var wallTop = (height - projectedHeight) * 0.5;
+            var top = Math.Max(0, (int)Math.Floor(wallTop));
+            var bottom = Math.Min(height, (int)Math.Ceiling(wallTop + projectedHeight));
+            if (useTextures)
+            {
+                var texture = wallTextures.GetTexture(column);
+                var textureX = Math.Clamp(
+                    (int)(column.TextureU * WolfensteinWallTexture.Size),
+                    0,
+                    WolfensteinWallTexture.Size - 1);
+                for (var y = top; y < bottom; y++)
+                {
+                    var textureV = (y - wallTop) / projectedHeight;
+                    var textureY = Math.Clamp(
+                        (int)(textureV * WolfensteinWallTexture.Size),
+                        0,
+                        WolfensteinWallTexture.Size - 1);
+                    WritePixel(pixels, width, x, y, palette.GetColor(texture.GetIndex(textureX, textureY)));
+                }
+                continue;
+            }
+
+            var color = GetFlatColor(column);
             for (var y = top; y < bottom; y++)
                 WritePixel(pixels, width, x, y, color);
         }
-
     }
 
-    private static void WritePixel(Span<byte> pixels, int width, int x, int y, RgbColor color)
+    private static RgbaColor GetFlatColor(WallColumn column)
+    {
+        var color = column.Tile is >= 90 and <= 101
+            ? s_doorColor
+            : s_wallColors[column.Tile % s_wallColors.Length];
+        return column.Side == WallSide.Horizontal ? color.Scale(0.68) : color;
+    }
+
+    private static void WritePixel(Span<byte> pixels, int width, int x, int y, RgbaColor color)
     {
         var offset = ((y * width) + x) * 4;
         pixels[offset] = color.Red;
         pixels[offset + 1] = color.Green;
         pixels[offset + 2] = color.Blue;
-        pixels[offset + 3] = byte.MaxValue;
-    }
-
-    private readonly record struct RgbColor(byte Red, byte Green, byte Blue)
-    {
-        public RgbColor Scale(double amount) => new(
-            (byte)(Red * amount),
-            (byte)(Green * amount),
-            (byte)(Blue * amount));
+        pixels[offset + 3] = color.Alpha;
     }
 }

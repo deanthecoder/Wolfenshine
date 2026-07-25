@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using NUnit.Framework;
+using Wolfenshine.Graphics;
 using Wolfenshine.Rendering;
 
 namespace Wolfenshine.Tests.Rendering;
@@ -48,6 +49,26 @@ public sealed class SoftwareRaycastRendererTests
             SoftwareRaycastRenderer.Render(new[] { column }, 4, new byte[15]));
 
         Assert.That(exception.Message, Does.Contain("exactly 16 bytes"));
+    }
+
+    [Test]
+    public void GivenIndexedWallCheckPaletteColorIsRendered()
+    {
+        var pages = Enumerable.Range(0, 8)
+            .Select(page => new WolfensteinWallTexture(
+                Enumerable.Repeat((byte)(page == 1 ? 7 : 0), WolfensteinWallTexture.DataLength).ToArray()))
+            .ToArray();
+        var textures = new WolfensteinWallTextures(pages, pages.Length);
+        var paletteData = new byte[WolfensteinPalette.VgaDataLength];
+        paletteData[7 * 3] = 63;
+        var palette = WolfensteinPalette.FromVgaDac(paletteData);
+        var pixels = new byte[16];
+        var column = new WallColumn(2.0, 0.5, 1, WallSide.Vertical);
+
+        SoftwareRaycastRenderer.Render(new[] { column }, 4, pixels, textures, palette);
+
+        Assert.That(GetPixel(pixels, 1), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
+        Assert.That(GetPixel(pixels, 2), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
     }
 
     private static byte[] GetPixel(byte[] pixels, int row) => pixels[(row * 4)..((row + 1) * 4)];

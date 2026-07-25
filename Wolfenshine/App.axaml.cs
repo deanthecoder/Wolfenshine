@@ -40,7 +40,9 @@ public sealed class App : Application
             {
                 var resources = WolfensteinResourceLocator.LoadDefault();
                 var maps = WolfensteinMapLoader.Load(resources);
-                viewModel = new MainWindowViewModel(resources, maps);
+                var wallTextures = WolfensteinVSwapLoader.LoadWallTextures(resources);
+                var palette = WolfensteinPaletteLoader.Load(resources);
+                viewModel = new MainWindowViewModel(resources, maps, wallTextures, palette);
             }
             catch (WolfensteinDataNotFoundException exception)
             {

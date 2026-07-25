@@ -6,7 +6,7 @@ A modern C# reimplementation of Wolfenstein 3D, beginning with a faithful 320×2
 
 ## Status
 
-Wolfenshine currently loads and decompresses all 60 maps from the original six-episode data, locates the E1M1 player start, and provides arrow-key navigation through a flat-color 320×200 software-raycast view. Space opens ordinary sliding doors. Wall textures, sprites, locked doors, automatic door closing, and wider gameplay are not implemented yet.
+Wolfenshine currently loads and decompresses all 60 maps from the original six-episode data, locates the E1M1 player start, and provides arrow-key navigation through a textured 320×200 software-raycast view using the original indexed wall art and VGA palette. Space opens ordinary sliding doors. Sprites, locked doors, automatic door closing, and wider gameplay are not implemented yet.
 
 ## Building
 
@@ -24,7 +24,13 @@ Wolfenshine does not include the commercial Wolfenstein 3D data. During developm
 local/game-data/wolf3d/
 ```
 
-The `local/` directory is ignored by Git. When the `.WL6` files are present, the build copies them into the application's `GameData` output directory. Without them, Wolfenshine still builds and starts, but displays a message listing the missing files and expected location.
+The original VGA palette is available in id Software's released source tree. Clone that alongside the game data at:
+
+```shell
+git clone https://github.com/id-Software/wolf3d.git local/reference/wolf3d-source
+```
+
+The `local/` directory is ignored by Git. When present, the build copies the `.WL6` files and `WOLFSRC/OBJ/GAMEPAL.OBJ` into the application's `GameData` output directory. Without the required resources, Wolfenshine still builds and starts, but displays a message listing the missing files and expected location.
 
 ## Original source reference
 
@@ -59,6 +65,7 @@ The `.WL6` suffix identifies data for the full six-episode edition. The sharewar
 | `VGAHEAD.WL6` | A table of 24-bit offsets locating graphics chunks within `VGAGRAPH.WL6`. |
 | `VGAGRAPH.WL6` | Huffman-compressed UI artwork, fonts, tiles, and other screen graphics. Chunk identifiers vary between game versions. |
 | `VSWAP.WL6` | A page-oriented container holding wall textures, sprites, and digitized sound samples. |
+| `GAMEPAL.OBJ` | The original source release's 16-bit OMF object containing the 256-color VGA palette. This is copied from the ignored local source checkout rather than committed to Wolfenshine. |
 
 `CONFIG.WL6` is generated configuration state rather than a required asset. `WOLF3D.EXE` is useful as a behavioral reference but is not loaded by Wolfenshine.
 
@@ -78,6 +85,14 @@ Each offset locates a 38-byte map header in `GAMEMAPS.WL6`:
 | Name | 16 bytes | Null-terminated DOS ASCII. |
 
 The game loads plane 0 (walls and areas) and plane 1 (actors, objects, and level information). Each plane starts with its Carmack-expanded byte length. Carmack expansion produces an RLEW stream whose first word is its final expanded byte length; expanding that stream produces `width × height` 16-bit tile values in row-major order.
+
+#### Wall textures and palette
+
+`VSWAP.WL6` begins with three 16-bit values: the total page count, the first sprite page, and the first digitized-sound page. These are followed by one 32-bit offset and one 16-bit length for every page. Pages before the sprite boundary are 64 × 64 wall textures stored as palette indices in column-major order.
+
+Each ordinary wall tile selects a pair of pages: one for east/west-facing walls and one for north/south-facing walls. Door textures occupy the final eight pages of the wall region and similarly use orientation-specific pairs.
+
+Wolfenshine retains the textures as 8-bit palette indices. `GAMEPAL.OBJ` contains 256 RGB triplets using the VGA DAC's 0–63 channel range; these are expanded to 8-bit RGB values when the palette loads. The software renderer resolves each texture index through that palette while writing its reusable RGBA framebuffer. Keeping indexed textures as the canonical representation preserves the original data and leaves palette swaps or a future GPU palette lookup straightforward.
 
 ## License
 

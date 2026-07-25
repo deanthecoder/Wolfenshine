@@ -10,6 +10,7 @@
 
 using DTC.Core.ViewModels;
 using Wolfenshine.Game;
+using Wolfenshine.Graphics;
 using Wolfenshine.Maps;
 using Wolfenshine.Rendering;
 using Wolfenshine.Resources;
@@ -34,12 +35,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
     }
 
-    public MainWindowViewModel(WolfensteinResources resources, WolfensteinMapSet maps)
+    public MainWindowViewModel(
+        WolfensteinResources resources,
+        WolfensteinMapSet maps,
+        WolfensteinWallTextures wallTextures = null,
+        WolfensteinPalette palette = null)
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(maps);
         Resources = resources;
         Maps = maps;
+        WallTextures = wallTextures;
+        Palette = palette;
         SelectedMap = maps.Maps.FirstOrDefault();
         if (SelectedMap != null)
         {
@@ -56,7 +63,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ArgumentNullException.ThrowIfNull(exception);
         StatusText = "Wolfenstein 3D data files were not found";
         DataErrorMessage =
-            $"Copy the original .WL6 files into:\n{exception.Directory.FullName}\n\n" +
+            $"Copy the required original game and palette files into:\n{exception.Directory.FullName}\n\n" +
             $"Missing: {string.Join(", ", exception.MissingFileNames)}";
     }
 
@@ -66,6 +73,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinMap SelectedMap { get; }
     public RaycastCamera Camera => m_camera;
     public WolfensteinDoors Doors => m_gameSession?.Doors;
+    public WolfensteinWallTextures WallTextures { get; }
+    public WolfensteinPalette Palette { get; }
     public string StatusText { get; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;

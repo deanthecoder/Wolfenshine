@@ -14,6 +14,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Wolfenshine.Graphics;
 using Wolfenshine.Maps;
 using Wolfenshine.Game;
 using Wolfenshine.Rendering;
@@ -42,8 +43,17 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, RaycastCamera>(nameof(Camera));
     public static readonly StyledProperty<WolfensteinDoors> DoorsProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinDoors>(nameof(Doors));
+    public static readonly StyledProperty<WolfensteinWallTextures> WallTexturesProperty =
+        AvaloniaProperty.Register<SoftwareViewport, WolfensteinWallTextures>(nameof(WallTextures));
+    public static readonly StyledProperty<WolfensteinPalette> PaletteProperty =
+        AvaloniaProperty.Register<SoftwareViewport, WolfensteinPalette>(nameof(Palette));
 
-    static SoftwareViewport() => AffectsRender<SoftwareViewport>(MapProperty, CameraProperty, DoorsProperty);
+    static SoftwareViewport() => AffectsRender<SoftwareViewport>(
+        MapProperty,
+        CameraProperty,
+        DoorsProperty,
+        WallTexturesProperty,
+        PaletteProperty);
 
     public WolfensteinMap Map
     {
@@ -63,6 +73,18 @@ public sealed class SoftwareViewport : Control
         set => SetValue(DoorsProperty, value);
     }
 
+    public WolfensteinWallTextures WallTextures
+    {
+        get => GetValue(WallTexturesProperty);
+        set => SetValue(WallTexturesProperty, value);
+    }
+
+    public WolfensteinPalette Palette
+    {
+        get => GetValue(PaletteProperty);
+        set => SetValue(PaletteProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -77,7 +99,7 @@ public sealed class SoftwareViewport : Control
     {
         // Raycasting and shading produce the complete native-resolution image independently of Avalonia.
         Raycaster.Cast(Map, Doors, Camera, m_columns);
-        SoftwareRaycastRenderer.Render(m_columns, ViewportHeight, m_pixels);
+        SoftwareRaycastRenderer.Render(m_columns, ViewportHeight, m_pixels, WallTextures, Palette);
 
         // The viewport size never changes, so retain its native bitmap and update only the locked pixel memory.
         m_bitmap ??= new WriteableBitmap(

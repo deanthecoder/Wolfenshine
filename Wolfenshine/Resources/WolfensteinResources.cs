@@ -30,7 +30,8 @@ public sealed class WolfensteinResources
             [WolfensteinResourceKind.GraphicsDictionary] = "VGADICT.WL6",
             [WolfensteinResourceKind.GraphicsHeader] = "VGAHEAD.WL6",
             [WolfensteinResourceKind.GraphicsData] = "VGAGRAPH.WL6",
-            [WolfensteinResourceKind.SwapData] = "VSWAP.WL6"
+            [WolfensteinResourceKind.SwapData] = "VSWAP.WL6",
+            [WolfensteinResourceKind.PaletteSource] = "GAMEPAL.OBJ"
         };
 
     private readonly IReadOnlyDictionary<WolfensteinResourceKind, FileInfo> m_files;

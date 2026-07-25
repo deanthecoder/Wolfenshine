@@ -110,6 +110,12 @@ public static class Raycaster
             ? camera.Y + (distance * rayDirectionY)
             : camera.X + (distance * rayDirectionX);
         var textureU = wallPosition - Math.Floor(wallPosition);
+        if (side == WallSide.Vertical && rayDirectionX > 0.0 ||
+            side == WallSide.Horizontal && rayDirectionY < 0.0)
+        {
+            textureU = 1.0 - textureU;
+        }
+        textureU = Math.Clamp(textureU, 0.0, double.BitDecrement(1.0));
         return new WallColumn(distance, textureU, tile, side);
     }
 

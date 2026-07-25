@@ -8,20 +8,23 @@
 //
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
-namespace Wolfenshine.Resources;
+namespace Wolfenshine.Graphics;
 
 /// <summary>
-/// Identifies each resource container required by the six-episode Wolfenstein 3D data set.
+/// Represents one renderer-independent 32-bit color.
 /// </summary>
-public enum WolfensteinResourceKind
+/// <remarks>
+/// Explicit channels avoid coupling game assets to Avalonia or a future GPU API's packed byte order.
+/// </remarks>
+public readonly record struct RgbaColor(
+    byte Red,
+    byte Green,
+    byte Blue,
+    byte Alpha = byte.MaxValue)
 {
-    AudioHeader,
-    AudioData,
-    MapHeader,
-    MapData,
-    GraphicsDictionary,
-    GraphicsHeader,
-    GraphicsData,
-    SwapData,
-    PaletteSource
+    public RgbaColor Scale(double amount) => new(
+        (byte)(Red * amount),
+        (byte)(Green * amount),
+        (byte)(Blue * amount),
+        Alpha);
 }
