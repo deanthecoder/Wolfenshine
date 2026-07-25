@@ -30,7 +30,7 @@
                                     Palette="{Binding Palette}"
                                     WeaponSprite="{Binding WeaponSprite}"
                                     Sprites="{Binding Sprites}"
-                                    StaticObjects="{Binding StaticObjects}"
+                                    StaticObjects="{Binding WorldObjects}"
                                     StatusBar="{Binding StatusBar}"
                                     RenderOptions.BitmapInterpolationMode="LowQuality" />
 

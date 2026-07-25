@@ -11,9 +11,19 @@
 namespace Wolfenshine.Game;
 
 /// <summary>
-/// Places one VSWAP sprite at a world-space position.
+/// Describes one map-spawned enemy before behavior and combat are applied.
 /// </summary>
 /// <remarks>
-/// Static decorations use tile centers now; actors can later supply continuously changing positions.
+/// Direction uses the map's cardinal order: east, north, west, then south.
 /// </remarks>
-public readonly record struct WorldSprite(double X, double Y, int SpriteNumber, int FacingDirection = -1);
+public readonly record struct WolfensteinActor(
+    double X,
+    double Y,
+    WolfensteinActorType Type,
+    int Direction,
+    bool IsPatrolling,
+    bool IsAmbush,
+    int BaseSpriteNumber)
+{
+    public WorldSprite ToWorldSprite() => new(X, Y, BaseSpriteNumber, Direction);
+}

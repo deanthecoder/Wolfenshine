@@ -69,7 +69,7 @@ public static class WorldSpriteProjector
             if (centerX + halfSize < 0 || centerX - halfSize >= viewportWidth)
                 continue;
             projectedSprites[visibleCount++] = new ProjectedWorldSprite(
-                sprite.SpriteNumber,
+                ResolveSpriteNumber(sprite, camera),
                 depth,
                 centerX,
                 renderedSize);
@@ -77,5 +77,17 @@ public static class WorldSpriteProjector
 
         projectedSprites[..visibleCount].Sort(static (left, right) => right.Depth.CompareTo(left.Depth));
         return visibleCount;
+    }
+
+    private static int ResolveSpriteNumber(WorldSprite sprite, RaycastCamera camera)
+    {
+        if (sprite.FacingDirection < 0)
+            return sprite.SpriteNumber;
+        var toCameraX = camera.X - sprite.X;
+        var toCameraY = camera.Y - sprite.Y;
+        var viewAngle = Math.Atan2(-toCameraY, toCameraX) * 180.0 / Math.PI;
+        var facingAngle = sprite.FacingDirection * 90.0;
+        var relativeAngle = (viewAngle - facingAngle + 22.5 + 360.0) % 360.0;
+        return sprite.SpriteNumber + (int)(relativeAngle / 45.0);
     }
 }

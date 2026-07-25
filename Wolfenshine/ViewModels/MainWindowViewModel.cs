@@ -59,6 +59,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         m_hudGraphics = hudGraphics;
         SelectedMap = maps.Maps.FirstOrDefault();
         StaticObjects = SelectedMap == null ? [] : WolfensteinStaticObjects.FromMap(SelectedMap);
+        Actors = SelectedMap == null ? [] : WolfensteinActors.FromMap(SelectedMap);
+        WorldObjects = StaticObjects.Concat(Actors.Select(actor => actor.ToWorldSprite())).ToArray();
         if (SelectedMap != null)
         {
             m_camera = RaycastCamera.FromPlayerStart(SelectedMap);
@@ -92,6 +94,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinSpriteSet Sprites { get; }
     public WolfensteinGraphic StatusBar => m_statusBar;
     public IReadOnlyList<WorldSprite> StaticObjects { get; }
+    public IReadOnlyList<WolfensteinActor> Actors { get; }
+    public IReadOnlyList<WorldSprite> WorldObjects { get; }
     public string StatusText { get; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;

@@ -60,4 +60,24 @@ public sealed class WorldSpriteProjectorTests
             Assert.That(projected[0].RenderedSize, Is.EqualTo(100));
         });
     }
+
+    [Test]
+    public void GivenDirectionalActorCheckRotationFacingCameraIsSelected()
+    {
+        WorldSprite[] sprites = [new(2.5, 2.5, 50, 0)];
+        var projected = new ProjectedWorldSprite[1];
+        var cameraEastOfActor = new RaycastCamera(3.5, 2.5, -1.0, 0.0, 0.0, 0.66);
+
+        WorldSpriteProjector.Project(sprites, cameraEastOfActor, 320, 200, projected);
+        var viewedFromFront = projected[0].SpriteNumber;
+
+        var cameraNorthOfActor = new RaycastCamera(2.5, 1.5, 0.0, 1.0, -0.66, 0.0);
+        WorldSpriteProjector.Project(sprites, cameraNorthOfActor, 320, 200, projected);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewedFromFront, Is.EqualTo(50));
+            Assert.That(projected[0].SpriteNumber, Is.EqualTo(52));
+        });
+    }
 }

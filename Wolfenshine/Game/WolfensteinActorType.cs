@@ -11,9 +11,13 @@
 namespace Wolfenshine.Game;
 
 /// <summary>
-/// Places one VSWAP sprite at a world-space position.
+/// Identifies the common Wolfenstein 3D enemy families currently loaded from maps.
 /// </summary>
-/// <remarks>
-/// Static decorations use tile centers now; actors can later supply continuously changing positions.
-/// </remarks>
-public readonly record struct WorldSprite(double X, double Y, int SpriteNumber, int FacingDirection = -1);
+public enum WolfensteinActorType
+{
+    Guard,
+    Officer,
+    Ss,
+    Dog,
+    Mutant
+}

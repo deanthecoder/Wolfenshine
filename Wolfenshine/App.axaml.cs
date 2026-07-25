@@ -54,6 +54,8 @@ public sealed class App : Application
                     hudGraphics);
                 Logger.Instance.Info(
                     $"Loaded {viewModel.StaticObjects.Count} static world objects for {viewModel.SelectedMap.Name}.");
+                Logger.Instance.Info(
+                    $"Placed {viewModel.Actors.Count} inert actors for {viewModel.SelectedMap.Name} on normal difficulty.");
             }
             catch (WolfensteinDataNotFoundException exception)
             {

@@ -11,9 +11,12 @@
 namespace Wolfenshine.Game;
 
 /// <summary>
-/// Places one VSWAP sprite at a world-space position.
+/// Identifies the original four gameplay difficulty levels.
 /// </summary>
-/// <remarks>
-/// Static decorations use tile centers now; actors can later supply continuously changing positions.
-/// </remarks>
-public readonly record struct WorldSprite(double X, double Y, int SpriteNumber, int FacingDirection = -1);
+public enum GameDifficulty
+{
+    Baby,
+    Easy,
+    Normal,
+    Hard
+}
