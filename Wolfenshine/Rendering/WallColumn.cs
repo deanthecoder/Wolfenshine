@@ -20,4 +20,5 @@ public readonly record struct WallColumn(
     double Distance,
     double TextureU,
     ushort Tile,
-    WallSide Side);
+    WallSide Side,
+    bool IsDoorJamb = false);

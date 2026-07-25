@@ -38,13 +38,18 @@ public sealed class WolfensteinWallTextures
 
     public WolfensteinWallTexture GetTexture(WallColumn column)
     {
-        var page = column.Tile is >= 90 and <= 101
-            ? GetDoorPage(column)
-            : ((column.Tile - 1) * 2) + (column.Side == WallSide.Vertical ? 1 : 0);
+        var page = column.IsDoorJamb
+            ? GetDoorJambPage(column.Side)
+            : column.Tile is >= 90 and <= 101
+                ? GetDoorPage(column)
+                : ((column.Tile - 1) * 2) + (column.Side == WallSide.Vertical ? 1 : 0);
         if (page < 0 || page >= Pages.Count)
             throw new InvalidDataException($"Wall tile {column.Tile} resolves to invalid VSWAP page {page}.");
         return Pages[page];
     }
+
+    private int GetDoorJambPage(WallSide side) =>
+        SpriteStart - DoorPageCount + (side == WallSide.Vertical ? 3 : 2);
 
     private int GetDoorPage(WallColumn column)
     {

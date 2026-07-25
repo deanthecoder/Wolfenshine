@@ -118,7 +118,11 @@ public static class Raycaster
             textureU = double.BitDecrement(1.0) - textureU;
         }
         textureU = Math.Clamp(textureU, 0.0, double.BitDecrement(1.0));
-        return new WallColumn(distance, textureU, tile, side);
+        // id marks these faces in its runtime tile map. Derive the same information without mutating map data.
+        var isDoorJamb = side == WallSide.Vertical
+            ? doors.Get(mapX - stepX, mapY) != null
+            : doors.Get(mapX, mapY - stepY) != null;
+        return new WallColumn(distance, textureU, tile, side, isDoorJamb);
     }
 
     private static bool TryHitDoor(

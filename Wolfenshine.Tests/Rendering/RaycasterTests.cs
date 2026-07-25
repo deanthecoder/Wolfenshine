@@ -111,6 +111,18 @@ public sealed class RaycasterTests
         Assert.That(columns[0].Distance, Is.GreaterThan(2.0));
     }
 
+    [Test]
+    public void GivenRayIntoDoorRecessCheckInnerWallIsMarkedAsJamb()
+    {
+        var map = CreateDoorMap();
+        var camera = new RaycastCamera(2.5, 3.5, -0.75, -1.0, 0.0, 0.0);
+        var columns = new WallColumn[1];
+
+        Raycaster.Cast(map, WolfensteinDoors.FromMap(map), camera, columns);
+
+        Assert.That(columns[0].IsDoorJamb, Is.True);
+    }
+
     private static WolfensteinMap CreateMap(ushort playerMarker)
     {
         const int size = 5;
