@@ -26,6 +26,23 @@ local/game-data/wolf3d/
 
 The `local/` directory is ignored by Git. When the `.WL6` files are present, the build copies them into the application's `GameData` output directory. Without them, Wolfenshine still builds and starts, but displays a message listing the missing files and expected location.
 
+## Original source reference
+
+The original Wolfenstein 3D source release is available from the official [id Software Wolf3D repository](https://github.com/id-Software/wolf3d). Wolfenshine links to that repository as a format and behavioral reference; the original C source is not included here.
+
+## Beyond the basics
+
+Once the original game data, rendering, and core behavior are working, possible enhanced-mode experiments include:
+
+- View bob and smoother camera motion.
+- Persistent enemy blood splats.
+- Improved dynamic and colored lighting.
+- Ambient occlusion for added depth around walls and objects.
+- Dynamic shadows.
+- Spatial 3D sound.
+
+These are ideas rather than compatibility requirements. A faithful rendering path should remain available alongside later visual and audio enhancements.
+
 ## Developer notes
 
 ### Wolfenstein 3D data files
@@ -43,7 +60,7 @@ The `.WL6` suffix identifies data for the full six-episode edition. The sharewar
 | `VGAGRAPH.WL6` | Huffman-compressed UI artwork, fonts, tiles, and other screen graphics. Chunk identifiers vary between game versions. |
 | `VSWAP.WL6` | A page-oriented container holding wall textures, sprites, and digitized sound samples. |
 
-`CONFIG.WL6` is generated configuration state rather than a required asset. `WOLF3D.EXE` is useful as a behavioural reference but is not loaded by Wolfenshine.
+`CONFIG.WL6` is generated configuration state rather than a required asset. `WOLF3D.EXE` is useful as a behavioral reference but is not loaded by Wolfenshine.
 
 The current private development data is the full six-episode June 1992 v1.1 release. The released source tree defaults to the later `GOODTIMES` v1.4 configuration, so resource readers must avoid assuming that version-specific chunk identifiers are universal.
 
