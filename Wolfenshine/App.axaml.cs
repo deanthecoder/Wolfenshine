@@ -41,8 +41,9 @@ public sealed class App : Application
                 var resources = WolfensteinResourceLocator.LoadDefault();
                 var maps = WolfensteinMapLoader.Load(resources);
                 var wallTextures = WolfensteinVSwapLoader.LoadWallTextures(resources);
+                var weaponSprite = WolfensteinVSwapLoader.LoadPistolReadySprite(resources);
                 var palette = WolfensteinPaletteLoader.Load(resources);
-                viewModel = new MainWindowViewModel(resources, maps, wallTextures, palette);
+                viewModel = new MainWindowViewModel(resources, maps, wallTextures, palette, weaponSprite);
             }
             catch (WolfensteinDataNotFoundException exception)
             {

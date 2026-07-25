@@ -28,6 +28,7 @@
                                     Camera="{Binding Camera}"
                                     WallTextures="{Binding WallTextures}"
                                     Palette="{Binding Palette}"
+                                    WeaponSprite="{Binding WeaponSprite}"
                                     RenderOptions.BitmapInterpolationMode="LowQuality" />
 
             <StackPanel IsVisible="{Binding !HasGameData}"

@@ -99,6 +99,42 @@ public static class SoftwareRaycastRenderer
         }
     }
 
+    public static void DrawSprite(
+        WolfensteinSprite sprite,
+        WolfensteinPalette palette,
+        int centerX,
+        int bottomY,
+        int renderedSize,
+        Span<byte> pixels,
+        int width,
+        int height)
+    {
+        ArgumentNullException.ThrowIfNull(sprite);
+        ArgumentNullException.ThrowIfNull(palette);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(renderedSize);
+        var expectedPixelBytes = checked(width * height * 4);
+        if (pixels.Length != expectedPixelBytes)
+            throw new ArgumentException($"The pixel buffer must contain exactly {expectedPixelBytes} bytes.", nameof(pixels));
+
+        // Scale the sprite's virtual 64 x 64 canvas, clipping transparent posts and off-screen edges.
+        var left = centerX - (renderedSize / 2);
+        var top = bottomY - renderedSize;
+        var firstX = Math.Max(0, left);
+        var lastX = Math.Min(width, left + renderedSize);
+        var firstY = Math.Max(0, top);
+        var lastY = Math.Min(height, top + renderedSize);
+        for (var y = firstY; y < lastY; y++)
+        {
+            var sourceY = ((y - top) * WolfensteinSprite.Size) / renderedSize;
+            for (var x = firstX; x < lastX; x++)
+            {
+                var sourceX = ((x - left) * WolfensteinSprite.Size) / renderedSize;
+                if (sprite.TryGetIndex(sourceX, sourceY, out var index))
+                    WritePixel(pixels, width, x, y, palette.GetColor(index));
+            }
+        }
+    }
+
     private static RgbaColor GetFlatColor(WallColumn column)
     {
         var color = column.Tile is >= 90 and <= 101

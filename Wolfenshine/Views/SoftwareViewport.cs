@@ -47,13 +47,16 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinWallTextures>(nameof(WallTextures));
     public static readonly StyledProperty<WolfensteinPalette> PaletteProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinPalette>(nameof(Palette));
+    public static readonly StyledProperty<WolfensteinSprite> WeaponSpriteProperty =
+        AvaloniaProperty.Register<SoftwareViewport, WolfensteinSprite>(nameof(WeaponSprite));
 
     static SoftwareViewport() => AffectsRender<SoftwareViewport>(
         MapProperty,
         CameraProperty,
         DoorsProperty,
         WallTexturesProperty,
-        PaletteProperty);
+        PaletteProperty,
+        WeaponSpriteProperty);
 
     public WolfensteinMap Map
     {
@@ -85,6 +88,12 @@ public sealed class SoftwareViewport : Control
         set => SetValue(PaletteProperty, value);
     }
 
+    public WolfensteinSprite WeaponSprite
+    {
+        get => GetValue(WeaponSpriteProperty);
+        set => SetValue(WeaponSpriteProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -100,6 +109,18 @@ public sealed class SoftwareViewport : Control
         // Raycasting and shading produce the complete native-resolution image independently of Avalonia.
         Raycaster.Cast(Map, Doors, Camera, m_columns);
         SoftwareRaycastRenderer.Render(m_columns, ViewportHeight, m_pixels, WallTextures, Palette);
+        if (WeaponSprite != null && Palette != null)
+        {
+            SoftwareRaycastRenderer.DrawSprite(
+                WeaponSprite,
+                Palette,
+                ViewportWidth / 2,
+                ViewportHeight,
+                ViewportHeight + 1,
+                m_pixels,
+                ViewportWidth,
+                ViewportHeight);
+        }
 
         // The viewport size never changes, so retain its native bitmap and update only the locked pixel memory.
         m_bitmap ??= new WriteableBitmap(

@@ -39,7 +39,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         WolfensteinResources resources,
         WolfensteinMapSet maps,
         WolfensteinWallTextures wallTextures = null,
-        WolfensteinPalette palette = null)
+        WolfensteinPalette palette = null,
+        WolfensteinSprite weaponSprite = null)
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(maps);
@@ -47,6 +48,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         Maps = maps;
         WallTextures = wallTextures;
         Palette = palette;
+        WeaponSprite = weaponSprite;
         SelectedMap = maps.Maps.FirstOrDefault();
         if (SelectedMap != null)
         {
@@ -75,6 +77,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinDoors Doors => m_gameSession?.Doors;
     public WolfensteinWallTextures WallTextures { get; }
     public WolfensteinPalette Palette { get; }
+    public WolfensteinSprite WeaponSprite { get; }
     public string StatusText { get; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;

@@ -35,6 +35,21 @@ public sealed class WolfensteinVSwapLoaderTests
         Assert.That(textures.Pages[1].GetIndex(3, 5), Is.EqualTo(42));
     }
 
+    [Test]
+    public void GivenCompiledSpriteCheckOpaquePostIsDecoded()
+    {
+        using var tempDirectory = CreateSpriteResources();
+
+        var sprite = WolfensteinVSwapLoader.LoadPistolReadySprite(WolfensteinResources.Load(tempDirectory));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sprite.TryGetIndex(32, 63, out var index), Is.True);
+            Assert.That(index, Is.EqualTo(7));
+            Assert.That(sprite.TryGetIndex(32, 62, out _), Is.False);
+        });
+    }
+
     private static TempDirectory CreateResources()
     {
         var tempDirectory = new TempDirectory();
@@ -66,5 +81,48 @@ public sealed class WolfensteinVSwapLoaderTests
         foreach (var page in pages)
             writer.Write(page);
         return tempDirectory;
+    }
+
+    private static TempDirectory CreateSpriteResources()
+    {
+        var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+
+        const int pageCount = 28;
+        const int spriteStart = 8;
+        const int soundStart = 28;
+        const int pistolReadyPage = soundStart - 15;
+        var sprite = CreateSinglePixelSprite();
+        var dataOffset = 6 + (pageCount * sizeof(uint)) + (pageCount * sizeof(ushort));
+        using var writer = new BinaryWriter(
+            new FileInfo(Path.Combine(directory.FullName, "VSWAP.WL6")).Open(FileMode.Create, FileAccess.Write));
+        writer.Write((ushort)pageCount);
+        writer.Write((ushort)spriteStart);
+        writer.Write((ushort)soundStart);
+        for (var page = 0; page < pageCount; page++)
+            writer.Write(page == pistolReadyPage ? (uint)dataOffset : 0U);
+        for (var page = 0; page < pageCount; page++)
+            writer.Write(page == pistolReadyPage ? (ushort)sprite.Length : (ushort)0);
+        writer.Write(sprite);
+        return tempDirectory;
+    }
+
+    private static byte[] CreateSinglePixelSprite()
+    {
+        var data = new byte[16];
+        using var stream = new MemoryStream(data);
+        using var writer = new BinaryWriter(stream);
+        writer.Write((ushort)32); // Left bound.
+        writer.Write((ushort)32); // Right bound.
+        writer.Write((ushort)8); // Column-command offset.
+        writer.Write((byte)7); // The single palette index.
+        writer.Write((byte)0); // Word alignment.
+        writer.Write((ushort)128); // End row 64, doubled.
+        writer.Write(unchecked((ushort)(6 - 63))); // Wrapped source offset for row 63.
+        writer.Write((ushort)126); // Start row 63, doubled.
+        writer.Write((ushort)0); // End of column.
+        return data;
     }
 }

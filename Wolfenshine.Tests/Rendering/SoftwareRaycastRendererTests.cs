@@ -71,5 +71,25 @@ public sealed class SoftwareRaycastRendererTests
         Assert.That(GetPixel(pixels, 2), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
     }
 
+    [Test]
+    public void GivenIndexedSpriteCheckOnlyOpaquePixelsAreComposited()
+    {
+        var indices = new byte[WolfensteinSprite.PixelCount];
+        var opacity = new bool[WolfensteinSprite.PixelCount];
+        var spritePixel = (32 * WolfensteinSprite.Size) + 32;
+        indices[spritePixel] = 7;
+        opacity[spritePixel] = true;
+        var sprite = new WolfensteinSprite(indices, opacity);
+        var paletteData = new byte[WolfensteinPalette.VgaDataLength];
+        paletteData[7 * 3] = 63;
+        var palette = WolfensteinPalette.FromVgaDac(paletteData);
+        var pixels = Enumerable.Repeat((byte)11, 16).ToArray();
+
+        SoftwareRaycastRenderer.DrawSprite(sprite, palette, 1, 2, 2, pixels, 2, 2);
+
+        Assert.That(GetPixel(pixels, 0), Is.EqualTo(new byte[] { 11, 11, 11, 11 }));
+        Assert.That(GetPixel(pixels, 3), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
+    }
+
     private static byte[] GetPixel(byte[] pixels, int row) => pixels[(row * 4)..((row + 1) * 4)];
 }
