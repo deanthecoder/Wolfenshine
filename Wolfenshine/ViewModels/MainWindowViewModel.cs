@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using DTC.Core.ViewModels;
+using Wolfenshine.Resources;
 
 namespace Wolfenshine.ViewModels;
 
@@ -20,8 +21,34 @@ namespace Wolfenshine.ViewModels;
 /// </remarks>
 public sealed class MainWindowViewModel : ViewModelBase
 {
+    public MainWindowViewModel()
+        : this(new WolfensteinDataNotFoundException(
+            WolfensteinResourceLocator.GetDefaultDirectory(),
+            WolfensteinResources.FileNames.Values.ToArray()))
+    {
+    }
+
+    public MainWindowViewModel(WolfensteinResources resources)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
+        Resources = resources;
+        StatusText = $"Wolfenstein 3D data loaded from {resources.Directory.FullName}";
+    }
+
+    public MainWindowViewModel(WolfensteinDataNotFoundException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        StatusText = "Wolfenstein 3D data files were not found";
+        DataErrorMessage =
+            $"Copy the original .WL6 files into:\n{exception.Directory.FullName}\n\n" +
+            $"Missing: {string.Join(", ", exception.MissingFileNames)}";
+    }
+
     public string Title => "Wolfenshine";
-    public string StatusText => "Software renderer foundation";
+    public WolfensteinResources Resources { get; }
+    public string StatusText { get; }
+    public string DataErrorMessage { get; }
+    public bool HasGameData => Resources != null;
     public int NativeViewportWidth => 320;
     public int NativeViewportHeight => 200;
 }

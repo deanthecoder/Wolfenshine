@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using NUnit.Framework;
+using Wolfenshine.Resources;
 using Wolfenshine.ViewModels;
 
 namespace Wolfenshine.Tests.ViewModels;
@@ -36,5 +37,18 @@ public sealed class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel();
 
         Assert.That(viewModel.Title, Is.EqualTo("Wolfenshine"));
+    }
+
+    [Test]
+    public void GivenMissingGameDataCheckErrorIsShown()
+    {
+        var directory = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "missing-wolfenshine-data"));
+        var exception = new WolfensteinDataNotFoundException(directory, ["VSWAP.WL6"]);
+
+        var viewModel = new MainWindowViewModel(exception);
+
+        Assert.That(viewModel.HasGameData, Is.False);
+        Assert.That(viewModel.StatusText, Does.Contain("not found"));
+        Assert.That(viewModel.DataErrorMessage, Does.Contain("VSWAP.WL6"));
     }
 }

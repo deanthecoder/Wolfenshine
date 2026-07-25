@@ -21,15 +21,30 @@
                 Height="{Binding NativeViewportHeight}"
                 Background="#20242B">
           <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
-            <TextBlock Text="WOLFENSHINE"
-                       HorizontalAlignment="Center"
-                       FontSize="18"
-                       FontWeight="Bold"
-                       Foreground="#D7D9DC" />
-            <TextBlock Text="320 × 200 software viewport"
-                       HorizontalAlignment="Center"
-                       FontSize="7"
-                       Foreground="#858B94" />
+            <StackPanel IsVisible="{Binding HasGameData}" Spacing="6">
+              <TextBlock Text="WOLFENSHINE"
+                         HorizontalAlignment="Center"
+                         FontSize="18"
+                         FontWeight="Bold"
+                         Foreground="#D7D9DC" />
+              <TextBlock Text="320 × 200 software viewport"
+                         HorizontalAlignment="Center"
+                         FontSize="7"
+                         Foreground="#858B94" />
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding !HasGameData}" Width="280" Spacing="6">
+              <TextBlock Text="GAME DATA NOT FOUND"
+                         HorizontalAlignment="Center"
+                         FontSize="12"
+                         FontWeight="Bold"
+                         Foreground="#F07D7D" />
+              <TextBlock Text="{Binding DataErrorMessage}"
+                         FontSize="6"
+                         TextAlignment="Center"
+                         TextWrapping="Wrap"
+                         Foreground="#D7D9DC" />
+            </StackPanel>
           </StackPanel>
         </Border>
       </Viewbox>

@@ -11,6 +11,8 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using DTC.Core;
+using Wolfenshine.Resources;
 using Wolfenshine.ViewModels;
 using Wolfenshine.Views;
 
@@ -30,9 +32,21 @@ public sealed class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            Logger.Instance.SysInfo();
+            Logger.Instance.Info("Starting Wolfenshine.");
+            MainWindowViewModel viewModel;
+            try
+            {
+                viewModel = new MainWindowViewModel(WolfensteinResourceLocator.LoadDefault());
+            }
+            catch (WolfensteinDataNotFoundException exception)
+            {
+                viewModel = new MainWindowViewModel(exception);
+            }
+
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel()
+                DataContext = viewModel
             };
         }
 

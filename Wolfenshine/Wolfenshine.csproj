@@ -30,4 +30,15 @@
   <ItemGroup>
     <ProjectReference Include="../DTC.Core/DTC.Core/DTC.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <LocalWolfensteinData Include="$(MSBuildProjectDirectory)/../local/game-data/wolf3d/*.WL6" />
+  </ItemGroup>
+
+  <Target Name="CopyLocalWolfensteinData" AfterTargets="Build" Condition="'@(LocalWolfensteinData)' != ''">
+    <MakeDir Directories="$(TargetDir)GameData" />
+    <Copy SourceFiles="@(LocalWolfensteinData)"
+          DestinationFolder="$(TargetDir)GameData"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>
