@@ -29,6 +29,8 @@
                                     WallTextures="{Binding WallTextures}"
                                     Palette="{Binding Palette}"
                                     WeaponSprite="{Binding WeaponSprite}"
+                                    Sprites="{Binding Sprites}"
+                                    StaticObjects="{Binding StaticObjects}"
                                     RenderOptions.BitmapInterpolationMode="LowQuality" />
 
             <StackPanel IsVisible="{Binding !HasGameData}"

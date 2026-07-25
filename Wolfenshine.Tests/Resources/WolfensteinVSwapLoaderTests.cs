@@ -50,6 +50,21 @@ public sealed class WolfensteinVSwapLoaderTests
         });
     }
 
+    [Test]
+    public void GivenSpriteRegionCheckAllSpritesAndReadyPistolAreLoaded()
+    {
+        using var tempDirectory = CreateSpriteResources();
+
+        var sprites = WolfensteinVSwapLoader.LoadSprites(WolfensteinResources.Load(tempDirectory));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sprites.Count, Is.EqualTo(20));
+            Assert.That(sprites.PistolReady.TryGetIndex(32, 63, out var index), Is.True);
+            Assert.That(index, Is.EqualTo(7));
+        });
+    }
+
     private static TempDirectory CreateResources()
     {
         var tempDirectory = new TempDirectory();
@@ -93,7 +108,6 @@ public sealed class WolfensteinVSwapLoaderTests
         const int pageCount = 28;
         const int spriteStart = 8;
         const int soundStart = 28;
-        const int pistolReadyPage = soundStart - 15;
         var sprite = CreateSinglePixelSprite();
         var dataOffset = 6 + (pageCount * sizeof(uint)) + (pageCount * sizeof(ushort));
         using var writer = new BinaryWriter(
@@ -102,10 +116,15 @@ public sealed class WolfensteinVSwapLoaderTests
         writer.Write((ushort)spriteStart);
         writer.Write((ushort)soundStart);
         for (var page = 0; page < pageCount; page++)
-            writer.Write(page == pistolReadyPage ? (uint)dataOffset : 0U);
+        {
+            writer.Write(page >= spriteStart
+                ? (uint)(dataOffset + ((page - spriteStart) * sprite.Length))
+                : 0U);
+        }
         for (var page = 0; page < pageCount; page++)
-            writer.Write(page == pistolReadyPage ? (ushort)sprite.Length : (ushort)0);
-        writer.Write(sprite);
+            writer.Write(page >= spriteStart ? (ushort)sprite.Length : (ushort)0);
+        for (var page = spriteStart; page < soundStart; page++)
+            writer.Write(sprite);
         return tempDirectory;
     }
 

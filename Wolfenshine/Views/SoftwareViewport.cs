@@ -34,6 +34,7 @@ public sealed class SoftwareViewport : Control
     private WriteableBitmap m_bitmap;
     private readonly WallColumn[] m_columns = new WallColumn[ViewportWidth];
     private readonly byte[] m_pixels = new byte[ViewportWidth * ViewportHeight * 4];
+    private ProjectedWorldSprite[] m_projectedSprites = [];
     private WolfensteinMap m_renderedMap;
     private RaycastCamera m_renderedCamera;
 
@@ -49,6 +50,10 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinPalette>(nameof(Palette));
     public static readonly StyledProperty<WolfensteinSprite> WeaponSpriteProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinSprite>(nameof(WeaponSprite));
+    public static readonly StyledProperty<WolfensteinSpriteSet> SpritesProperty =
+        AvaloniaProperty.Register<SoftwareViewport, WolfensteinSpriteSet>(nameof(Sprites));
+    public static readonly StyledProperty<IReadOnlyList<WorldSprite>> StaticObjectsProperty =
+        AvaloniaProperty.Register<SoftwareViewport, IReadOnlyList<WorldSprite>>(nameof(StaticObjects));
 
     static SoftwareViewport() => AffectsRender<SoftwareViewport>(
         MapProperty,
@@ -56,7 +61,9 @@ public sealed class SoftwareViewport : Control
         DoorsProperty,
         WallTexturesProperty,
         PaletteProperty,
-        WeaponSpriteProperty);
+        WeaponSpriteProperty,
+        SpritesProperty,
+        StaticObjectsProperty);
 
     public WolfensteinMap Map
     {
@@ -94,6 +101,18 @@ public sealed class SoftwareViewport : Control
         set => SetValue(WeaponSpriteProperty, value);
     }
 
+    public WolfensteinSpriteSet Sprites
+    {
+        get => GetValue(SpritesProperty);
+        set => SetValue(SpritesProperty, value);
+    }
+
+    public IReadOnlyList<WorldSprite> StaticObjects
+    {
+        get => GetValue(StaticObjectsProperty);
+        set => SetValue(StaticObjectsProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -109,6 +128,25 @@ public sealed class SoftwareViewport : Control
         // Raycasting and shading produce the complete native-resolution image independently of Avalonia.
         Raycaster.Cast(Map, Doors, Camera, m_columns);
         SoftwareRaycastRenderer.Render(m_columns, ViewportHeight, m_pixels, WallTextures, Palette);
+        if (Sprites != null && StaticObjects != null && Palette != null)
+        {
+            if (m_projectedSprites.Length != StaticObjects.Count)
+                m_projectedSprites = new ProjectedWorldSprite[StaticObjects.Count];
+            var visibleSpriteCount = WorldSpriteProjector.Project(
+                StaticObjects,
+                Camera,
+                ViewportWidth,
+                ViewportHeight,
+                m_projectedSprites);
+            SoftwareRaycastRenderer.DrawWorldSprites(
+                m_projectedSprites.AsSpan(0, visibleSpriteCount),
+                Sprites,
+                Palette,
+                m_columns,
+                m_pixels,
+                ViewportWidth,
+                ViewportHeight);
+        }
         if (WeaponSprite != null && Palette != null)
         {
             SoftwareRaycastRenderer.DrawSprite(

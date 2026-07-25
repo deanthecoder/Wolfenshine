@@ -58,6 +58,22 @@ public static class WolfensteinVSwapLoader
         return sprite;
     }
 
+    public static WolfensteinSpriteSet LoadSprites(WolfensteinResources resources)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
+        using var reader = new BinaryReader(resources.OpenRead(WolfensteinResourceKind.SwapData));
+        var directory = ReadDirectory(reader);
+        var spriteCount = directory.SoundStart - directory.SpriteStart;
+        var sprites = new WolfensteinSprite[spriteCount];
+        for (var spriteNumber = 0; spriteNumber < sprites.Length; spriteNumber++)
+        {
+            var page = directory.SpriteStart + spriteNumber;
+            sprites[spriteNumber] = DecodeSprite(ReadPage(reader, directory, page));
+        }
+        Logger.Instance.Info($"Loaded {sprites.Length} indexed sprites from VSWAP.");
+        return new WolfensteinSpriteSet(sprites);
+    }
+
     private static VSwapDirectory ReadDirectory(BinaryReader reader)
     {
         if (reader.BaseStream.Length < 6)

@@ -91,5 +91,34 @@ public sealed class SoftwareRaycastRendererTests
         Assert.That(GetPixel(pixels, 3), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
     }
 
+    [Test]
+    public void GivenWorldSpriteCheckWallDepthOccludesIndividualColumns()
+    {
+        var sprite = new WolfensteinSprite(
+            Enumerable.Repeat((byte)7, WolfensteinSprite.PixelCount).ToArray(),
+            Enumerable.Repeat(true, WolfensteinSprite.PixelCount).ToArray());
+        var sprites = new WolfensteinSpriteSet(Enumerable.Repeat(sprite, 20).ToArray());
+        var paletteData = new byte[WolfensteinPalette.VgaDataLength];
+        paletteData[7 * 3] = 63;
+        var palette = WolfensteinPalette.FromVgaDac(paletteData);
+        WallColumn[] walls =
+        [
+            new(1.0, 0.0, 1, WallSide.Horizontal),
+            new(3.0, 0.0, 1, WallSide.Horizontal)
+        ];
+        var pixels = Enumerable.Repeat((byte)11, 16).ToArray();
+        ProjectedWorldSprite[] projected = [new(0, 2.0, 1, 2)];
+
+        SoftwareRaycastRenderer.DrawWorldSprites(projected, sprites, palette, walls, pixels, 2, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(GetPixel(pixels, 0), Is.EqualTo(new byte[] { 11, 11, 11, 11 }));
+            Assert.That(GetPixel(pixels, 1), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
+            Assert.That(GetPixel(pixels, 2), Is.EqualTo(new byte[] { 11, 11, 11, 11 }));
+            Assert.That(GetPixel(pixels, 3), Is.EqualTo(new byte[] { 255, 0, 0, 255 }));
+        });
+    }
+
     private static byte[] GetPixel(byte[] pixels, int row) => pixels[(row * 4)..((row + 1) * 4)];
 }

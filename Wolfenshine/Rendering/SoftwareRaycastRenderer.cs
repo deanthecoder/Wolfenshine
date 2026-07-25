@@ -135,6 +135,51 @@ public static class SoftwareRaycastRenderer
         }
     }
 
+    public static void DrawWorldSprites(
+        ReadOnlySpan<ProjectedWorldSprite> projectedSprites,
+        WolfensteinSpriteSet sprites,
+        WolfensteinPalette palette,
+        IReadOnlyList<WallColumn> wallColumns,
+        Span<byte> pixels,
+        int width,
+        int height)
+    {
+        ArgumentNullException.ThrowIfNull(sprites);
+        ArgumentNullException.ThrowIfNull(palette);
+        ArgumentNullException.ThrowIfNull(wallColumns);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+        if (wallColumns.Count != width)
+            throw new ArgumentException("There must be one wall column per output pixel.", nameof(wallColumns));
+        var expectedPixelBytes = checked(width * height * 4);
+        if (pixels.Length != expectedPixelBytes)
+            throw new ArgumentException($"The pixel buffer must contain exactly {expectedPixelBytes} bytes.", nameof(pixels));
+
+        // Sprites arrive farthest first. Nearer opaque pixels naturally overwrite farther sprites.
+        foreach (var projected in projectedSprites)
+        {
+            var sprite = sprites.Get(projected.SpriteNumber);
+            var left = projected.CenterX - (projected.RenderedSize / 2);
+            var top = (height - projected.RenderedSize) / 2;
+            var firstX = Math.Max(0, left);
+            var lastX = Math.Min(width, left + projected.RenderedSize);
+            var firstY = Math.Max(0, top);
+            var lastY = Math.Min(height, top + projected.RenderedSize);
+            for (var x = firstX; x < lastX; x++)
+            {
+                if (projected.Depth >= wallColumns[x].Distance)
+                    continue;
+                var sourceX = ((x - left) * WolfensteinSprite.Size) / projected.RenderedSize;
+                for (var y = firstY; y < lastY; y++)
+                {
+                    var sourceY = ((y - top) * WolfensteinSprite.Size) / projected.RenderedSize;
+                    if (sprite.TryGetIndex(sourceX, sourceY, out var index))
+                        WritePixel(pixels, width, x, y, palette.GetColor(index));
+                }
+            }
+        }
+    }
+
     private static RgbaColor GetFlatColor(WallColumn column)
     {
         var color = column.Tile is >= 90 and <= 101
