@@ -32,6 +32,8 @@ public sealed class MainWindowViewModelTests
 
         Assert.That(viewModel.NativeViewportWidth, Is.EqualTo(320));
         Assert.That(viewModel.NativeViewportHeight, Is.EqualTo(200));
+        Assert.That(viewModel.PresentationViewportWidth, Is.EqualTo(320));
+        Assert.That(viewModel.PresentationViewportHeight, Is.EqualTo(240));
     }
 
     [Test]

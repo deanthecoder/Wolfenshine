@@ -74,6 +74,25 @@ public sealed class RaycasterTests
         Assert.That(columns[1].Distance, Is.EqualTo(columns[^2].Distance).Within(0.0001));
     }
 
+    [TestCase(1.0, 0.0, 24)]
+    [TestCase(-1.0, 0.0, 39)]
+    [TestCase(0.0, -1.0, 16)]
+    [TestCase(0.0, 1.0, 47)]
+    public void GivenWallFaceCheckTextureDirectionMatchesOriginal(
+        double directionX,
+        double directionY,
+        int expectedTextureColumn)
+    {
+        var map = CreateMap(19);
+        var camera = new RaycastCamera(2.25, 2.375, directionX, directionY, 0.0, 0.0);
+        var columns = new WallColumn[1];
+
+        Raycaster.Cast(map, WolfensteinDoors.FromMap(map), camera, columns);
+
+        var textureColumn = (int)(columns[0].TextureU * 64);
+        Assert.That(textureColumn, Is.EqualTo(expectedTextureColumn));
+    }
+
     [Test]
     public void GivenOpeningDoorCheckExposedRaysContinueThroughDoorway()
     {

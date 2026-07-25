@@ -110,10 +110,12 @@ public static class Raycaster
             ? camera.Y + (distance * rayDirectionY)
             : camera.X + (distance * rayDirectionX);
         var textureU = wallPosition - Math.Floor(wallPosition);
-        if (side == WallSide.Vertical && rayDirectionX > 0.0 ||
-            side == WallSide.Horizontal && rayDirectionY < 0.0)
+        // Match the original renderer's face orientation. Subtracting from the largest value below one
+        // mirrors discrete texels exactly: column zero becomes 63 rather than overflowing to column 64.
+        if (side == WallSide.Vertical && rayDirectionX < 0.0 ||
+            side == WallSide.Horizontal && rayDirectionY > 0.0)
         {
-            textureU = 1.0 - textureU;
+            textureU = double.BitDecrement(1.0) - textureU;
         }
         textureU = Math.Clamp(textureU, 0.0, double.BitDecrement(1.0));
         return new WallColumn(distance, textureU, tile, side);

@@ -18,8 +18,8 @@
   <Grid RowDefinitions="*,Auto" Background="#111318">
     <Border Grid.Row="0" Margin="24" Background="#08090B" BorderBrush="#343942" BorderThickness="1">
       <Viewbox Stretch="Uniform">
-        <Border Width="{Binding NativeViewportWidth}"
-                Height="{Binding NativeViewportHeight}"
+        <Border Width="{Binding PresentationViewportWidth}"
+                Height="{Binding PresentationViewportHeight}"
                 Background="#20242B">
           <Grid>
             <local:SoftwareViewport IsVisible="{Binding HasGameData}"

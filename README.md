@@ -6,7 +6,7 @@ A modern C# reimplementation of Wolfenstein 3D, beginning with a faithful 320×2
 
 ## Status
 
-Wolfenshine currently loads and decompresses all 60 maps from the original six-episode data, locates the E1M1 player start, and provides arrow-key navigation through a textured 320×200 software-raycast view using the original indexed wall art and VGA palette. Space opens ordinary sliding doors. Sprites, locked doors, automatic door closing, and wider gameplay are not implemented yet.
+Wolfenshine currently loads and decompresses all 60 maps from the original six-episode data, locates the E1M1 player start, and provides arrow-key navigation through a textured 320×200 software-raycast view using the original indexed wall art and VGA palette. The native image is presented at the original 4:3 display aspect ratio, accounting for Mode 13h's non-square pixels. Space opens ordinary sliding doors. Sprites, locked doors, automatic door closing, and wider gameplay are not implemented yet.
 
 ## Building
 

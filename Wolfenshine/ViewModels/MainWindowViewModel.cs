@@ -21,7 +21,7 @@ namespace Wolfenshine.ViewModels;
 /// Supplies the initial state for the main Wolfenshine window.
 /// </summary>
 /// <remarks>
-/// The native viewport dimensions establish the original Wolfenstein 3D rendering target.
+/// The native viewport remains 320 x 200, while its presentation size accounts for DOS-era non-square pixels.
 /// </remarks>
 public sealed class MainWindowViewModel : ViewModelBase
 {
@@ -80,6 +80,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool HasGameData => Resources != null;
     public int NativeViewportWidth => 320;
     public int NativeViewportHeight => 200;
+    public int PresentationViewportWidth => 320;
+    public int PresentationViewportHeight => 240;
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {
