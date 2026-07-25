@@ -20,15 +20,13 @@ namespace Wolfenshine.Rendering;
 /// </remarks>
 public static class Raycaster
 {
-    private const ushort AreaTile = 107;
-
-    public static WallColumn[] Cast(WolfensteinMap map, RaycastCamera camera, int columnCount)
+    public static void Cast(WolfensteinMap map, RaycastCamera camera, Span<WallColumn> columns)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(camera);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(columnCount);
+        if (columns.IsEmpty)
+            throw new ArgumentException("At least one output column is required.", nameof(columns));
 
-        var columns = new WallColumn[columnCount];
         // Map each pixel center onto the camera plane, then cast its world-space ray independently.
         for (var column = 0; column < columns.Length; column++)
         {
@@ -38,7 +36,6 @@ public static class Raycaster
             columns[column] = CastRay(map, camera, rayDirectionX, rayDirectionY);
         }
 
-        return columns;
     }
 
     private static WallColumn CastRay(
@@ -81,9 +78,11 @@ public static class Raycaster
 
             if (mapX < 0 || mapX >= map.Width || mapY < 0 || mapY >= map.Height)
                 throw new InvalidDataException("A ray left the map without hitting an enclosing wall.");
-            tile = map.GetWall(mapX, mapY);
-            if (tile > 0 && tile < AreaTile)
+            if (map.IsSolid(mapX, mapY))
+            {
+                tile = map.GetWall(mapX, mapY);
                 break;
+            }
         }
 
         // This perpendicular distance projects walls without fish-eye distortion.

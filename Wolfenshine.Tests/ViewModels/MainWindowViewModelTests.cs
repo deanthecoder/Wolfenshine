@@ -10,6 +10,7 @@
 
 using DTC.Core;
 using NUnit.Framework;
+using Wolfenshine.Game;
 using Wolfenshine.Maps;
 using Wolfenshine.Resources;
 using Wolfenshine.ViewModels;
@@ -70,5 +71,25 @@ public sealed class MainWindowViewModelTests
         Assert.That(viewModel.SelectedMap, Is.SameAs(map));
         Assert.That(viewModel.Camera, Is.Not.Null);
         Assert.That(viewModel.StatusText, Does.Contain("E1M1"));
+    }
+
+    [Test]
+    public void GivenGameUpdateCheckCameraChangeIsPublished()
+    {
+        var map = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        var originalCamera = viewModel.Camera;
+        var changedProperty = string.Empty;
+        viewModel.PropertyChanged += (_, args) => changedProperty = args.PropertyName;
+
+        viewModel.UpdateGame(0.1, new PlayerInput(false, false, false, true));
+
+        Assert.That(viewModel.Camera, Is.Not.SameAs(originalCamera));
+        Assert.That(changedProperty, Is.EqualTo(nameof(MainWindowViewModel.Camera)));
     }
 }

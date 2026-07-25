@@ -47,7 +47,9 @@ public sealed class RaycasterTests
         var map = CreateMap(19);
         var camera = RaycastCamera.FromPlayerStart(map);
 
-        var column = Raycaster.Cast(map, camera, 1)[0];
+        var columns = new WallColumn[1];
+        Raycaster.Cast(map, camera, columns);
+        var column = columns[0];
 
         Assert.Multiple(() =>
         {
@@ -64,7 +66,8 @@ public sealed class RaycasterTests
         var map = CreateMap(19);
         var camera = RaycastCamera.FromPlayerStart(map);
 
-        var columns = Raycaster.Cast(map, camera, 5);
+        var columns = new WallColumn[5];
+        Raycaster.Cast(map, camera, columns);
 
         Assert.That(columns[0].Distance, Is.EqualTo(columns[^1].Distance).Within(0.0001));
         Assert.That(columns[1].Distance, Is.EqualTo(columns[^2].Distance).Within(0.0001));

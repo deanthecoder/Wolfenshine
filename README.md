@@ -6,7 +6,7 @@ A modern C# reimplementation of Wolfenstein 3D, beginning with a faithful 320×2
 
 ## Status
 
-Wolfenshine currently loads and decompresses all 60 maps from the original six-episode data, locates the E1M1 player start, and displays a flat-color 320×200 software-raycast view. Wall textures, movement, sprites, doors, and gameplay are not implemented yet.
+Wolfenshine currently loads and decompresses all 60 maps from the original six-episode data, locates the E1M1 player start, and provides arrow-key navigation through a flat-color 320×200 software-raycast view. Wall textures, sprites, functional doors, and wider gameplay are not implemented yet.
 
 ## Building
 

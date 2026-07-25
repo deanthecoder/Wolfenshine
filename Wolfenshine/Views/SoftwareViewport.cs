@@ -30,6 +30,7 @@ public sealed class SoftwareViewport : Control
     private const int ViewportWidth = 320;
     private const int ViewportHeight = 200;
     private WriteableBitmap m_bitmap;
+    private readonly WallColumn[] m_columns = new WallColumn[ViewportWidth];
     private readonly byte[] m_pixels = new byte[ViewportWidth * ViewportHeight * 4];
     private WolfensteinMap m_renderedMap;
     private RaycastCamera m_renderedCamera;
@@ -66,8 +67,8 @@ public sealed class SoftwareViewport : Control
     private void RenderFrame()
     {
         // Raycasting and shading produce the complete native-resolution image independently of Avalonia.
-        var columns = Raycaster.Cast(Map, Camera, ViewportWidth);
-        SoftwareRaycastRenderer.Render(columns, ViewportHeight, m_pixels);
+        Raycaster.Cast(Map, Camera, m_columns);
+        SoftwareRaycastRenderer.Render(m_columns, ViewportHeight, m_pixels);
 
         // The viewport size never changes, so retain its native bitmap and update only the locked pixel memory.
         m_bitmap ??= new WriteableBitmap(

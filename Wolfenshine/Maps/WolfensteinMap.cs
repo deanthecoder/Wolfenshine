@@ -18,6 +18,9 @@ namespace Wolfenshine.Maps;
 /// </remarks>
 public sealed class WolfensteinMap
 {
+    // Original plane-zero values from this point onward identify walkable floor areas rather than structures.
+    private const ushort FirstAreaTile = 107;
+
     public WolfensteinMap(
         int slot,
         string name,
@@ -57,6 +60,14 @@ public sealed class WolfensteinMap
     public ushort GetWall(int x, int y) => GetTile(Walls, x, y);
 
     public ushort GetObject(int x, int y) => GetTile(Objects, x, y);
+
+    public bool IsSolid(int x, int y)
+    {
+        if (x < 0 || x >= Width || y < 0 || y >= Height)
+            return true;
+        var tile = GetWall(x, y);
+        return tile > 0 && tile < FirstAreaTile;
+    }
 
     private ushort GetTile(IReadOnlyList<ushort> plane, int x, int y)
     {

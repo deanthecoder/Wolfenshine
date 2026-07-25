@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using DTC.Core.ViewModels;
+using Wolfenshine.Game;
 using Wolfenshine.Maps;
 using Wolfenshine.Rendering;
 using Wolfenshine.Resources;
@@ -23,6 +24,9 @@ namespace Wolfenshine.ViewModels;
 /// </remarks>
 public sealed class MainWindowViewModel : ViewModelBase
 {
+    private readonly GameSession m_gameSession;
+    private RaycastCamera m_camera;
+
     public MainWindowViewModel()
         : this(new WolfensteinDataNotFoundException(
             WolfensteinResourceLocator.GetDefaultDirectory(),
@@ -37,10 +41,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         Resources = resources;
         Maps = maps;
         SelectedMap = maps.Maps.FirstOrDefault();
-        Camera = SelectedMap == null ? null : RaycastCamera.FromPlayerStart(SelectedMap);
+        if (SelectedMap != null)
+        {
+            m_camera = RaycastCamera.FromPlayerStart(SelectedMap);
+            m_gameSession = new GameSession(SelectedMap, m_camera);
+        }
         StatusText = SelectedMap == null
             ? "Wolfenstein 3D data loaded, but it contains no maps"
-            : $"{SelectedMap.Name} · flat-color software raycaster · {maps.Maps.Count} maps loaded";
+            : $"{SelectedMap.Name} · arrows move and turn · {maps.Maps.Count} maps loaded";
     }
 
     public MainWindowViewModel(WolfensteinDataNotFoundException exception)
@@ -56,10 +64,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinResources Resources { get; }
     public WolfensteinMapSet Maps { get; }
     public WolfensteinMap SelectedMap { get; }
-    public RaycastCamera Camera { get; }
+    public RaycastCamera Camera => m_camera;
     public string StatusText { get; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;
     public int NativeViewportWidth => 320;
     public int NativeViewportHeight => 200;
+
+    public void UpdateGame(double elapsedSeconds, PlayerInput input)
+    {
+        if (m_gameSession?.Update(elapsedSeconds, input) == true)
+            SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
+    }
 }
