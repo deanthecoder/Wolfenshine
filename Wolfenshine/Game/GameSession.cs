@@ -43,6 +43,7 @@ public sealed class GameSession
     private int m_attackStep;
     private double m_attackTimeRemaining;
     private PlayerWeapon m_chosenWeapon = PlayerWeapon.Pistol;
+    private PlayerWeapon m_bestWeapon = PlayerWeapon.Pistol;
     private readonly IReadOnlyList<WolfensteinActorState> m_actors;
     private readonly List<WorldSprite> m_staticObjects;
 
@@ -67,6 +68,7 @@ public sealed class GameSession
     public WolfensteinDoors Doors { get; }
     public WolfensteinPushWalls PushWalls { get; }
     public PlayerWeapon Weapon { get; private set; } = PlayerWeapon.Pistol;
+    public PlayerWeapon BestWeapon => m_bestWeapon;
     public int WeaponFrame { get; private set; }
     public int Ammo { get; private set; } = 8;
     public int Health { get; private set; } = MaximumHealth;
@@ -83,7 +85,9 @@ public sealed class GameSession
     public bool ReloadDebugState()
     {
         var changed = Ammo != MaximumAmmo || Health != MaximumHealth ||
+                      m_bestWeapon != PlayerWeapon.Chaingun ||
                       !IsAttacking && Weapon != m_chosenWeapon;
+        m_bestWeapon = PlayerWeapon.Chaingun;
         GiveAmmo(MaximumAmmo);
         Health = MaximumHealth;
         return changed;
@@ -280,6 +284,12 @@ public sealed class GameSession
                 case WolfensteinPickupType.AmmoClip:
                     GiveAmmo(8);
                     break;
+                case WolfensteinPickupType.MachineGun:
+                    GiveWeapon(PlayerWeapon.MachineGun);
+                    break;
+                case WolfensteinPickupType.Chaingun:
+                    GiveWeapon(PlayerWeapon.Chaingun);
+                    break;
                 case WolfensteinPickupType.Cross:
                     CollectTreasure(100);
                     break;
@@ -315,7 +325,8 @@ public sealed class GameSession
     private bool UpdateWeapon(double elapsedSeconds, PlayerInput input)
     {
         var changed = false;
-        if (!IsAttacking && Ammo > 0 && input.WeaponSelection is { } selection && selection != Weapon)
+        if (!IsAttacking && Ammo > 0 && input.WeaponSelection is { } selection &&
+            selection <= m_bestWeapon && selection != Weapon)
         {
             m_chosenWeapon = selection;
             Weapon = selection;
@@ -420,8 +431,14 @@ public sealed class GameSession
         if (target.IsDead)
         {
             Score += target.Score;
-            if (target.Actor.Type != WolfensteinActorType.Dog)
-                m_staticObjects.Add(new WorldSprite(target.Actor.X, target.Actor.Y, 28));
+            var dropSprite = target.Actor.Type switch
+            {
+                WolfensteinActorType.Dog => -1,
+                WolfensteinActorType.Ss when m_bestWeapon < PlayerWeapon.MachineGun => 29,
+                _ => 28
+            };
+            if (dropSprite >= 0)
+                m_staticObjects.Add(new WorldSprite(target.Actor.X, target.Actor.Y, dropSprite));
         }
         ActorRevision++;
     }
@@ -435,5 +452,16 @@ public sealed class GameSession
             Weapon = m_chosenWeapon;
             WeaponFrame = 0;
         }
+    }
+
+    private void GiveWeapon(PlayerWeapon weapon)
+    {
+        GiveAmmo(6);
+        if (weapon <= m_bestWeapon)
+            return;
+        m_bestWeapon = weapon;
+        m_chosenWeapon = weapon;
+        Weapon = weapon;
+        WeaponFrame = 0;
     }
 }

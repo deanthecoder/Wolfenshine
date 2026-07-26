@@ -60,6 +60,8 @@ public sealed class WolfensteinStaticObjectsTests
     }
 
     [TestCase(28, WolfensteinPickupType.AmmoClip)]
+    [TestCase(29, WolfensteinPickupType.MachineGun)]
+    [TestCase(30, WolfensteinPickupType.Chaingun)]
     [TestCase(31, WolfensteinPickupType.Cross)]
     [TestCase(32, WolfensteinPickupType.Chalice)]
     [TestCase(33, WolfensteinPickupType.Bible)]

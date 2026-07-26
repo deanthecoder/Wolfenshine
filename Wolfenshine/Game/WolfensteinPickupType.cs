@@ -17,6 +17,8 @@ public enum WolfensteinPickupType
 {
     None,
     AmmoClip,
+    MachineGun,
+    Chaingun,
     Cross,
     Chalice,
     Bible,

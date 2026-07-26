@@ -60,14 +60,31 @@ public sealed class GameSessionTests
     }
 
     [Test]
-    public void GivenWeaponSelectionCheckAllWeaponsAreImmediatelyAvailable()
+    public void GivenUnownedWeaponSelectionCheckCurrentWeaponIsUnchanged()
     {
         var session = CreateSession();
 
         session.Update(0.0, new PlayerInput(false, false, false, false, WeaponSelection: PlayerWeapon.Chaingun));
 
-        Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.Chaingun));
+        Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.Pistol));
         Assert.That(session.WeaponFrame, Is.Zero);
+    }
+
+    [TestCase(50, PlayerWeapon.MachineGun)]
+    [TestCase(51, PlayerWeapon.Chaingun)]
+    public void GivenWeaponPickupCheckItIsOwnedEquippedAndAddsSixRounds(int marker, PlayerWeapon weapon)
+    {
+        var session = CreateSessionWithObject((ushort)marker);
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.BestWeapon, Is.EqualTo(weapon));
+            Assert.That(session.Weapon, Is.EqualTo(weapon));
+            Assert.That(session.Ammo, Is.EqualTo(14));
+            Assert.That(session.StaticObjects, Is.Empty);
+        });
     }
 
     [Test]
@@ -105,8 +122,6 @@ public sealed class GameSessionTests
     }
 
     [TestCase(PlayerWeapon.Pistol)]
-    [TestCase(PlayerWeapon.MachineGun)]
-    [TestCase(PlayerWeapon.Chaingun)]
     public void GivenFinalRoundAndHeldAttackCheckGunStopsAndReturnsToKnife(PlayerWeapon weapon)
     {
         var session = CreateSession();
@@ -136,7 +151,7 @@ public sealed class GameSessionTests
             false,
             false,
             Attack: true,
-            WeaponSelection: PlayerWeapon.Chaingun));
+            WeaponSelection: PlayerWeapon.Pistol));
 
         Assert.Multiple(() =>
         {
@@ -156,7 +171,7 @@ public sealed class GameSessionTests
             false,
             false,
             false,
-            WeaponSelection: PlayerWeapon.MachineGun));
+            WeaponSelection: PlayerWeapon.Pistol));
         session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
         session.Update(0.5, new PlayerInput(false, false, false, false, Attack: true));
         session.Update(0.0, default);
@@ -167,7 +182,7 @@ public sealed class GameSessionTests
         Assert.Multiple(() =>
         {
             Assert.That(session.Ammo, Is.EqualTo(8));
-            Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.MachineGun));
+            Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.Pistol));
             Assert.That(session.WeaponFrame, Is.Zero);
         });
     }
@@ -186,7 +201,16 @@ public sealed class GameSessionTests
             Assert.That(changed, Is.True);
             Assert.That(session.Ammo, Is.EqualTo(99));
             Assert.That(session.Health, Is.EqualTo(100));
+            Assert.That(session.BestWeapon, Is.EqualTo(PlayerWeapon.Chaingun));
         });
+
+        session.Update(0.0, new PlayerInput(
+            false,
+            false,
+            false,
+            false,
+            WeaponSelection: PlayerWeapon.Chaingun));
+        Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.Chaingun));
     }
 #endif
 

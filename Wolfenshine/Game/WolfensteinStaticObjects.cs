@@ -61,6 +61,8 @@ public static class WolfensteinStaticObjects
     public static WolfensteinPickupType GetPickupType(int spriteNumber) => spriteNumber switch
     {
         28 => WolfensteinPickupType.AmmoClip,
+        29 => WolfensteinPickupType.MachineGun,
+        30 => WolfensteinPickupType.Chaingun,
         31 => WolfensteinPickupType.Cross,
         32 => WolfensteinPickupType.Chalice,
         33 => WolfensteinPickupType.Bible,
