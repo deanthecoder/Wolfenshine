@@ -195,6 +195,7 @@ public sealed partial class MainWindow : Window
                 m_turnRight = isDown;
                 return true;
             case Key.Space:
+            case Key.Enter:
                 m_use = isDown;
                 return true;
             case Key.LeftShift:

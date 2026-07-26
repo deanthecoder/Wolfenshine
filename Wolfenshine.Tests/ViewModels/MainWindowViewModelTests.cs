@@ -71,8 +71,9 @@ public sealed class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel(resources, mapSet);
 
         Assert.That(viewModel.SelectedMap, Is.SameAs(map));
-        Assert.That(viewModel.Camera, Is.Not.Null);
-        Assert.That(viewModel.StatusText, Does.Contain("E1M1"));
+        Assert.That(viewModel.Camera, Is.Null);
+        Assert.That(viewModel.IsSelectingDifficulty, Is.True);
+        Assert.That(viewModel.StatusText, Does.Contain("Select difficulty"));
     }
 
     [Test]
@@ -85,6 +86,7 @@ public sealed class MainWindowViewModelTests
         foreach (var fileName in WolfensteinResources.FileNames.Values)
             File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
         var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        StartNormalGame(viewModel);
         var originalCamera = viewModel.Camera;
         var changedProperty = string.Empty;
         viewModel.PropertyChanged += (_, args) => changedProperty = args.PropertyName;
@@ -93,6 +95,34 @@ public sealed class MainWindowViewModelTests
 
         Assert.That(viewModel.Camera, Is.Not.SameAs(originalCamera));
         Assert.That(changedProperty, Is.EqualTo(nameof(MainWindowViewModel.Camera)));
+    }
+
+    [Test]
+    public void GivenHardDifficultySelectedCheckHardActorsArePlaced()
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        var objects = new ushort[size * size];
+        objects[(2 * size) + 2] = 19;
+        objects[(1 * size) + 2] = 180;
+        var map = new WolfensteinMap(0, "E1M1", size, size, walls, objects);
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+
+        viewModel.UpdateGame(0.0, new PlayerInput(false, true, false, false));
+        viewModel.UpdateGame(0.0, default);
+        viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsSelectingDifficulty, Is.False);
+            Assert.That(viewModel.Difficulty, Is.EqualTo(GameDifficulty.Hard));
+            Assert.That(viewModel.Actors, Has.Count.EqualTo(1));
+        });
     }
 
     [Test]
@@ -106,6 +136,7 @@ public sealed class MainWindowViewModelTests
         foreach (var fileName in WolfensteinResources.FileNames.Values)
             File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
         var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        StartNormalGame(viewModel);
 
         CompleteLevel(viewModel);
         Assert.That(viewModel.IsShowingLevelStats, Is.True);
@@ -116,6 +147,31 @@ public sealed class MainWindowViewModelTests
         CompleteLevel(viewModel);
         ContinueFromStats(viewModel);
         Assert.That(viewModel.SelectedMap, Is.SameAs(firstMap));
+    }
+
+    [Test]
+    public void GivenFinalLifeLostCheckDifficultyScreenReturnsAtFirstLevel()
+    {
+        var firstMap = CreateDogMap(0, "E1M1");
+        var secondMap = CreateElevatorMap(1, "E1M2");
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { firstMap, secondMap });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        StartNormalGame(viewModel);
+
+        for (var update = 0; update < 500 && !viewModel.IsSelectingDifficulty; update++)
+            viewModel.UpdateGame(1.0, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsSelectingDifficulty, Is.True);
+            Assert.That(viewModel.IsGameOver, Is.False);
+            Assert.That(viewModel.SelectedMap, Is.SameAs(firstMap));
+            Assert.That(viewModel.Camera, Is.Null);
+        });
     }
 
     private static WolfensteinMap CreateElevatorMap(int slot, string name)
@@ -135,7 +191,30 @@ public sealed class MainWindowViewModelTests
         return new WolfensteinMap(slot, name, size, size, walls, objects);
     }
 
+    private static WolfensteinMap CreateDogMap(int slot, string name)
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        for (var index = 0; index < size; index++)
+        {
+            walls[index] = 1;
+            walls[((size - 1) * size) + index] = 1;
+            walls[index * size] = 1;
+            walls[(index * size) + size - 1] = 1;
+        }
+        var objects = new ushort[size * size];
+        objects[(2 * size) + 2] = 19;
+        objects[(1 * size) + 2] = 134;
+        return new WolfensteinMap(slot, name, size, size, walls, objects);
+    }
+
     private static void CompleteLevel(MainWindowViewModel viewModel)
+    {
+        viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
+        viewModel.UpdateGame(0.5, default);
+    }
+
+    private static void StartNormalGame(MainWindowViewModel viewModel)
     {
         viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
         viewModel.UpdateGame(0.5, default);

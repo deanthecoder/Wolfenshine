@@ -47,6 +47,7 @@ public sealed class App : Application
                 var palette = WolfensteinPaletteLoader.Load(resources);
                 var hudGraphics = WolfensteinGraphicsLoader.LoadHudGraphics(resources);
                 var intermissionGraphics = WolfensteinGraphicsLoader.LoadIntermissionGraphics(resources);
+                var difficultyGraphics = WolfensteinGraphicsLoader.LoadDifficultyGraphics(resources);
                 WolfensteinAudioPlayer audioPlayer = null;
                 try
                 {
@@ -68,11 +69,9 @@ public sealed class App : Application
                     hudGraphics,
                     audioPlayer,
                     settings,
-                    intermissionGraphics);
-                Logger.Instance.Info(
-                    $"Loaded {viewModel.StaticObjects.Count} static world objects for {viewModel.SelectedMap.Name}.");
-                Logger.Instance.Info(
-                    $"Placed {viewModel.Actors.Count} actors for {viewModel.SelectedMap.Name} on normal difficulty.");
+                    intermissionGraphics,
+                    difficultyGraphics);
+                Logger.Instance.Info("Waiting for the player to select a difficulty.");
             }
             catch (WolfensteinDataNotFoundException exception)
             {

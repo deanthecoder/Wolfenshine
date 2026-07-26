@@ -59,6 +59,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private double m_statsCountTime;
     private WolfensteinElevatorSwitch m_elevatorSwitch;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
+    private bool m_isSelectingDifficulty;
+    private bool m_difficultyInputReleased = true;
+    private int m_selectedDifficultyIndex = 2;
+    private GameDifficulty m_difficulty = GameDifficulty.Normal;
 
     public MainWindowViewModel()
         : this(new WolfensteinDataNotFoundException(
@@ -77,7 +81,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         WolfensteinHudGraphics hudGraphics = null,
         WolfensteinAudioPlayer audioPlayer = null,
         WolfenshineSettings settings = null,
-        WolfensteinIntermissionGraphics intermissionGraphics = null)
+        WolfensteinIntermissionGraphics intermissionGraphics = null,
+        WolfensteinDifficultyGraphics difficultyGraphics = null)
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(maps);
@@ -90,10 +95,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer = audioPlayer;
         m_settings = settings;
         IntermissionGraphics = intermissionGraphics;
+        DifficultyGraphics = difficultyGraphics;
         m_weaponSprite = weaponSprite;
         SelectedMap = maps.Maps.FirstOrDefault();
         if (SelectedMap != null)
-            StartMap(SelectedMap, null, startFaded: false);
+        {
+            m_isSelectingDifficulty = true;
+            Actors = [];
+            StaticObjects = [];
+            m_audioPlayer?.PlayMusicTrack(14);
+        }
         else
         {
             Actors = [];
@@ -101,7 +112,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
         StatusText = SelectedMap == null
             ? "Wolfenstein 3D data loaded, but it contains no maps"
-            : $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · 1–4 select weapons · Space opens doors";
+            : "Select difficulty · arrows choose · Enter, Space, or Command starts";
     }
 
     public MainWindowViewModel(WolfensteinDataNotFoundException exception)
@@ -127,6 +138,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public WolfensteinSpriteSet Sprites { get; }
     public WolfensteinGraphic StatusBar => m_statusBar;
     public WolfensteinIntermissionGraphics IntermissionGraphics { get; }
+    public WolfensteinDifficultyGraphics DifficultyGraphics { get; }
     public IReadOnlyList<WorldSprite> StaticObjects { get; private set; }
     public IReadOnlyList<WolfensteinActor> Actors { get; private set; }
     public IReadOnlyList<WorldSprite> WorldObjects => m_worldObjects;
@@ -138,6 +150,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public double DamageFlash => m_damageFlash;
     public double LevelFade => m_levelFade;
     public bool IsShowingLevelStats => m_isShowingLevelStats;
+    public bool IsSelectingDifficulty => m_isSelectingDifficulty;
+    public int SelectedDifficultyIndex => m_selectedDifficultyIndex;
+    public GameDifficulty Difficulty => m_difficulty;
     public WolfensteinLevelStats LevelStats => m_levelStats;
     public int BjFrame => m_bjFrame;
     public int NativeViewportWidth => 320;
@@ -147,6 +162,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {
+        if (m_isSelectingDifficulty)
+        {
+            UpdateDifficultySelection(input);
+            return;
+        }
         if (m_isShowingLevelStats)
         {
             UpdateStatsAnimation(elapsedSeconds);
@@ -168,6 +188,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         foreach (var soundEvent in m_gameSession.DrainSoundEvents())
             m_audioPlayer?.Play(soundEvent, m_gameSession.Camera);
+        if (m_gameSession.IsGameOver)
+        {
+            ReturnToDifficultySelection();
+            return;
+        }
         if (m_gameSession.IsReadyForNextLevel)
         {
             BeginLevelStats();
@@ -202,6 +227,74 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
         UpdateHud();
         SetField(ref m_isGameOver, m_gameSession.IsGameOver, nameof(IsGameOver));
+    }
+
+    private void UpdateDifficultySelection(PlayerInput input)
+    {
+        var hasInput = HasInput(input);
+        if (!hasInput)
+        {
+            m_difficultyInputReleased = true;
+            return;
+        }
+        if (!m_difficultyInputReleased)
+            return;
+        m_difficultyInputReleased = false;
+
+        if (input.MoveForward || input.TurnLeft)
+        {
+            SetField(
+                ref m_selectedDifficultyIndex,
+                (m_selectedDifficultyIndex + 3) % 4,
+                nameof(SelectedDifficultyIndex));
+            PlayMenuSound(WolfensteinSoundEffect.MenuMove);
+            return;
+        }
+        if (input.MoveBackward || input.TurnRight)
+        {
+            SetField(
+                ref m_selectedDifficultyIndex,
+                (m_selectedDifficultyIndex + 1) % 4,
+                nameof(SelectedDifficultyIndex));
+            PlayMenuSound(WolfensteinSoundEffect.MenuMove);
+            return;
+        }
+        if (!input.Use && !input.Attack)
+            return;
+
+        m_difficulty = (GameDifficulty)m_selectedDifficultyIndex;
+        PlayMenuSound(WolfensteinSoundEffect.MenuSelect);
+        SetField(ref m_isSelectingDifficulty, false, nameof(IsSelectingDifficulty));
+        StartMap(SelectedMap, null, startFaded: true);
+        NotifyMapChanged();
+    }
+
+    private void PlayMenuSound(WolfensteinSoundEffect effect)
+    {
+        if (SelectedMap == null)
+            return;
+        m_audioPlayer?.Play(new WolfensteinSoundEvent(effect), RaycastCamera.FromPlayerStart(SelectedMap));
+    }
+
+    private void ReturnToDifficultySelection()
+    {
+        m_gameSession = null;
+        SelectedMap = Maps.Maps.FirstOrDefault();
+        Actors = [];
+        StaticObjects = [];
+        SetField(ref m_worldObjects, [], nameof(WorldObjects));
+        SetField(ref m_camera, null, nameof(Camera));
+        SetField(ref m_elevatorSwitch, null, nameof(ElevatorSwitch));
+        SetField(ref m_deathFade, 0.0, nameof(DeathFade));
+        SetField(ref m_damageFlash, 0.0, nameof(DamageFlash));
+        SetField(ref m_levelFade, 0.0, nameof(LevelFade));
+        SetField(ref m_isGameOver, false, nameof(IsGameOver));
+        SetField(ref m_isSelectingDifficulty, true, nameof(IsSelectingDifficulty));
+        m_difficultyInputReleased = false;
+        m_audioPlayer?.PlayMusicTrack(14);
+        m_audioPlayer?.SetMusicFade(0.0);
+        StatusText = "Select difficulty · arrows choose · Enter, Space, or Command starts";
+        NotifyMapChanged();
     }
 
     public void Dispose()
@@ -354,13 +447,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_isShowingLevelStats, false, nameof(IsShowingLevelStats));
         SetField(ref m_levelStats, null, nameof(LevelStats));
         SelectedMap = map;
-        Actors = WolfensteinActors.FromMap(map, GameDifficulty.Normal);
+        Actors = WolfensteinActors.FromMap(map, m_difficulty);
         m_camera = camera ?? RaycastCamera.FromPlayerStart(map);
         m_gameSession = new GameSession(
             map,
             m_camera,
             Actors,
-            GameDifficulty.Normal,
+            m_difficulty,
             playerState,
             startFaded);
         m_elevatorSwitch = m_gameSession.ElevatorSwitch;
@@ -449,7 +542,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         Logger.Instance.Info(
             $"Player weapon {m_gameSession.Weapon}, frame {m_gameSession.WeaponFrame}, " +
             $"attacking {m_gameSession.IsAttacking}, health {m_gameSession.Health}, lives {m_gameSession.Lives}, " +
-            $"ammo {m_gameSession.Ammo}, " +
+            $"ammo {m_gameSession.Ammo}, difficulty {m_gameSession.Difficulty}, " +
             $"score {m_gameSession.Score}, treasure {m_gameSession.TreasureCount}, " +
             $"secrets {m_gameSession.SecretCount}/{m_gameSession.SecretTotal}.");
         foreach (var wall in m_gameSession.PushWalls.Items)

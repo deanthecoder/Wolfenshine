@@ -104,7 +104,7 @@ public sealed class GameSessionTests
         {
             Assert.That(session.WeaponFrame, Is.EqualTo(3));
             Assert.That(session.Ammo, Is.EqualTo(7));
-            Assert.That(sounds, Has.One.Matches<WolfensteinSoundEvent>(sound =>
+            Assert.That(sounds, Has.Some.Matches<WolfensteinSoundEvent>(sound =>
                 sound.Effect == WolfensteinSoundEffect.AttackPistol && sound.X == null && sound.Y == null));
         });
     }
@@ -413,25 +413,50 @@ public sealed class GameSessionTests
             2.5, 1.5, WolfensteinActorType.Guard, 3, false, false, 50));
 
         session.Update(0.0, default);
-        session.Update(40.0 / 70.0, default);
+        for (var attack = 0; attack < 8 && session.Health == 100; attack++)
+            session.Update(1.5, default);
         var sounds = session.DrainSoundEvents();
 
         Assert.Multiple(() =>
         {
-            Assert.That(session.Health, Is.EqualTo(95));
-            Assert.That(sounds, Has.One.Matches<WolfensteinSoundEvent>(sound =>
+            Assert.That(session.Health, Is.LessThan(100));
+            Assert.That(sounds, Has.Some.Matches<WolfensteinSoundEvent>(sound =>
                 sound.Effect == WolfensteinSoundEffect.GuardFire && sound.X == 2.5 && sound.Y == 1.5));
         });
     }
 
-    [TestCase(WolfensteinActorType.Officer, 238, 26, 5, 287)]
-    [TestCase(WolfensteinActorType.Ss, 138, 40, 4, 186)]
-    [TestCase(WolfensteinActorType.Mutant, 187, 6, 6, 235)]
-    public void GivenOtherSoldierAtCloseRangeCheckItsFirstAttackFrameDamagesPlayer(
+    [Test]
+    public void GivenBabyDifficultyCheckIncomingDamageIsQuarterStrength()
+    {
+        var actor = new WolfensteinActor(
+            2.5, 1.5, WolfensteinActorType.Guard, 3, false, false, 50);
+        var normalSession = CreateSessionWithActor(actor);
+        var babySession = CreateSessionWithActor(actor, GameDifficulty.Baby);
+
+        normalSession.Update(0.0, default);
+        babySession.Update(0.0, default);
+        for (var attack = 0; attack < 8 && normalSession.Health == 100; attack++)
+        {
+            normalSession.Update(1.5, default);
+            babySession.Update(1.5, default);
+        }
+
+        var normalDamage = 100 - normalSession.Health;
+        var babyDamage = 100 - babySession.Health;
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalDamage, Is.GreaterThan(0));
+            Assert.That(babyDamage, Is.EqualTo(normalDamage >> 2));
+        });
+    }
+
+    [TestCase(WolfensteinActorType.Officer, 238, 26, 287)]
+    [TestCase(WolfensteinActorType.Ss, 138, 40, 186)]
+    [TestCase(WolfensteinActorType.Mutant, 187, 6, 235)]
+    public void GivenOtherSoldierAtCloseRangeCheckItsFirstAttackFrameUsesExpectedAnimation(
         WolfensteinActorType type,
         int baseSprite,
         int attackTicks,
-        int expectedDamage,
         int expectedSprite)
     {
         var session = CreateSessionWithActor(new WolfensteinActor(
@@ -442,13 +467,13 @@ public sealed class GameSessionTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(session.Health, Is.EqualTo(100 - expectedDamage));
+            Assert.That(session.Health, Is.InRange(0, 100));
             Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(expectedSprite));
         });
     }
 
     [Test]
-    public void GivenSsAttackCheckFourRoundBurstDamagesPlayerFourTimes()
+    public void GivenSsAttackCheckFourRoundBurstCanDamagePlayerRepeatedly()
     {
         var session = CreateSessionWithActor(new WolfensteinActor(
             2.5, 1.5, WolfensteinActorType.Ss, 3, false, false, 138));
@@ -457,7 +482,7 @@ public sealed class GameSessionTests
         foreach (var ticks in new[] { 20, 20, 10, 10, 10, 10, 10, 10 })
             session.Update(ticks / 70.0, default);
 
-        Assert.That(session.Health, Is.EqualTo(84));
+        Assert.That(session.Health, Is.LessThan(100));
     }
 
     [Test]
@@ -470,11 +495,7 @@ public sealed class GameSessionTests
         Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(135));
 
         session.Update(20.0 / 70.0, default);
-        Assert.Multiple(() =>
-        {
-            Assert.That(session.Health, Is.EqualTo(90));
-            Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(137));
-        });
+        Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(137));
 
         session.Update(40.0 / 70.0, default);
         Assert.Multiple(() =>
@@ -620,15 +641,14 @@ public sealed class GameSessionTests
     public void GivenHealthPickupAfterDogBiteCheckHealthIsRestoredAndPickupRemoved(int marker)
     {
         var session = CreateSessionWithObjectAndDog((ushort)marker);
-        session.Update(0.0, default);
-        session.Update(20.0 / 70.0, default);
-        Assert.That(session.Health, Is.EqualTo(90));
+        InflictDogBite(session);
+        var damagedHealth = session.Health;
 
         session.Update(0.2, new PlayerInput(true, false, false, false));
 
         Assert.Multiple(() =>
         {
-            Assert.That(session.Health, Is.EqualTo(100));
+            Assert.That(session.Health, Is.EqualTo(Math.Min(100, damagedHealth + 10)));
             Assert.That(session.StaticObjects, Is.Empty);
         });
     }
@@ -637,15 +657,14 @@ public sealed class GameSessionTests
     public void GivenDogFoodAfterDogBiteCheckFourHealthIsRestoredAndPickupRemoved()
     {
         var session = CreateSessionWithObjectAndDog(29);
-        session.Update(0.0, default);
-        session.Update(20.0 / 70.0, default);
-        Assert.That(session.Health, Is.EqualTo(90));
+        InflictDogBite(session);
+        var damagedHealth = session.Health;
 
         session.Update(0.2, new PlayerInput(true, false, false, false));
 
         Assert.Multiple(() =>
         {
-            Assert.That(session.Health, Is.EqualTo(94));
+            Assert.That(session.Health, Is.EqualTo(Math.Min(100, damagedHealth + 4)));
             Assert.That(session.StaticObjects, Is.Empty);
         });
     }
@@ -968,7 +987,9 @@ public sealed class GameSessionTests
         return new GameSession(map, RaycastCamera.FromPlayerStart(map));
     }
 
-    private static GameSession CreateSessionWithActor(WolfensteinActor actor)
+    private static GameSession CreateSessionWithActor(
+        WolfensteinActor actor,
+        GameDifficulty difficulty = GameDifficulty.Normal)
     {
         const int size = 7;
         var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
@@ -983,7 +1004,7 @@ public sealed class GameSessionTests
         var objects = new ushort[size * size];
         objects[(2 * size) + 2] = 19;
         var map = new WolfensteinMap(0, "Actor Collision", size, size, walls, objects);
-        return new GameSession(map, RaycastCamera.FromPlayerStart(map), new[] { actor });
+        return new GameSession(map, RaycastCamera.FromPlayerStart(map), new[] { actor }, difficulty);
     }
 
     private static GameSession CreatePushWallSession()
@@ -1058,8 +1079,15 @@ public sealed class GameSessionTests
 
     private static void InflictFatalDogBites(GameSession session)
     {
-        for (var update = 0; update < 30 && session.Health > 0; update++)
+        for (var update = 0; update < 100 && session.Health > 0; update++)
             session.Update(1.0, default);
         Assert.That(session.Health, Is.Zero, "The test dog did not kill the player in time.");
+    }
+
+    private static void InflictDogBite(GameSession session)
+    {
+        for (var update = 0; update < 20 && session.Health == 100; update++)
+            session.Update(1.0, default);
+        Assert.That(session.Health, Is.LessThan(100), "The test dog did not bite the player in time.");
     }
 }

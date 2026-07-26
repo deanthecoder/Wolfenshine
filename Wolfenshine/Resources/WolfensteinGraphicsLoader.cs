@@ -35,6 +35,10 @@ public static class WolfensteinGraphicsLoader
     private const int FirstFacePictureOffset = 23;
     private const int FacePictureCount = 23;
     private const int IntermissionGuyOffset = -43;
+    private const int DifficultyCursorChunk = 22;
+    private const int DifficultyMouseLegendChunk = 29;
+    private const int FirstDifficultyFaceChunk = 30;
+    private const int MenuFontChunk = 2;
 
     public static WolfensteinHudGraphics LoadHudGraphics(WolfensteinResources resources)
     {
@@ -107,6 +111,48 @@ public static class WolfensteinGraphicsLoader
         ];
         Logger.Instance.Info($"Loaded original intermission graphics relative to VGAGRAPH chunk {statusChunk}.");
         return new WolfensteinIntermissionGraphics(bjFrames, characters);
+    }
+
+    public static WolfensteinDifficultyGraphics LoadDifficultyGraphics(WolfensteinResources resources)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
+        var dictionary = ReadDictionary(resources);
+        var offsets = ReadOffsets(resources);
+        using var reader = new BinaryReader(resources.OpenRead(WolfensteinResourceKind.GraphicsData));
+        var pictureTableData = ReadChunk(reader, offsets, 0, dictionary);
+        var pictures = ReadPictureTable(pictureTableData);
+        var cursor = ReadPicture(reader, offsets, dictionary, pictures, DifficultyCursorChunk);
+        var mouseLegend = ReadPicture(reader, offsets, dictionary, pictures, DifficultyMouseLegendChunk);
+        var faces = Enumerable.Range(FirstDifficultyFaceChunk, 4)
+            .Select(chunk => ReadPicture(reader, offsets, dictionary, pictures, chunk))
+            .ToArray();
+        var font = ReadFont(ReadChunk(reader, offsets, MenuFontChunk, dictionary));
+        Logger.Instance.Info("Loaded the original cursor, mouse legend, portraits, and font for the difficulty menu.");
+        return new WolfensteinDifficultyGraphics(cursor, mouseLegend, faces, font);
+    }
+
+    private static WolfensteinFont ReadFont(ReadOnlySpan<byte> data)
+    {
+        const int characterCount = 256;
+        const int locationTableOffset = sizeof(ushort);
+        const int widthTableOffset = locationTableOffset + (characterCount * sizeof(ushort));
+        const int headerLength = widthTableOffset + characterCount;
+        if (data.Length < headerLength)
+            throw new InvalidDataException("A VGAGRAPH font chunk is shorter than its header.");
+        var height = BitConverter.ToUInt16(data);
+        var glyphs = new Dictionary<char, WolfensteinGraphic>();
+        for (var character = 32; character < 127; character++)
+        {
+            var width = data[widthTableOffset + character];
+            if (width == 0)
+                continue;
+            var location = BitConverter.ToUInt16(data.Slice(locationTableOffset + (character * sizeof(ushort))));
+            var length = checked(width * height);
+            if (location > data.Length - length)
+                throw new InvalidDataException($"VGAGRAPH font glyph {character} lies outside its chunk.");
+            glyphs[(char)character] = new WolfensteinGraphic(width, height, data.Slice(location, length).ToArray());
+        }
+        return new WolfensteinFont(height, glyphs);
     }
 
     public static byte[] ExpandHuffman(

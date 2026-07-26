@@ -218,7 +218,7 @@ public sealed class GameSession
         }
         m_useWasDown = input.Use;
         changed |= UpdateWeapon(elapsedSeconds, input);
-        changed |= UpdateActors(elapsedSeconds);
+        changed |= UpdateActors(elapsedSeconds, input.Run);
         changed |= UpdateFace(elapsedSeconds);
         changed |= CollectPickups(Camera.X, Camera.Y);
 
@@ -756,7 +756,7 @@ public sealed class GameSession
         return (byte)m_randomState;
     }
 
-    private bool UpdateActors(double elapsedSeconds)
+    private bool UpdateActors(double elapsedSeconds, bool playerIsRunning)
     {
         var changed = false;
         foreach (var actor in m_actors)
@@ -770,8 +770,11 @@ public sealed class GameSession
                 if (fired)
                 {
                     PlaySound(GetEnemyAttackSound(actor.Actor.Type), actor.X, actor.Y);
-                    if (HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y))
-                        TakeDamage(actor.Profile.AttackDamage, actor.X, actor.Y);
+                    if (HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y) &&
+                        TryGetEnemyAttackDamage(actor, playerIsRunning, out var damage))
+                    {
+                        TakeDamage(damage, actor.X, actor.Y);
+                    }
                 }
                 continue;
             }
@@ -810,6 +813,51 @@ public sealed class GameSession
         if (changed)
             ActorRevision++;
         return changed;
+    }
+
+    private bool TryGetEnemyAttackDamage(
+        WolfensteinActorState actor,
+        bool playerIsRunning,
+        out int damage)
+    {
+        if (actor.Actor.Type == WolfensteinActorType.Dog)
+        {
+            if (NextRandomByte() >= 180)
+            {
+                damage = 0;
+                return false;
+            }
+            damage = NextRandomByte() >> 4;
+            return true;
+        }
+
+        var distanceX = Math.Abs((int)Math.Floor(actor.X) - (int)Math.Floor(Camera.X));
+        var distanceY = Math.Abs((int)Math.Floor(actor.Y) - (int)Math.Floor(Camera.Y));
+        var distance = Math.Max(distanceX, distanceY);
+        if (actor.Actor.Type == WolfensteinActorType.Ss)
+            distance = distance * 2 / 3;
+        var visible = IsInPlayerView(actor.X, actor.Y);
+        var hitChance = (playerIsRunning ? 160 : 256) - (distance * (visible ? 16 : 8));
+        if (NextRandomByte() >= hitChance)
+        {
+            damage = 0;
+            return false;
+        }
+
+        damage = distance switch
+        {
+            < 2 => NextRandomByte() >> 2,
+            < 4 => NextRandomByte() >> 3,
+            _ => NextRandomByte() >> 4
+        };
+        return true;
+    }
+
+    private bool IsInPlayerView(double x, double y)
+    {
+        var deltaX = x - Camera.X;
+        var deltaY = y - Camera.Y;
+        return (deltaX * Camera.DirectionX) + (deltaY * Camera.DirectionY) > 0.0;
     }
 
     private bool CanSeePlayer(WolfensteinActorState actor)
@@ -1009,6 +1057,8 @@ public sealed class GameSession
     {
         if (Health == 0)
             return;
+        if (Difficulty == GameDifficulty.Baby)
+            damage >>= 2;
         m_damageCount += damage;
         Health = Math.Max(0, Health - damage);
         if (Health > 0)

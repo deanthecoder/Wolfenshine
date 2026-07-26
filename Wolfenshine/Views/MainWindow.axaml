@@ -49,6 +49,12 @@
                                         BjFrame="{Binding BjFrame}"
                                         RenderOptions.BitmapInterpolationMode="LowQuality" />
 
+            <local:DifficultyViewport IsVisible="{Binding IsSelectingDifficulty}"
+                                      Graphics="{Binding DifficultyGraphics}"
+                                      Palette="{Binding Palette}"
+                                      Selection="{Binding SelectedDifficultyIndex}"
+                                      RenderOptions.BitmapInterpolationMode="LowQuality" />
+
             <StackPanel IsVisible="{Binding !HasGameData}"
                         Width="280"
                         HorizontalAlignment="Center"
