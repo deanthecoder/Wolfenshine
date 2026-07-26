@@ -240,6 +240,33 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenGunShotAtVisibleGuardCheckItDiesScoresAndStopsBlocking()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 1.5, WolfensteinActorType.Guard, 0, false, false, 50));
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        session.Update(12.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Score, Is.EqualTo(100));
+            Assert.That(session.ActorSprites[0].SpriteNumber, Is.EqualTo(91));
+            Assert.That(session.StaticObjects, Has.One.Matches<WorldSprite>(item =>
+                item.SpriteNumber == 28 && item.X == 2.5 && item.Y == 1.5));
+        });
+
+        session.Update(45.0 / 70.0, default);
+        session.Update(0.5, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.ActorSprites[0].SpriteNumber, Is.EqualTo(95));
+            Assert.That(session.Camera.Y, Is.LessThan(2.0));
+        });
+    }
+
+    [Test]
     public void GivenBlockingDecorationAheadCheckPlayerCannotWalkThroughItsTile()
     {
         var session = CreateSessionWithObject(31);

@@ -36,12 +36,14 @@ public sealed class GameSession
     private const double PlayerRadius = 0.2;
     private const double OriginalPlayerRadius = 0x5800 / FixedUnitsPerTile;
     private const double MaximumMovementStep = 0.1;
+    private const int CombatViewportWidth = 320;
+    private const int CrosshairHalfWidth = 20;
     private bool m_useWasDown;
     private bool m_attackWasDown;
     private int m_attackStep;
     private double m_attackTimeRemaining;
     private PlayerWeapon m_chosenWeapon = PlayerWeapon.Pistol;
-    private readonly IReadOnlyList<WolfensteinActor> m_actors;
+    private readonly IReadOnlyList<WolfensteinActorState> m_actors;
     private readonly List<WorldSprite> m_staticObjects;
 
     public GameSession(
@@ -56,7 +58,7 @@ public sealed class GameSession
         Doors = WolfensteinDoors.FromMap(map);
         PushWalls = new WolfensteinPushWalls(map);
         SecretTotal = map.Objects.Count(marker => marker == 98);
-        m_actors = actors ?? [];
+        m_actors = (actors ?? []).Select(actor => new WolfensteinActorState(actor)).ToArray();
         m_staticObjects = WolfensteinStaticObjects.FromMap(map).ToList();
     }
 
@@ -74,6 +76,8 @@ public sealed class GameSession
     public int SecretTotal { get; }
     public bool IsAttacking { get; private set; }
     public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
+    public IReadOnlyList<WorldSprite> ActorSprites => m_actors.Select(actor => actor.ToWorldSprite()).ToArray();
+    public int ActorRevision { get; private set; }
 
 #if DEBUG
     public bool ReloadDebugState()
@@ -93,6 +97,14 @@ public sealed class GameSession
 
         var changed = Doors.Update(elapsedSeconds, CanDoorClose);
         changed |= PushWalls.Update(elapsedSeconds, CanPushWallEnterTile);
+        var actorsChanged = false;
+        foreach (var actor in m_actors)
+            actorsChanged |= actor.Update(elapsedSeconds);
+        if (actorsChanged)
+        {
+            ActorRevision++;
+            changed = true;
+        }
         if (input.Use && !m_useWasDown)
             changed |= OperateAhead();
         m_useWasDown = input.Use;
@@ -166,8 +178,9 @@ public sealed class GameSession
 
         // Wolf3D uses an axis-aligned one-tile exclusion box around every shootable actor.
         return m_actors.All(actor =>
-            Math.Abs(x - actor.X) > MinimumActorDistance ||
-            Math.Abs(y - actor.Y) > MinimumActorDistance);
+            actor.IsDead ||
+            Math.Abs(x - actor.Actor.X) > MinimumActorDistance ||
+            Math.Abs(y - actor.Actor.Y) > MinimumActorDistance);
     }
 
     private bool IsSolid(int x, int y)
@@ -220,14 +233,15 @@ public sealed class GameSession
         {
             return false;
         }
-        return m_actors.All(actor => (int)Math.Floor(actor.X) != x || (int)Math.Floor(actor.Y) != y);
+        return m_actors.All(actor => actor.IsDead ||
+            (int)Math.Floor(actor.Actor.X) != x || (int)Math.Floor(actor.Actor.Y) != y);
     }
 
     private bool CanDoorClose(WolfensteinDoor door)
     {
         if (OccupiesDoorway(Camera.X, Camera.Y, door))
             return false;
-        return m_actors.All(actor => !OccupiesDoorway(actor.X, actor.Y, door));
+        return m_actors.All(actor => actor.IsDead || !OccupiesDoorway(actor.Actor.X, actor.Actor.Y, door));
     }
 
     private static bool OccupiesDoorway(double x, double y, WolfensteinDoor door)
@@ -368,9 +382,48 @@ public sealed class GameSession
 
     private void FireCurrentWeapon()
     {
-        if (Weapon == PlayerWeapon.Knife || Ammo == 0)
+        if (Weapon != PlayerWeapon.Knife && Ammo == 0)
             return;
-        Ammo--;
+        if (Weapon != PlayerWeapon.Knife)
+            Ammo--;
+        DamageTarget(Weapon == PlayerWeapon.Knife ? 25 : 100);
+    }
+
+    private void DamageTarget(int damage)
+    {
+        Span<WallColumn> columns = stackalloc WallColumn[CombatViewportWidth];
+        Raycaster.Cast(Map, Doors, PushWalls, Camera, columns);
+        WolfensteinActorState target = null;
+        var nearestDepth = double.PositiveInfinity;
+        Span<ProjectedWorldSprite> projected = stackalloc ProjectedWorldSprite[1];
+        foreach (var actor in m_actors)
+        {
+            if (actor.IsDead)
+                continue;
+            WorldSprite[] sprite = [actor.ToWorldSprite()];
+            if (WorldSpriteProjector.Project(sprite, Camera, CombatViewportWidth, 160, 200, projected) == 0)
+                continue;
+            var projection = projected[0];
+            if (Math.Abs(projection.CenterX - (CombatViewportWidth / 2)) >= CrosshairHalfWidth ||
+                projection.Depth >= nearestDepth)
+            {
+                continue;
+            }
+            var column = Math.Clamp(projection.CenterX, 0, CombatViewportWidth - 1);
+            if (projection.Depth >= columns[column].Distance)
+                continue;
+            target = actor;
+            nearestDepth = projection.Depth;
+        }
+        if (target == null || !target.Damage(damage))
+            return;
+        if (target.IsDead)
+        {
+            Score += target.Score;
+            if (target.Actor.Type != WolfensteinActorType.Dog)
+                m_staticObjects.Add(new WorldSprite(target.Actor.X, target.Actor.Y, 28));
+        }
+        ActorRevision++;
     }
 
     private void GiveAmmo(int amount)

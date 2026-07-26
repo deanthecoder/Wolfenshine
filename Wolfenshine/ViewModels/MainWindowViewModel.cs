@@ -35,6 +35,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int m_hudAmmo = -1;
     private int m_hudScore = -1;
     private int m_hudHealth = -1;
+    private int m_actorRevision = -1;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
 
     public MainWindowViewModel()
@@ -118,8 +119,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (m_gameSession?.Update(elapsedSeconds, input) == true)
         {
             SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
-            if (m_worldObjects.Count != StaticObjects.Count + Actors.Count)
+            if (m_worldObjects.Count != StaticObjects.Count + Actors.Count ||
+                m_actorRevision != m_gameSession.ActorRevision)
+            {
+                m_actorRevision = m_gameSession.ActorRevision;
                 SetField(ref m_worldObjects, CreateWorldObjects(), nameof(WorldObjects));
+            }
             if (Sprites != null)
             {
                 var sprite = Sprites.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame);
@@ -207,7 +212,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     private IReadOnlyList<WorldSprite> CreateWorldObjects() =>
-        StaticObjects.Concat(Actors.Select(actor => actor.ToWorldSprite())).ToArray();
+        StaticObjects.Concat(m_gameSession.ActorSprites).ToArray();
 
 #if DEBUG
     private double DistanceToCamera(double x, double y)
