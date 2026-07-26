@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="using:Wolfenshine.Views"
+        xmlns:vm="using:Wolfenshine.ViewModels"
+        x:Class="Wolfenshine.Views.MapWindow"
+        x:DataType="vm:MainWindowViewModel"
+        mc:Ignorable="d"
+        Title="Wolfenshine Debug Map"
+        Width="552"
+        Height="600"
+        MinWidth="300"
+        MinHeight="300"
+        WindowStartupLocation="CenterOwner">
+  <Grid RowDefinitions="*,Auto" Background="#101216">
+    <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Auto">
+      <Border Margin="12" Background="Black" BorderBrush="#454A54" BorderThickness="1">
+        <local:MapViewport Map="{Binding SelectedMap}"
+                           Camera="{Binding Camera}"
+                           WallTextures="{Binding WallTextures}"
+                           Palette="{Binding Palette}" />
+      </Border>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="1"
+                Margin="12,4,12,10"
+                Orientation="Horizontal"
+                Spacing="16">
+      <StackPanel Orientation="Horizontal" Spacing="5">
+        <Border Width="10" Height="10" Background="#FF40C0" />
+        <TextBlock Text="Secret wall" Foreground="#D7D9DC" FontSize="11" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="5">
+        <Border Width="10" Height="10" Background="#40F060" />
+        <TextBlock Text="Exit" Foreground="#D7D9DC" FontSize="11" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="5">
+        <Border Width="10" Height="10" Background="White" CornerRadius="5" />
+        <TextBlock Text="Player" Foreground="#D7D9DC" FontSize="11" />
+      </StackPanel>
+    </StackPanel>
+  </Grid>
+</Window>

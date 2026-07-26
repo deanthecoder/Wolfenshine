@@ -37,6 +37,9 @@ public sealed partial class MainWindow : Window
     private bool m_attack;
     private bool m_strafe;
     private PlayerWeapon? m_weaponSelection;
+#if DEBUG
+    private MapWindow m_mapWindow;
+#endif
 
     public MainWindow()
     {
@@ -52,6 +55,12 @@ public sealed partial class MainWindow : Window
     {
         base.OnKeyDown(e);
 #if DEBUG
+        if (e.Key == Key.M)
+        {
+            ToggleMapWindow();
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.R)
         {
             if (DataContext is MainWindowViewModel viewModel)
@@ -85,9 +94,31 @@ public sealed partial class MainWindow : Window
 
     private void OnClosed(object sender, EventArgs e)
     {
+#if DEBUG
+        m_mapWindow?.Close();
+        m_mapWindow = null;
+#endif
         m_gameTimer.Stop();
         m_gameClock.Stop();
     }
+
+#if DEBUG
+    private void ToggleMapWindow()
+    {
+        if (m_mapWindow != null)
+        {
+            m_mapWindow.Close();
+            m_mapWindow = null;
+            return;
+        }
+
+        if (DataContext is not MainWindowViewModel { HasGameData: true } viewModel)
+            return;
+        m_mapWindow = new MapWindow { DataContext = viewModel };
+        m_mapWindow.Closed += (_, _) => m_mapWindow = null;
+        m_mapWindow.Show(this);
+    }
+#endif
 
     private void OnDeactivated(object sender, EventArgs e)
     {
