@@ -43,11 +43,16 @@ The original Wolfenstein 3D source release is available from the official [id So
 Once the original game data, rendering, and core behavior are working, possible enhanced-mode experiments include:
 
 - View bob and smoother camera motion.
+- Damage feedback using edge-focused display blur and blood on the screen.
+- Subtle peripheral motion blur while moving, strengthened while running.
 - Persistent enemy blood splats.
 - Improved dynamic and colored lighting.
+- Flickering lights in dungeon-like areas.
 - Ambient occlusion for added depth around walls and objects.
 - Dynamic shadows.
 - Spatial 3D sound.
+- Optional hint HUD components, such as a floor-projected route to the nearest exit.
+- A toggle that redirects the route hint toward the nearest unvisited treasure room.
 
 These are ideas rather than compatibility requirements. A faithful rendering path should remain available alongside later visual and audio enhancements.
 
