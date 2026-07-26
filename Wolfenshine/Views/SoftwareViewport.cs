@@ -27,16 +27,16 @@ namespace Wolfenshine.Views;
 /// <remarks>
 /// Avalonia only scales and displays the completed 320 x 200 image; scene rendering happens entirely in software.
 /// </remarks>
-public sealed class SoftwareViewport : Control
+public class SoftwareViewport : Control
 {
-    private const int ViewportWidth = 320;
-    private const int ViewportHeight = 200;
-    private const int StatusBarHeight = 40;
-    private const int PlayViewHeight = ViewportHeight - StatusBarHeight;
+    protected const int ViewportWidth = 320;
+    protected const int ViewportHeight = 200;
+    protected const int StatusBarHeight = 40;
+    protected const int PlayViewHeight = ViewportHeight - StatusBarHeight;
     private WriteableBitmap m_bitmap;
-    private readonly WallColumn[] m_columns = new WallColumn[ViewportWidth];
-    private readonly byte[] m_pixels = new byte[ViewportWidth * ViewportHeight * 4];
-    private ProjectedWorldSprite[] m_projectedSprites = [];
+    protected readonly WallColumn[] m_columns = new WallColumn[ViewportWidth];
+    protected readonly byte[] m_pixels = new byte[ViewportWidth * ViewportHeight * 4];
+    protected ProjectedWorldSprite[] m_projectedSprites = [];
     private WolfensteinMap m_renderedMap;
     private RaycastCamera m_renderedCamera;
     private WolfensteinElevatorSwitch m_renderedElevatorSwitch;
@@ -186,7 +186,7 @@ public sealed class SoftwareViewport : Control
         context.DrawImage(m_bitmap, Bounds);
     }
 
-    private void RenderFrame()
+    protected void RenderFrame()
     {
         // Raycasting and shading produce the complete native-resolution image independently of Avalonia.
         Raycaster.Cast(Map, Doors, PushWalls, ElevatorSwitch, Camera, m_columns);

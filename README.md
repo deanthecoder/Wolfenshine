@@ -10,6 +10,12 @@ The first goal is to reproduce how the 1992 game looks and plays. That gives us 
 
 ![Wolfenshine gameplay](img/gameplay.png)
 
+### Authentic and enhanced rendering
+
+Press F2 at any time during play to switch between the faithful software renderer and the experimental shader renderer. The comparison below shows enhanced distance shading on the left and the authentic presentation on the right.
+
+![A 50/50 comparison of Wolfenshine's enhanced and authentic renderers](img/renderer-comparison.png)
+
 ## What works today
 
 - All 60 maps from the six-episode edition load directly from the original data files.
@@ -19,6 +25,7 @@ The first goal is to reproduce how the 1992 game looks and plays. That gives us 
 - Original digitized and AdLib effects are played spatially through OpenAL; original IMF music is rendered through OPL emulation.
 - Difficulty affects enemy placement, health, behavior, and incoming damage in the same places it did originally.
 - An authentic-looking difficulty screen, HUD, pause plaque, and intermission screen complete the experience.
+- F2 switches live between the authentic software image and an experimental shader-enhanced view with distance-darkened walls and movement bob.
 
 Wolfenshine is still under development. Bosses, episode endings, save games, and some less common gameplay details remain to be implemented.
 
@@ -68,6 +75,7 @@ Only the full `.WL6` data set is supported at present. Shareware `.WL1` and data
 | Fire | Control / Command |
 | Select an owned weapon | 1–4                        |
 | Pause or resume | P                          |
+| Toggle authentic/enhanced rendering | F2    |
 
 ## Build and run
 

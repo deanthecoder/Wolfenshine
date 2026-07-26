@@ -24,6 +24,11 @@ public sealed class WolfenshineSettings : UserSettingsBase
     public double SavedY { get => Get<double>(); set => Set(value); }
     public double SavedDirectionX { get => Get<double>(); set => Set(value); }
     public double SavedDirectionY { get => Get<double>(); set => Set(value); }
+    public bool UseEnhancedRenderer { get => Get<bool>(); set => Set(value); }
 
-    protected override void ApplyDefaults() => SavedMapSlot = -1;
+    protected override void ApplyDefaults()
+    {
+        SavedMapSlot = -1;
+        UseEnhancedRenderer = false;
+    }
 }

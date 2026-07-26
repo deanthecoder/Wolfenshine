@@ -34,6 +34,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <LocalWolfensteinData Include="$(MSBuildProjectDirectory)/../local/game-data/*.WL6" />
     <LocalWolfensteinPalette Include="$(MSBuildProjectDirectory)/../local/game-data/GAMEPAL.OBJ"
                              Condition="Exists('$(MSBuildProjectDirectory)/../local/game-data/GAMEPAL.OBJ')" />

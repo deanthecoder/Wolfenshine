@@ -129,6 +129,33 @@ public sealed class MainWindowViewModelTests
     }
 
     [Test]
+    public void GivenRendererToggledCheckEnhancedModeCanReturnToAuthenticMode()
+    {
+        var map = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        StartNormalGame(viewModel);
+
+        viewModel.ToggleRenderer();
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsEnhancedRendering, Is.True);
+            Assert.That(viewModel.RenderModeText, Is.EqualTo("RENDERER: ENHANCED"));
+        });
+
+        viewModel.ToggleRenderer();
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsEnhancedRendering, Is.False);
+            Assert.That(viewModel.RenderModeText, Is.EqualTo("RENDERER: AUTHENTIC"));
+        });
+    }
+
+    [Test]
     public void GivenHardDifficultySelectedCheckHardActorsArePlaced()
     {
         const int size = 5;

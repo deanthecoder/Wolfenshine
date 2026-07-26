@@ -22,7 +22,8 @@
                 Height="{Binding PresentationViewportHeight}"
                 Background="#20242B">
           <Grid>
-            <local:SoftwareViewport IsVisible="{Binding HasGameData}"
+            <local:SoftwareViewport x:Name="SoftwareViewport"
+                                    IsVisible="{Binding IsAuthenticRendering}"
                                     Map="{Binding SelectedMap}"
                                     Doors="{Binding Doors}"
                                     PushWalls="{Binding PushWalls}"
@@ -38,6 +39,23 @@
                                     DeathFade="{Binding DeathFade}"
                                     LevelFade="{Binding LevelFade}"
                                     RenderOptions.BitmapInterpolationMode="LowQuality" />
+
+            <local:EnhancedViewport x:Name="EnhancedViewport"
+                                    IsVisible="{Binding IsEnhancedRendering}"
+                                    Map="{Binding SelectedMap}"
+                                    Doors="{Binding Doors}"
+                                    PushWalls="{Binding PushWalls}"
+                                    ElevatorSwitch="{Binding ElevatorSwitch}"
+                                    Camera="{Binding Camera}"
+                                    WallTextures="{Binding WallTextures}"
+                                    Palette="{Binding Palette}"
+                                    WeaponSprite="{Binding WeaponSprite}"
+                                    Sprites="{Binding Sprites}"
+                                    StaticObjects="{Binding WorldObjects}"
+                                    StatusBar="{Binding StatusBar}"
+                                    DamageFlash="{Binding DamageFlash}"
+                                    DeathFade="{Binding DeathFade}"
+                                    LevelFade="{Binding LevelFade}" />
 
             <local:IntermissionViewport IsVisible="{Binding IsShowingLevelStats}"
                                         Width="320"
@@ -82,7 +100,15 @@
     </Border>
 
     <Border Grid.Row="1" Background="#1A1E24" BorderBrush="#343942" BorderThickness="0,1,0,0" Padding="12,7">
-      <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#AEB4BC" />
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#AEB4BC" />
+        <TextBlock Grid.Column="1"
+                   Margin="16,0,0,0"
+                   Text="{Binding RenderModeText}"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   Foreground="#7FC9A5" />
+      </Grid>
     </Border>
   </Grid>
 </Window>

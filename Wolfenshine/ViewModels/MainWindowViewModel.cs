@@ -64,6 +64,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private int m_selectedDifficultyIndex = 2;
     private GameDifficulty m_difficulty = GameDifficulty.Normal;
     private bool m_isPaused;
+    private bool m_isEnhancedRendering;
 
     public MainWindowViewModel()
         : this(new WolfensteinDataNotFoundException(
@@ -95,6 +96,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_hudGraphics = hudGraphics;
         m_audioPlayer = audioPlayer;
         m_settings = settings;
+        m_isEnhancedRendering = settings?.UseEnhancedRenderer == true;
         IntermissionGraphics = intermissionGraphics;
         DifficultyGraphics = difficultyGraphics;
         m_weaponSprite = weaponSprite;
@@ -154,6 +156,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool IsShowingLevelStats => m_isShowingLevelStats;
     public bool IsSelectingDifficulty => m_isSelectingDifficulty;
     public bool IsPaused => m_isPaused;
+    public bool IsEnhancedRendering => m_isEnhancedRendering;
+    public bool IsAuthenticRendering => HasGameData && !m_isEnhancedRendering;
+    public string RenderModeText => m_isEnhancedRendering ? "RENDERER: ENHANCED" : "RENDERER: AUTHENTIC";
     public int SelectedDifficultyIndex => m_selectedDifficultyIndex;
     public GameDifficulty Difficulty => m_difficulty;
     public WolfensteinLevelStats LevelStats => m_levelStats;
@@ -244,6 +249,21 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             ? "Paused · press P to continue"
             : $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
               "1–4 select weapons · Space opens doors";
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    public void ToggleRenderer()
+    {
+        if (m_gameSession == null || m_isSelectingDifficulty || m_isShowingLevelStats)
+            return;
+        SetField(ref m_isEnhancedRendering, !m_isEnhancedRendering, nameof(IsEnhancedRendering));
+        if (m_settings != null)
+            m_settings.UseEnhancedRenderer = m_isEnhancedRendering;
+        OnPropertyChanged(nameof(IsAuthenticRendering));
+        OnPropertyChanged(nameof(RenderModeText));
+        StatusText = m_isEnhancedRendering
+            ? "Enhanced shader renderer · F2 returns to authentic rendering"
+            : "Authentic software renderer · F2 enables enhanced rendering";
         OnPropertyChanged(nameof(StatusText));
     }
 

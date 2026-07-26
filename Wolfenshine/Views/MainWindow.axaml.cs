@@ -37,6 +37,9 @@ public sealed partial class MainWindow : Window
     private bool m_attack;
     private bool m_strafe;
     private bool m_pauseKeyDown;
+    private bool m_rendererKeyDown;
+    private double m_viewBobOffset;
+    private double m_viewBobPhase;
     private PlayerWeapon? m_weaponSelection;
 #if DEBUG
     private MapWindow m_mapWindow;
@@ -61,6 +64,14 @@ public sealed partial class MainWindow : Window
             if (!m_pauseKeyDown && DataContext is MainWindowViewModel viewModel)
                 viewModel.TogglePause();
             m_pauseKeyDown = true;
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.F2)
+        {
+            if (!m_rendererKeyDown && DataContext is MainWindowViewModel viewModel)
+                viewModel.ToggleRenderer();
+            m_rendererKeyDown = true;
             e.Handled = true;
             return;
         }
@@ -114,6 +125,12 @@ public sealed partial class MainWindow : Window
         if (e.Key == Key.P)
         {
             m_pauseKeyDown = false;
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.F2)
+        {
+            m_rendererKeyDown = false;
             e.Handled = true;
             return;
         }
@@ -176,6 +193,7 @@ public sealed partial class MainWindow : Window
         m_gameClock.Restart();
         if (DataContext is not MainWindowViewModel viewModel)
             return;
+        UpdateViewBob(elapsedSeconds, viewModel);
         viewModel.UpdateGame(
             elapsedSeconds,
             new PlayerInput(
@@ -191,6 +209,22 @@ public sealed partial class MainWindow : Window
         m_weaponSelection = null;
         if (viewModel.IsGameOver)
             Close();
+    }
+
+    private void UpdateViewBob(double elapsedSeconds, MainWindowViewModel viewModel)
+    {
+        var isMoving = m_moveForward || m_moveBackward || m_strafe && (m_turnLeft || m_turnRight);
+        if (viewModel.IsEnhancedRendering && !viewModel.IsPaused && isMoving)
+        {
+            m_viewBobPhase += elapsedSeconds * (m_run ? 13.0 : 9.0);
+            m_viewBobOffset = Math.Sin(m_viewBobPhase) * (m_run ? 2.25 : 1.4);
+            EnhancedViewport.ViewBob = m_viewBobOffset;
+            return;
+        }
+        m_viewBobOffset *= Math.Pow(0.02, elapsedSeconds);
+        if (Math.Abs(m_viewBobOffset) < 0.01)
+            m_viewBobOffset = 0.0;
+        EnhancedViewport.ViewBob = m_viewBobOffset;
     }
 
     private bool SetKeyState(Key key, bool isDown)
@@ -253,6 +287,7 @@ public sealed partial class MainWindow : Window
         m_attack = false;
         m_strafe = false;
         m_pauseKeyDown = false;
+        m_rendererKeyDown = false;
         m_weaponSelection = null;
     }
 }
