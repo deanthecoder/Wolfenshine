@@ -45,6 +45,7 @@ Once the original game data, rendering, and core behavior are working, possible 
 - View bob and smoother camera motion.
 - Damage feedback using edge-focused display blur and blood on the screen.
 - Subtle peripheral motion blur while moving, strengthened while running.
+- An optional LCD-screen shader for a stylized modern display treatment.
 - Persistent enemy blood splats.
 - Improved dynamic and colored lighting.
 - Flickering lights in dungeon-like areas.
