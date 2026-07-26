@@ -463,6 +463,42 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenAdjacentDogsChasingSidewaysCheckTheyDoNotDeadlockEachOther()
+    {
+        const int width = 6;
+        const int height = 5;
+        var walls = Enumerable.Repeat((ushort)1, width * height).ToArray();
+        for (var y = 1; y <= 3; y++)
+        {
+            for (var x = 1; x <= 4; x++)
+                walls[(y * width) + x] = 107;
+        }
+        var map = new WolfensteinMap(0, "Adjacent Dogs", width, height, walls, new ushort[width * height]);
+        WolfensteinActor[] actors =
+        [
+            new(4.5, 2.5, WolfensteinActorType.Dog, 2, false, false, 99),
+            new(4.5, 1.5, WolfensteinActorType.Dog, 2, false, false, 99)
+        ];
+        var session = new GameSession(
+            map,
+            new RaycastCamera(1.5, 2.5, 1.0, 0.0, 0.0, 0.66),
+            actors);
+        foreach (var dog in session.Actors)
+        {
+            dog.Alert();
+            dog.AttackCooldown = 10.0;
+        }
+
+        session.Update(0.1, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Actors[0].X, Is.LessThan(4.5));
+            Assert.That(session.Actors[1].X, Is.LessThan(4.5));
+        });
+    }
+
+    [Test]
     public void GivenBlockingDecorationAheadCheckPlayerCannotWalkThroughItsTile()
     {
         var session = CreateSessionWithObject(31);

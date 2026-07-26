@@ -34,6 +34,7 @@ public sealed class GameSession
     private const int MaximumHealth = 100;
     private const double PickupDistance = 0.5;
     private const double MinimumActorDistance = 1.0;
+    private const double MinimumActorSeparation = 0.5;
     private const double PlayerRadius = 0.2;
     private const double OriginalPlayerRadius = 0x5800 / FixedUnitsPerTile;
     private const double MaximumMovementStep = 0.1;
@@ -782,8 +783,8 @@ public sealed class GameSession
             return false;
         }
         return m_actors.All(actor => ReferenceEquals(actor, movingActor) || actor.IsDead ||
-            Math.Abs(x - actor.X) > MinimumActorDistance ||
-            Math.Abs(y - actor.Y) > MinimumActorDistance);
+            Math.Abs(x - actor.X) >= MinimumActorSeparation ||
+            Math.Abs(y - actor.Y) >= MinimumActorSeparation);
     }
 
     private (int X, int Y)? FindNextPathTile(int startX, int startY, bool allowClosedDoors)
