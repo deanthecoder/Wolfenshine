@@ -47,6 +47,7 @@ public sealed class GameSession
     private const ushort ElevatorSwitchTile = 21;
     private const double LevelFadeDuration = 0.5;
     private bool m_useWasDown;
+    private double m_useRepeatTime;
     private bool m_attackWasDown;
     private int m_attackStep;
     private double m_attackTimeRemaining;
@@ -181,7 +182,20 @@ public sealed class GameSession
             PlaySound(WolfensteinSoundEffect.CloseDoor, door.X + 0.5, door.Y + 0.5);
         changed |= PushWalls.Update(elapsedSeconds, CanPushWallEnterTile);
         if (input.Use && !m_useWasDown)
+        {
             changed |= OperateAhead();
+            m_useRepeatTime = 0.2;
+        }
+        else if (input.Use)
+        {
+            m_useRepeatTime -= elapsedSeconds;
+            if (m_useRepeatTime <= 0.0 && IsFacingOrdinaryWall())
+            {
+                PlaySound(WolfensteinSoundEffect.DoNothing);
+                m_useRepeatTime += 0.2;
+                changed = true;
+            }
+        }
         m_useWasDown = input.Use;
         changed |= UpdateWeapon(elapsedSeconds, input);
         changed |= UpdateActors(elapsedSeconds);
@@ -276,9 +290,16 @@ public sealed class GameSession
         var (directionX, directionY) = GetCardinalDirection();
         var pushWallX = (int)Math.Floor(Camera.X) + directionX;
         var pushWallY = (int)Math.Floor(Camera.Y) + directionY;
+        var isPushWall = Map.GetObject(pushWallX, pushWallY) == 98;
         if (PushWalls.TryPush(pushWallX, pushWallY, directionX, directionY, CanPushWallEnterTile))
         {
             SecretCount++;
+            PlaySound(WolfensteinSoundEffect.PushWall);
+            return true;
+        }
+        if (isPushWall)
+        {
+            PlaySound(WolfensteinSoundEffect.CannotUse);
             return true;
         }
 
@@ -287,6 +308,7 @@ public sealed class GameSession
             ElevatorSwitch = new WolfensteinElevatorSwitch(pushWallX, pushWallY);
             m_isCompletingLevel = true;
             m_levelFade = 0.0;
+            PlaySound(WolfensteinSoundEffect.LevelDone);
             return true;
         }
 
@@ -300,7 +322,10 @@ public sealed class GameSession
             {
                 var wasOpen = door.IsFullyOpen;
                 if (!door.Operate(CanDoorClose(door)))
-                    return false;
+                {
+                    PlaySound(WolfensteinSoundEffect.CannotUse);
+                    return true;
+                }
                 PlaySound(
                     wasOpen ? WolfensteinSoundEffect.CloseDoor : WolfensteinSoundEffect.OpenDoor,
                     door.X + 0.5,
@@ -308,15 +333,28 @@ public sealed class GameSession
                 return true;
             }
             if (Map.IsSolid(x, y) && !PushWalls.IsOriginalWallSuppressed(x, y))
-                return false;
+            {
+                PlaySound(WolfensteinSoundEffect.DoNothing);
+                return true;
+            }
         }
 
-        return false;
+        PlaySound(WolfensteinSoundEffect.DoNothing);
+        return true;
     }
 
     private (int X, int Y) GetCardinalDirection() => Math.Abs(Camera.DirectionX) > Math.Abs(Camera.DirectionY)
         ? (Math.Sign(Camera.DirectionX), 0)
         : (0, Math.Sign(Camera.DirectionY));
+
+    private bool IsFacingOrdinaryWall()
+    {
+        var (directionX, directionY) = GetCardinalDirection();
+        var x = (int)Math.Floor(Camera.X) + directionX;
+        var y = (int)Math.Floor(Camera.Y) + directionY;
+        return Doors.Get(x, y) == null && Map.GetObject(x, y) != 98 &&
+               Map.GetWall(x, y) != ElevatorSwitchTile && Map.IsSolid(x, y);
+    }
 
     private bool CanPushWallEnterTile(int x, int y)
     {
@@ -572,6 +610,7 @@ public sealed class GameSession
         if (target.IsDead)
         {
             Score += target.Score;
+            PlaySound(GetEnemyDeathSound(target.Actor.Type), target.X, target.Y);
             var dropSprite = target.Actor.Type switch
             {
                 WolfensteinActorType.Dog => -1,
@@ -659,10 +698,16 @@ public sealed class GameSession
 
             if (actor.Behavior == WolfensteinActorBehavior.Dormant)
             {
-                var canHear = m_playerMadeNoise && !actor.Actor.IsAmbush && HasOpenPath(actor.X, actor.Y);
+                var canHear = m_playerMadeNoise && !actor.Actor.IsAmbush && CanHearPlayer(actor.X, actor.Y);
                 if (!canHear && !CanSeePlayer(actor))
                     continue;
-                changed |= actor.Alert();
+                if (actor.Alert())
+                {
+                    changed = true;
+                    var alertSound = GetEnemyAlertSound(actor.Actor.Type);
+                    if (alertSound != null)
+                        PlaySound(alertSound.Value, actor.X, actor.Y);
+                }
             }
 
             actor.AttackCooldown = Math.Max(0.0, actor.AttackCooldown - elapsedSeconds);
@@ -721,8 +766,46 @@ public sealed class GameSession
         return true;
     }
 
-    private bool HasOpenPath(double actorX, double actorY) =>
-        FindNextPathTile((int)actorX, (int)actorY, allowClosedDoors: false) != null;
+    private bool CanHearPlayer(double actorX, double actorY)
+    {
+        var actorArea = Map.GetWall((int)Math.Floor(actorX), (int)Math.Floor(actorY));
+        var playerArea = Map.GetWall((int)Math.Floor(Camera.X), (int)Math.Floor(Camera.Y));
+        if (actorArea >= 107 && actorArea == playerArea)
+            return true;
+        return FindNextPathTile((int)actorX, (int)actorY, allowClosedDoors: false) != null;
+    }
+
+    private static WolfensteinSoundEffect? GetEnemyAlertSound(WolfensteinActorType type) => type switch
+    {
+        WolfensteinActorType.Guard => WolfensteinSoundEffect.GuardAlert,
+        WolfensteinActorType.Officer => WolfensteinSoundEffect.OfficerAlert,
+        WolfensteinActorType.Ss => WolfensteinSoundEffect.SsAlert,
+        WolfensteinActorType.Dog => WolfensteinSoundEffect.DogAlert,
+        _ => null
+    };
+
+    private WolfensteinSoundEffect GetEnemyDeathSound(WolfensteinActorType type)
+    {
+        WolfensteinSoundEffect[] guardSounds =
+        [
+            WolfensteinSoundEffect.GuardDeath1,
+            WolfensteinSoundEffect.GuardDeath2,
+            WolfensteinSoundEffect.GuardDeath3,
+            WolfensteinSoundEffect.GuardDeath4,
+            WolfensteinSoundEffect.GuardDeath5,
+            WolfensteinSoundEffect.GuardDeath7,
+            WolfensteinSoundEffect.GuardDeath8,
+            WolfensteinSoundEffect.GuardDeath9
+        ];
+        return type switch
+        {
+            WolfensteinActorType.Guard => guardSounds[NextRandomByte() % guardSounds.Length],
+            WolfensteinActorType.Officer => WolfensteinSoundEffect.OfficerDeath,
+            WolfensteinActorType.Ss => WolfensteinSoundEffect.SsDeath,
+            WolfensteinActorType.Dog => WolfensteinSoundEffect.DogDeath,
+            _ => WolfensteinSoundEffect.MutantDeath
+        };
+    }
 
     private bool MoveActorTowardPlayer(WolfensteinActorState actor, double elapsedSeconds)
     {
@@ -738,7 +821,13 @@ public sealed class GameSession
         }
         var door = Doors.Get(next.Value.X, next.Value.Y);
         if (door != null && !door.IsFullyOpen)
-            return door.Open();
+        {
+            var wasOpening = door.IsOpening;
+            var opened = door.Open();
+            if (opened && !wasOpening)
+                PlaySound(WolfensteinSoundEffect.OpenDoor, door.X + 0.5, door.Y + 0.5);
+            return opened;
+        }
         var targetX = next.Value.X + 0.5;
         var targetY = next.Value.Y + 0.5;
         var deltaX = targetX - actor.X;

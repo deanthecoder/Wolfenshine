@@ -18,12 +18,19 @@ namespace Wolfenshine.Audio;
 /// </remarks>
 public enum WolfensteinSoundEffect
 {
+    CannotUse = 6,
+    DogDeath = 10,
     AttackGatling = 11,
     OpenDoor = 18,
     CloseDoor = 19,
+    DoNothing = 20,
+    GuardAlert = 21,
+    GuardDeath2 = 22,
     AttackKnife = 23,
     AttackPistol = 24,
+    GuardDeath3 = 25,
     AttackMachineGun = 26,
+    GuardDeath1 = 29,
     GetMachineGun = 30,
     GetAmmo = 31,
     Health = 33,
@@ -32,9 +39,22 @@ public enum WolfensteinSoundEffect
     BonusChalice = 36,
     BonusBible = 37,
     GetGatling = 38,
+    LevelDone = 40,
+    DogAlert = 41,
     ExtraLife = 44,
     BonusCrown = 45,
+    PushWall = 46,
+    SsAlert = 51,
+    MutantDeath = 52,
+    SsDeath = 56,
     GuardFire = 58,
     SsFire = 60,
-    DogAttack = 68
+    OfficerAlert = 66,
+    OfficerDeath = 67,
+    DogAttack = 68,
+    GuardDeath4 = 73,
+    GuardDeath5 = 74,
+    GuardDeath7 = 76,
+    GuardDeath8 = 77,
+    GuardDeath9 = 78
 }
