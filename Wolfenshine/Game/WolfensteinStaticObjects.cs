@@ -54,4 +54,17 @@ public static class WolfensteinStaticObjects
     /// Determines whether a plane-one marker represents solid scenery.
     /// </summary>
     public static bool BlocksMovement(ushort marker) => BlockingMarkers.Contains(marker);
+
+    /// <summary>
+    /// Identifies ammo and treasure represented by a static sprite.
+    /// </summary>
+    public static WolfensteinPickupType GetPickupType(int spriteNumber) => spriteNumber switch
+    {
+        28 => WolfensteinPickupType.AmmoClip,
+        31 => WolfensteinPickupType.Cross,
+        32 => WolfensteinPickupType.Chalice,
+        33 => WolfensteinPickupType.Bible,
+        34 => WolfensteinPickupType.Crown,
+        _ => WolfensteinPickupType.None
+    };
 }

@@ -161,6 +161,53 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenAmmoClipCheckEightRoundsAreAddedAndPickupIsRemoved()
+    {
+        var session = CreateSessionWithObject(49);
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Ammo, Is.EqualTo(16));
+            Assert.That(session.StaticObjects, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void GivenFullAmmoCheckClipRemainsAvailable()
+    {
+        var session = CreateSessionWithObject(49);
+        FireShots(session, 8);
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Ammo, Is.EqualTo(99));
+            Assert.That(session.StaticObjects, Has.Count.EqualTo(1));
+        });
+    }
+
+    [TestCase(52, 100)]
+    [TestCase(53, 500)]
+    [TestCase(54, 1000)]
+    [TestCase(55, 5000)]
+    public void GivenTreasureCheckOriginalScoreIsAwardedAndPickupIsRemoved(int marker, int expectedScore)
+    {
+        var session = CreateSessionWithObject((ushort)marker);
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Score, Is.EqualTo(expectedScore));
+            Assert.That(session.TreasureCount, Is.EqualTo(1));
+            Assert.That(session.StaticObjects, Is.Empty);
+        });
+    }
+
+    [Test]
     public void GivenNoInputCheckCameraIsUnchanged()
     {
         var session = CreateSession();
@@ -260,5 +307,15 @@ public sealed class GameSessionTests
         objects[(1 * size) + 2] = marker;
         var map = new WolfensteinMap(0, "Decoration Collision", size, size, walls, objects);
         return new GameSession(map, RaycastCamera.FromPlayerStart(map));
+    }
+
+    private static void FireShots(GameSession session, int count)
+    {
+        for (var shot = 0; shot < count; shot++)
+        {
+            session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+            session.Update(0.4, new PlayerInput(false, false, false, false, Attack: true));
+            session.Update(0.0, default);
+        }
     }
 }

@@ -33,6 +33,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private WolfensteinGraphic m_statusBar;
     private PlayerWeapon m_hudWeapon;
     private int m_hudAmmo = -1;
+    private int m_hudScore = -1;
+    private IReadOnlyList<WorldSprite> m_worldObjects = [];
 
     public MainWindowViewModel()
         : this(new WolfensteinDataNotFoundException(
@@ -59,15 +61,19 @@ public sealed class MainWindowViewModel : ViewModelBase
         Sprites = sprites;
         m_hudGraphics = hudGraphics;
         SelectedMap = maps.Maps.FirstOrDefault();
-        StaticObjects = SelectedMap == null ? [] : WolfensteinStaticObjects.FromMap(SelectedMap);
         Actors = SelectedMap == null ? [] : WolfensteinActors.FromMap(SelectedMap);
-        WorldObjects = StaticObjects.Concat(Actors.Select(actor => actor.ToWorldSprite())).ToArray();
         if (SelectedMap != null)
         {
             m_camera = RaycastCamera.FromPlayerStart(SelectedMap);
             m_gameSession = new GameSession(SelectedMap, m_camera, Actors);
+            StaticObjects = m_gameSession.StaticObjects;
+            m_worldObjects = CreateWorldObjects();
             m_weaponSprite = sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? weaponSprite;
             UpdateHud();
+        }
+        else
+        {
+            StaticObjects = [];
         }
         StatusText = SelectedMap == null
             ? "Wolfenstein 3D data loaded, but it contains no maps"
@@ -96,7 +102,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinGraphic StatusBar => m_statusBar;
     public IReadOnlyList<WorldSprite> StaticObjects { get; }
     public IReadOnlyList<WolfensteinActor> Actors { get; }
-    public IReadOnlyList<WorldSprite> WorldObjects { get; }
+    public IReadOnlyList<WorldSprite> WorldObjects => m_worldObjects;
     public string StatusText { get; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;
@@ -110,6 +116,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (m_gameSession?.Update(elapsedSeconds, input) == true)
         {
             SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
+            if (m_worldObjects.Count != StaticObjects.Count + Actors.Count)
+                SetField(ref m_worldObjects, CreateWorldObjects(), nameof(WorldObjects));
             if (Sprites != null)
             {
                 var sprite = Sprites.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame);
@@ -134,7 +142,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             $"plane ({Camera.PlaneX:0.000}, {Camera.PlaneY:0.000}).");
         Logger.Instance.Info(
             $"Player weapon {m_gameSession.Weapon}, frame {m_gameSession.WeaponFrame}, " +
-            $"attacking {m_gameSession.IsAttacking}, ammo {m_gameSession.Ammo}.");
+            $"attacking {m_gameSession.IsAttacking}, ammo {m_gameSession.Ammo}, " +
+            $"score {m_gameSession.Score}, treasure {m_gameSession.TreasureCount}.");
         foreach (var door in m_gameSession.Doors.Items)
         {
             Logger.Instance.Info(
@@ -165,14 +174,19 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void UpdateHud()
     {
         if (m_hudGraphics == null || m_gameSession == null ||
-            m_hudWeapon == m_gameSession.Weapon && m_hudAmmo == m_gameSession.Ammo)
+            m_hudWeapon == m_gameSession.Weapon && m_hudAmmo == m_gameSession.Ammo &&
+            m_hudScore == m_gameSession.Score)
         {
             return;
         }
         m_hudWeapon = m_gameSession.Weapon;
         m_hudAmmo = m_gameSession.Ammo;
-        SetField(ref m_statusBar, m_hudGraphics.Render(m_hudWeapon, m_hudAmmo), nameof(StatusBar));
+        m_hudScore = m_gameSession.Score;
+        SetField(ref m_statusBar, m_hudGraphics.Render(m_hudWeapon, m_hudAmmo, m_hudScore), nameof(StatusBar));
     }
+
+    private IReadOnlyList<WorldSprite> CreateWorldObjects() =>
+        StaticObjects.Concat(Actors.Select(actor => actor.ToWorldSprite())).ToArray();
 
 #if DEBUG
     private double DistanceToCamera(double x, double y)

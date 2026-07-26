@@ -58,4 +58,15 @@ public sealed class WolfensteinStaticObjectsTests
     {
         Assert.That(WolfensteinStaticObjects.BlocksMovement((ushort)marker), Is.False);
     }
+
+    [TestCase(28, WolfensteinPickupType.AmmoClip)]
+    [TestCase(31, WolfensteinPickupType.Cross)]
+    [TestCase(32, WolfensteinPickupType.Chalice)]
+    [TestCase(33, WolfensteinPickupType.Bible)]
+    [TestCase(34, WolfensteinPickupType.Crown)]
+    [TestCase(2, WolfensteinPickupType.None)]
+    public void GivenStaticSpriteCheckPickupTypeIsIdentified(int spriteNumber, WolfensteinPickupType expected)
+    {
+        Assert.That(WolfensteinStaticObjects.GetPickupType(spriteNumber), Is.EqualTo(expected));
+    }
 }

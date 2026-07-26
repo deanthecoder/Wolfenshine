@@ -30,6 +30,8 @@ public sealed class GameSession
     private const double AngleScale = 20.0;
     private const double AttackFrameDuration = 6.0 / OriginalTicksPerSecond;
     private const int RenewedAmmo = 99;
+    private const int MaximumAmmo = 99;
+    private const double PickupDistance = 0.5;
     private const double MinimumActorDistance = 1.0;
     private const double PlayerRadius = 0.2;
     private const double MaximumMovementStep = 0.1;
@@ -38,6 +40,7 @@ public sealed class GameSession
     private int m_attackStep;
     private double m_attackTimeRemaining;
     private readonly IReadOnlyList<WolfensteinActor> m_actors;
+    private readonly List<WorldSprite> m_staticObjects;
 
     public GameSession(
         WolfensteinMap map,
@@ -50,6 +53,7 @@ public sealed class GameSession
         Camera = camera;
         Doors = WolfensteinDoors.FromMap(map);
         m_actors = actors ?? [];
+        m_staticObjects = WolfensteinStaticObjects.FromMap(map).ToList();
     }
 
     public WolfensteinMap Map { get; }
@@ -58,7 +62,10 @@ public sealed class GameSession
     public PlayerWeapon Weapon { get; private set; } = PlayerWeapon.Pistol;
     public int WeaponFrame { get; private set; }
     public int Ammo { get; private set; } = 8;
+    public int Score { get; private set; }
+    public int TreasureCount { get; private set; }
     public bool IsAttacking { get; private set; }
+    public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
 
     public bool Update(double elapsedSeconds, PlayerInput input)
     {
@@ -70,6 +77,7 @@ public sealed class GameSession
             changed |= OpenDoorAhead();
         m_useWasDown = input.Use;
         changed |= UpdateWeapon(elapsedSeconds, input);
+        changed |= CollectPickups(Camera.X, Camera.Y);
 
         var horizontal = (input.TurnRight ? 1.0 : 0.0) - (input.TurnLeft ? 1.0 : 0.0);
         var turn = input.Strafe ? 0.0 : horizontal;
@@ -117,6 +125,7 @@ public sealed class GameSession
                 var nextY = y + stepY;
                 if (CanOccupy(x, nextY))
                     y = nextY;
+                changed |= CollectPickups(x, y);
             }
         }
 
@@ -164,6 +173,52 @@ public sealed class GameSession
         }
 
         return false;
+    }
+
+    private bool CollectPickups(double x, double y)
+    {
+        var changed = false;
+        for (var index = m_staticObjects.Count - 1; index >= 0; index--)
+        {
+            var item = m_staticObjects[index];
+            if (Math.Abs(x - item.X) > PickupDistance || Math.Abs(y - item.Y) > PickupDistance)
+                continue;
+
+            var pickupType = WolfensteinStaticObjects.GetPickupType(item.SpriteNumber);
+            if (pickupType == WolfensteinPickupType.None ||
+                pickupType == WolfensteinPickupType.AmmoClip && Ammo == MaximumAmmo)
+            {
+                continue;
+            }
+
+            switch (pickupType)
+            {
+                case WolfensteinPickupType.AmmoClip:
+                    Ammo = Math.Min(MaximumAmmo, Ammo + 8);
+                    break;
+                case WolfensteinPickupType.Cross:
+                    CollectTreasure(100);
+                    break;
+                case WolfensteinPickupType.Chalice:
+                    CollectTreasure(500);
+                    break;
+                case WolfensteinPickupType.Bible:
+                    CollectTreasure(1000);
+                    break;
+                case WolfensteinPickupType.Crown:
+                    CollectTreasure(5000);
+                    break;
+            }
+            m_staticObjects.RemoveAt(index);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private void CollectTreasure(int points)
+    {
+        Score += points;
+        TreasureCount++;
     }
 
     private static (double X, double Y) Rotate(double x, double y, double angle)

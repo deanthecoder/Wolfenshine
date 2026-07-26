@@ -36,13 +36,15 @@ public sealed class WolfensteinHudGraphicsTests
             digits,
             CreateGraphic(1, 1, 3));
 
-        var rendered = hud.Render(PlayerWeapon.Chaingun, 42);
+        var rendered = hud.Render(PlayerWeapon.Chaingun, 42, 1234);
 
         Assert.Multiple(() =>
         {
             Assert.That(rendered.GetIndex(32 * 8, 8), Is.EqualTo(13));
             Assert.That(rendered.GetIndex(27 * 8, 16), Is.EqualTo(24));
             Assert.That(rendered.GetIndex(28 * 8, 16), Is.EqualTo(22));
+            Assert.That(rendered.GetIndex(8 * 8, 16), Is.EqualTo(21));
+            Assert.That(rendered.GetIndex(11 * 8, 16), Is.EqualTo(24));
         });
     }
 
