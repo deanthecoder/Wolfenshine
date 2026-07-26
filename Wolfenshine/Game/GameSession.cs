@@ -95,6 +95,8 @@ public sealed class GameSession
         m_actorDefinitions = actors ?? [];
         m_actors = CreateActorStates();
         m_staticObjects = WolfensteinStaticObjects.FromMap(map).ToList();
+        TreasureTotal = m_staticObjects.Count(item =>
+            IsTreasure(WolfensteinStaticObjects.GetPickupType(item.SpriteNumber)));
         if (playerState is { } state)
         {
             Health = state.Health;
@@ -123,6 +125,10 @@ public sealed class GameSession
     public int Lives { get; private set; } = 3;
     public int Score { get; private set; }
     public int TreasureCount { get; private set; }
+    public int TreasureTotal { get; }
+    public int KillCount { get; private set; }
+    public int KillTotal => m_actorDefinitions.Count;
+    public double LevelElapsedSeconds { get; private set; }
     public int SecretCount { get; private set; }
     public int SecretTotal { get; }
     public bool IsAttacking { get; private set; }
@@ -186,6 +192,7 @@ public sealed class GameSession
             return elapsedSeconds > 0.0 || feedbackChanged;
         }
 
+        LevelElapsedSeconds += elapsedSeconds;
         var doorsClosingBeforeUpdate = Doors.Items.Where(door => door.IsClosing).ToHashSet();
         var changed = Doors.Update(elapsedSeconds, CanDoorClose) || feedbackChanged;
         foreach (var door in Doors.Items.Where(door => door.IsClosing && !doorsClosingBeforeUpdate.Contains(door)))
@@ -492,6 +499,26 @@ public sealed class GameSession
         TreasureCount++;
     }
 
+    public WolfensteinLevelStats CreateLevelStats() => WolfensteinLevelStats.Create(
+        Map.Slot,
+        LevelElapsedSeconds,
+        KillCount,
+        KillTotal,
+        SecretCount,
+        SecretTotal,
+        TreasureCount,
+        TreasureTotal);
+
+    public void ApplyLevelBonus(int bonus)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(bonus);
+        Score += bonus;
+    }
+
+    private static bool IsTreasure(WolfensteinPickupType pickup) => pickup is
+        WolfensteinPickupType.Cross or WolfensteinPickupType.Chalice or WolfensteinPickupType.Bible or
+        WolfensteinPickupType.Crown or WolfensteinPickupType.FullHeal;
+
     private void Heal(int amount) => Health = Math.Min(MaximumHealth, Health + amount);
 
     private static (double X, double Y) Rotate(double x, double y, double angle)
@@ -630,6 +657,7 @@ public sealed class GameSession
         if (target.IsDead)
         {
             Score += target.Score;
+            KillCount++;
             PlaySound(GetEnemyDeathSound(target.Actor.Type), target.X, target.Y);
             var dropSprite = target.Actor.Type switch
             {
@@ -1058,6 +1086,8 @@ public sealed class GameSession
         m_killerY = null;
         m_faceFrame = 0;
         TreasureCount = 0;
+        KillCount = 0;
+        LevelElapsedSeconds = 0.0;
         SecretCount = 0;
         ActorRevision++;
         RestartRevision++;

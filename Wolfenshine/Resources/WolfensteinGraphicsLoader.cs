@@ -32,6 +32,7 @@ public static class WolfensteinGraphicsLoader
     private const int ZeroDigitPictureOffset = 13;
     private const int FirstFacePictureOffset = 23;
     private const int FacePictureCount = 23;
+    private const int IntermissionGuyOffset = -43;
 
     public static WolfensteinHudGraphics LoadHudGraphics(WolfensteinResources resources)
     {
@@ -71,6 +72,36 @@ public static class WolfensteinGraphicsLoader
         }
 
         throw new InvalidDataException("VGAGRAPH.WL6 does not contain a 320 x 40 status-bar picture.");
+    }
+
+    public static WolfensteinIntermissionGraphics LoadIntermissionGraphics(WolfensteinResources resources)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
+        var dictionary = ReadDictionary(resources);
+        var offsets = ReadOffsets(resources);
+        using var reader = new BinaryReader(resources.OpenRead(WolfensteinResourceKind.GraphicsData));
+        var pictureTableData = ReadChunk(reader, offsets, 0, dictionary);
+        var pictures = ReadPictureTable(pictureTableData);
+        var statusChunk = FindPictureChunk(pictures, StatusBarWidth, StatusBarHeight);
+        var firstChunk = statusChunk + IntermissionGuyOffset;
+        var characters = new Dictionary<char, WolfensteinGraphic>
+        {
+            [':'] = ReadPicture(reader, offsets, dictionary, pictures, firstChunk + 1),
+            ['%'] = ReadPicture(reader, offsets, dictionary, pictures, firstChunk + 12),
+            ['!'] = ReadPicture(reader, offsets, dictionary, pictures, firstChunk + 39),
+            ['\''] = ReadPicture(reader, offsets, dictionary, pictures, firstChunk + 40)
+        };
+        for (var digit = 0; digit < 10; digit++)
+            characters[(char)('0' + digit)] = ReadPicture(reader, offsets, dictionary, pictures, firstChunk + 2 + digit);
+        for (var letter = 0; letter < 26; letter++)
+            characters[(char)('A' + letter)] = ReadPicture(reader, offsets, dictionary, pictures, firstChunk + 13 + letter);
+        WolfensteinGraphic[] bjFrames =
+        [
+            ReadPicture(reader, offsets, dictionary, pictures, firstChunk),
+            ReadPicture(reader, offsets, dictionary, pictures, firstChunk + 41)
+        ];
+        Logger.Instance.Info($"Loaded original intermission graphics relative to VGAGRAPH chunk {statusChunk}.");
+        return new WolfensteinIntermissionGraphics(bjFrames, characters);
     }
 
     public static byte[] ExpandHuffman(
@@ -196,6 +227,16 @@ public static class WolfensteinGraphicsLoader
                 BitConverter.ToUInt16(data, offset + sizeof(ushort)));
         }
         return pictures;
+    }
+
+    private static int FindPictureChunk(IReadOnlyList<(int Width, int Height)> pictures, int width, int height)
+    {
+        for (var picture = 0; picture < pictures.Count; picture++)
+        {
+            if (pictures[picture].Width == width && pictures[picture].Height == height)
+                return FirstPictureChunk + picture;
+        }
+        throw new InvalidDataException($"VGAGRAPH.WL6 does not contain a {width} x {height} picture.");
     }
 
     private static WolfensteinGraphic ReadPicture(

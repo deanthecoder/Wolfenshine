@@ -108,10 +108,13 @@ public sealed class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
 
         CompleteLevel(viewModel);
+        Assert.That(viewModel.IsShowingLevelStats, Is.True);
+        ContinueFromStats(viewModel);
         Assert.That(viewModel.SelectedMap, Is.SameAs(secondMap));
 
         viewModel.UpdateGame(0.5, default);
         CompleteLevel(viewModel);
+        ContinueFromStats(viewModel);
         Assert.That(viewModel.SelectedMap, Is.SameAs(firstMap));
     }
 
@@ -136,5 +139,13 @@ public sealed class MainWindowViewModelTests
     {
         viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
         viewModel.UpdateGame(0.5, default);
+    }
+
+    private static void ContinueFromStats(MainWindowViewModel viewModel)
+    {
+        viewModel.UpdateGame(0.0, default);
+        viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        viewModel.UpdateGame(0.0, default);
+        viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Attack: true));
     }
 }

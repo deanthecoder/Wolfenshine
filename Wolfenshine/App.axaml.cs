@@ -46,6 +46,7 @@ public sealed class App : Application
                 var sprites = WolfensteinVSwapLoader.LoadSprites(resources);
                 var palette = WolfensteinPaletteLoader.Load(resources);
                 var hudGraphics = WolfensteinGraphicsLoader.LoadHudGraphics(resources);
+                var intermissionGraphics = WolfensteinGraphicsLoader.LoadIntermissionGraphics(resources);
                 WolfensteinAudioPlayer audioPlayer = null;
                 try
                 {
@@ -66,7 +67,8 @@ public sealed class App : Application
                     sprites,
                     hudGraphics,
                     audioPlayer,
-                    settings);
+                    settings,
+                    intermissionGraphics);
                 Logger.Instance.Info(
                     $"Loaded {viewModel.StaticObjects.Count} static world objects for {viewModel.SelectedMap.Name}.");
                 Logger.Instance.Info(

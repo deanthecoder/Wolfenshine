@@ -31,6 +31,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly WolfensteinAudioPlayer m_audioPlayer;
     private readonly WolfenshineSettings m_settings;
     private readonly WolfensteinHudGraphics m_hudGraphics;
+    private double m_bjAnimationTime;
+    private int m_bjFrame;
+    private bool m_bjHasBreathed;
     private RaycastCamera m_camera;
     private WolfensteinSprite m_weaponSprite;
     private WolfensteinGraphic m_statusBar;
@@ -46,6 +49,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private double m_deathFade;
     private double m_damageFlash;
     private double m_levelFade;
+    private bool m_isShowingLevelStats;
+    private bool m_statsInputReleased;
+    private WolfensteinLevelStats m_levelStats;
+    private WolfensteinLevelStats m_finalLevelStats;
+    private int m_statsStage;
+    private double m_statsCountTime;
     private WolfensteinElevatorSwitch m_elevatorSwitch;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
 
@@ -65,7 +74,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         WolfensteinSpriteSet sprites = null,
         WolfensteinHudGraphics hudGraphics = null,
         WolfensteinAudioPlayer audioPlayer = null,
-        WolfenshineSettings settings = null)
+        WolfenshineSettings settings = null,
+        WolfensteinIntermissionGraphics intermissionGraphics = null)
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(maps);
@@ -77,6 +87,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_hudGraphics = hudGraphics;
         m_audioPlayer = audioPlayer;
         m_settings = settings;
+        IntermissionGraphics = intermissionGraphics;
         m_weaponSprite = weaponSprite;
         SelectedMap = maps.Maps.FirstOrDefault();
         if (SelectedMap != null)
@@ -113,6 +124,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public WolfensteinSprite WeaponSprite => m_weaponSprite;
     public WolfensteinSpriteSet Sprites { get; }
     public WolfensteinGraphic StatusBar => m_statusBar;
+    public WolfensteinIntermissionGraphics IntermissionGraphics { get; }
     public IReadOnlyList<WorldSprite> StaticObjects { get; private set; }
     public IReadOnlyList<WolfensteinActor> Actors { get; private set; }
     public IReadOnlyList<WorldSprite> WorldObjects => m_worldObjects;
@@ -123,6 +135,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public double DeathFade => m_deathFade;
     public double DamageFlash => m_damageFlash;
     public double LevelFade => m_levelFade;
+    public bool IsShowingLevelStats => m_isShowingLevelStats;
+    public WolfensteinLevelStats LevelStats => m_levelStats;
+    public int BjFrame => m_bjFrame;
     public int NativeViewportWidth => 320;
     public int NativeViewportHeight => 200;
     public int PresentationViewportWidth => 320;
@@ -130,12 +145,32 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {
+        if (m_isShowingLevelStats)
+        {
+            UpdateStatsAnimation(elapsedSeconds);
+            if (!HasInput(input))
+                m_statsInputReleased = true;
+            else if (m_statsInputReleased)
+            {
+                if (m_statsStage < 4)
+                {
+                    FinishStatsAnimation();
+                    m_statsInputReleased = false;
+                }
+                else
+                    AdvanceMap();
+            }
+            return;
+        }
         if (m_gameSession?.Update(elapsedSeconds, input) != true)
             return;
         foreach (var soundEvent in m_gameSession.DrainSoundEvents())
             m_audioPlayer?.Play(soundEvent, m_gameSession.Camera);
         if (m_gameSession.IsReadyForNextLevel)
-            AdvanceMap();
+        {
+            BeginLevelStats();
+            return;
+        }
         if (m_restartRevision != m_gameSession.RestartRevision)
         {
             m_restartRevision = m_gameSession.RestartRevision;
@@ -187,6 +222,109 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         NotifyMapChanged();
     }
 
+    private void BeginLevelStats()
+    {
+        var stats = m_gameSession.CreateLevelStats();
+        m_gameSession.ApplyLevelBonus(stats.Bonus);
+        UpdateHud();
+        m_finalLevelStats = stats;
+        SetField(
+            ref m_levelStats,
+            stats with { KillRatio = 0, SecretRatio = 0, TreasureRatio = 0, Bonus = 0 },
+            nameof(LevelStats));
+        SetField(ref m_isShowingLevelStats, true, nameof(IsShowingLevelStats));
+        SetField(ref m_levelFade, 0.0, nameof(LevelFade));
+        m_bjAnimationTime = 0.0;
+        m_bjHasBreathed = false;
+        SetField(ref m_bjFrame, 0, nameof(BjFrame));
+        m_statsStage = 0;
+        m_statsCountTime = 0.0;
+        m_statsInputReleased = false;
+        m_audioPlayer?.PlayMusicTrack(16);
+        m_audioPlayer?.SetMusicFade(0.0);
+        StatusText = "Level complete · release the controls, then press any gameplay key to continue";
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void UpdateStatsAnimation(double elapsedSeconds)
+    {
+        m_bjAnimationTime += elapsedSeconds;
+        var frameDuration = m_bjHasBreathed ? 35.0 / 70.0 : 10.0 / 70.0;
+        if (m_bjAnimationTime >= frameDuration)
+        {
+            m_bjAnimationTime %= frameDuration;
+            m_bjHasBreathed = true;
+            SetField(ref m_bjFrame, m_bjFrame ^ 1, nameof(BjFrame));
+        }
+
+        m_statsCountTime += elapsedSeconds;
+        while (m_statsCountTime >= 0.02 && m_statsStage < 4)
+        {
+            m_statsCountTime -= 0.02;
+            AdvanceStatsCount();
+        }
+    }
+
+    private void AdvanceStatsCount()
+    {
+        var current = m_levelStats;
+        var target = m_statsStage switch
+        {
+            0 => m_finalLevelStats.TimeBonus / 500,
+            1 => m_finalLevelStats.KillRatio,
+            2 => m_finalLevelStats.SecretRatio,
+            _ => m_finalLevelStats.TreasureRatio
+        };
+        var value = m_statsStage switch
+        {
+            0 => current.Bonus / 500,
+            1 => current.KillRatio,
+            2 => current.SecretRatio,
+            _ => current.TreasureRatio
+        };
+        if (value < target)
+        {
+            value++;
+            current = m_statsStage switch
+            {
+                0 => current with { Bonus = value * 500 },
+                1 => current with { KillRatio = value },
+                2 => current with { SecretRatio = value },
+                _ => current with { TreasureRatio = value }
+            };
+            SetField(ref m_levelStats, current, nameof(LevelStats));
+            if (value % 10 == 0)
+                PlayStatsSound(WolfensteinSoundEffect.EndBonusTick);
+            return;
+        }
+
+        if (m_statsStage > 0 && target == 100)
+        {
+            SetField(ref m_levelStats, current with { Bonus = current.Bonus + 10000 }, nameof(LevelStats));
+            PlayStatsSound(WolfensteinSoundEffect.PerfectRatio);
+        }
+        else
+            PlayStatsSound(target == 0 ? WolfensteinSoundEffect.NoBonus : WolfensteinSoundEffect.EndBonusDone);
+        m_statsStage++;
+    }
+
+    private void FinishStatsAnimation()
+    {
+        SetField(ref m_levelStats, m_finalLevelStats, nameof(LevelStats));
+        m_statsStage = 4;
+        PlayStatsSound(WolfensteinSoundEffect.EndBonusDone);
+    }
+
+    private void PlayStatsSound(WolfensteinSoundEffect effect)
+    {
+        if (Camera != null)
+            m_audioPlayer?.Play(new WolfensteinSoundEvent(effect), Camera);
+    }
+
+    private static bool HasInput(PlayerInput input) =>
+        input.MoveForward || input.MoveBackward || input.TurnLeft || input.TurnRight ||
+        input.Use || input.Run || input.Attack || input.Strafe || input.WeaponSelection != null;
+
     private void NotifyMapChanged()
     {
         OnPropertyChanged(nameof(SelectedMap));
@@ -208,6 +346,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         bool startFaded,
         RaycastCamera camera = null)
     {
+        SetField(ref m_isShowingLevelStats, false, nameof(IsShowingLevelStats));
+        SetField(ref m_levelStats, null, nameof(LevelStats));
         SelectedMap = map;
         Actors = WolfensteinActors.FromMap(map, GameDifficulty.Normal);
         m_camera = camera ?? RaycastCamera.FromPlayerStart(map);

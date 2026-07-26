@@ -39,6 +39,16 @@
                                     LevelFade="{Binding LevelFade}"
                                     RenderOptions.BitmapInterpolationMode="LowQuality" />
 
+            <local:IntermissionViewport IsVisible="{Binding IsShowingLevelStats}"
+                                        Width="320"
+                                        Height="192"
+                                        VerticalAlignment="Top"
+                                        Stats="{Binding LevelStats}"
+                                        Graphics="{Binding IntermissionGraphics}"
+                                        Palette="{Binding Palette}"
+                                        BjFrame="{Binding BjFrame}"
+                                        RenderOptions.BitmapInterpolationMode="LowQuality" />
+
             <StackPanel IsVisible="{Binding !HasGameData}"
                         Width="280"
                         HorizontalAlignment="Center"

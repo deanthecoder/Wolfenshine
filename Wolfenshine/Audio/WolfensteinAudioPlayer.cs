@@ -108,7 +108,16 @@ public sealed class WolfensteinAudioPlayer : IDisposable
     {
         if (m_isDisposed || mapSlot < 0 || mapSlot >= s_mapMusic.Length)
             return;
-        var trackNumber = s_mapMusic[mapSlot];
+        PlayMusicTrack(s_mapMusic[mapSlot]);
+    }
+
+    /// <summary>
+    /// Starts a looping music sequence by its original music number.
+    /// </summary>
+    public void PlayMusicTrack(int trackNumber)
+    {
+        if (m_isDisposed)
+            return;
         if (trackNumber >= m_musicTracks.Count)
             return;
         AL.SourceStop(m_musicSource);
@@ -120,7 +129,7 @@ public sealed class WolfensteinAudioPlayer : IDisposable
         AL.Source(m_musicSource, ALSourcei.Buffer, buffer);
         AL.Source(m_musicSource, ALSourcef.Gain, MusicGain);
         AL.SourcePlay(m_musicSource);
-        Logger.Instance.Info($"Playing music track {trackNumber} for map slot {mapSlot}.");
+        Logger.Instance.Info($"Playing music track {trackNumber}.");
     }
 
     /// <summary>
