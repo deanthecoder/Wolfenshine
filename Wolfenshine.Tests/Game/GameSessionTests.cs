@@ -293,6 +293,20 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenGuardMovedFromSpawnCheckAmmoDropsAtDeathPosition()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 1.5, WolfensteinActorType.Guard, 0, false, false, 50));
+        session.Actors[0].MoveTo(2.5, 1.8, 3, 0.1);
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        session.Update(12.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
+
+        Assert.That(session.StaticObjects, Has.One.Matches<WorldSprite>(item =>
+            item.SpriteNumber == 28 && item.X == 2.5 && item.Y == 1.8));
+    }
+
+    [Test]
     public void GivenGuardFacingPlayerCheckItBecomesAlertedBySight()
     {
         var session = CreateSessionWithActor(new WolfensteinActor(

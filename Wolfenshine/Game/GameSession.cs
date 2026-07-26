@@ -468,7 +468,7 @@ public sealed class GameSession
                 _ => 28
             };
             if (dropSprite >= 0)
-                m_staticObjects.Add(new WorldSprite(target.Actor.X, target.Actor.Y, dropSprite));
+                m_staticObjects.Add(new WorldSprite(target.X, target.Y, dropSprite));
         }
         ActorRevision++;
     }
