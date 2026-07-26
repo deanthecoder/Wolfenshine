@@ -48,7 +48,9 @@ public sealed class App : Application
                 WolfensteinAudioPlayer audioPlayer = null;
                 try
                 {
-                    audioPlayer = new WolfensteinAudioPlayer(WolfensteinSoundLoader.Load(resources));
+                    audioPlayer = new WolfensteinAudioPlayer(
+                        WolfensteinSoundLoader.Load(resources),
+                        WolfensteinMusicLoader.Load(resources));
                 }
                 catch (Exception exception)
                 {

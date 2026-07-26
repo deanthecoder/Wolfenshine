@@ -134,9 +134,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (m_restartRevision != m_gameSession.RestartRevision)
         {
             m_restartRevision = m_gameSession.RestartRevision;
+            m_audioPlayer?.PlayMusic(SelectedMap.Slot);
             OnPropertyChanged(nameof(Doors));
             OnPropertyChanged(nameof(PushWalls));
         }
+        m_audioPlayer?.SetMusicFade(Math.Max(m_gameSession.DeathFade, m_gameSession.LevelFade));
         SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
         SetField(ref m_deathFade, m_gameSession.DeathFade, nameof(DeathFade));
         SetField(ref m_levelFade, m_gameSession.LevelFade, nameof(LevelFade));
@@ -204,6 +206,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         StaticObjects = m_gameSession.StaticObjects;
         m_actorRevision = m_gameSession.ActorRevision;
         m_restartRevision = m_gameSession.RestartRevision;
+        m_audioPlayer?.PlayMusic(map.Slot);
+        m_audioPlayer?.SetMusicFade(startFaded ? 1.0 : 0.0);
         m_worldObjects = CreateWorldObjects();
         m_weaponSprite = Sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? m_weaponSprite;
         StatusText = $"{map.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
