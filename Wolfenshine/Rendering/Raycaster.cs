@@ -25,6 +25,13 @@ public static class Raycaster
         WolfensteinMap map,
         WolfensteinDoors doors,
         RaycastCamera camera,
+        Span<WallColumn> columns) => Cast(map, doors, null, camera, columns);
+
+    public static void Cast(
+        WolfensteinMap map,
+        WolfensteinDoors doors,
+        WolfensteinPushWalls pushWalls,
+        RaycastCamera camera,
         Span<WallColumn> columns)
     {
         ArgumentNullException.ThrowIfNull(map);
@@ -41,7 +48,13 @@ public static class Raycaster
             var cameraX = (2.0 * (column + 0.5) / columns.Length) - 1.0;
             var rayDirectionX = camera.DirectionX + (camera.PlaneX * cameraX);
             var rayDirectionY = camera.DirectionY + (camera.PlaneY * cameraX);
-            columns[column] = CastRay(map, doors, camera, rayDirectionX, rayDirectionY);
+            var wallColumn = CastRay(map, doors, pushWalls, camera, rayDirectionX, rayDirectionY);
+            if (TryHitPushWall(pushWalls, camera, rayDirectionX, rayDirectionY, out var pushWallColumn) &&
+                pushWallColumn.Distance < wallColumn.Distance)
+            {
+                wallColumn = pushWallColumn;
+            }
+            columns[column] = wallColumn;
         }
 
     }
@@ -49,6 +62,7 @@ public static class Raycaster
     private static WallColumn CastRay(
         WolfensteinMap map,
         WolfensteinDoors doors,
+        WolfensteinPushWalls pushWalls,
         RaycastCamera camera,
         double rayDirectionX,
         double rayDirectionY)
@@ -94,7 +108,7 @@ public static class Raycaster
                     return doorColumn;
                 continue;
             }
-            if (map.IsSolid(mapX, mapY))
+            if (map.IsSolid(mapX, mapY) && pushWalls?.IsOriginalWallSuppressed(mapX, mapY) != true)
             {
                 tile = map.GetWall(mapX, mapY);
                 break;
@@ -123,6 +137,69 @@ public static class Raycaster
             ? doors.Get(mapX - stepX, mapY) != null
             : doors.Get(mapX, mapY - stepY) != null;
         return new WallColumn(distance, textureU, tile, side, isDoorJamb);
+    }
+
+    private static bool TryHitPushWall(
+        WolfensteinPushWalls pushWalls,
+        RaycastCamera camera,
+        double rayDirectionX,
+        double rayDirectionY,
+        out WallColumn column)
+    {
+        column = default;
+        if (pushWalls == null)
+            return false;
+
+        var nearestDistance = double.PositiveInfinity;
+        foreach (var wall in pushWalls.Items)
+        {
+            var minimumX = wall.X - 0.5;
+            var maximumX = wall.X + 0.5;
+            var minimumY = wall.Y - 0.5;
+            var maximumY = wall.Y + 0.5;
+            var nearX = AxisNearDistance(camera.X, rayDirectionX, minimumX, maximumX, out var farX);
+            var nearY = AxisNearDistance(camera.Y, rayDirectionY, minimumY, maximumY, out var farY);
+            var distance = Math.Max(nearX, nearY);
+            if (distance <= 0.0 || distance > Math.Min(farX, farY) || distance >= nearestDistance)
+                continue;
+
+            var side = nearX > nearY ? WallSide.Vertical : WallSide.Horizontal;
+            var textureU = side == WallSide.Vertical
+                ? camera.Y + (distance * rayDirectionY) - minimumY
+                : camera.X + (distance * rayDirectionX) - minimumX;
+            if (side == WallSide.Vertical && rayDirectionX < 0.0 ||
+                side == WallSide.Horizontal && rayDirectionY > 0.0)
+            {
+                textureU = double.BitDecrement(1.0) - textureU;
+            }
+            textureU = Math.Clamp(textureU, 0.0, double.BitDecrement(1.0));
+            nearestDistance = distance;
+            column = new WallColumn(distance, textureU, wall.Tile, side);
+        }
+        return double.IsFinite(nearestDistance);
+    }
+
+    private static double AxisNearDistance(
+        double origin,
+        double direction,
+        double minimum,
+        double maximum,
+        out double farDistance)
+    {
+        if (direction == 0.0)
+        {
+            farDistance = origin >= minimum && origin <= maximum
+                ? double.PositiveInfinity
+                : double.NegativeInfinity;
+            return origin >= minimum && origin <= maximum
+                ? double.NegativeInfinity
+                : double.PositiveInfinity;
+        }
+
+        var first = (minimum - origin) / direction;
+        var second = (maximum - origin) / direction;
+        farDistance = Math.Max(first, second);
+        return Math.Min(first, second);
     }
 
     private static bool TryHitDoor(

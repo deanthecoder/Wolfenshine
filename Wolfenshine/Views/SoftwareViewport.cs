@@ -46,6 +46,8 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, RaycastCamera>(nameof(Camera));
     public static readonly StyledProperty<WolfensteinDoors> DoorsProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinDoors>(nameof(Doors));
+    public static readonly StyledProperty<WolfensteinPushWalls> PushWallsProperty =
+        AvaloniaProperty.Register<SoftwareViewport, WolfensteinPushWalls>(nameof(PushWalls));
     public static readonly StyledProperty<WolfensteinWallTextures> WallTexturesProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinWallTextures>(nameof(WallTextures));
     public static readonly StyledProperty<WolfensteinPalette> PaletteProperty =
@@ -63,6 +65,7 @@ public sealed class SoftwareViewport : Control
         MapProperty,
         CameraProperty,
         DoorsProperty,
+        PushWallsProperty,
         WallTexturesProperty,
         PaletteProperty,
         WeaponSpriteProperty,
@@ -86,6 +89,12 @@ public sealed class SoftwareViewport : Control
     {
         get => GetValue(DoorsProperty);
         set => SetValue(DoorsProperty, value);
+    }
+
+    public WolfensteinPushWalls PushWalls
+    {
+        get => GetValue(PushWallsProperty);
+        set => SetValue(PushWallsProperty, value);
     }
 
     public WolfensteinWallTextures WallTextures
@@ -137,7 +146,7 @@ public sealed class SoftwareViewport : Control
     private void RenderFrame()
     {
         // Raycasting and shading produce the complete native-resolution image independently of Avalonia.
-        Raycaster.Cast(Map, Doors, Camera, m_columns);
+        Raycaster.Cast(Map, Doors, PushWalls, Camera, m_columns);
         var playViewPixels = m_pixels.AsSpan(0, ViewportWidth * PlayViewHeight * 4);
         // The HUD clips the play view to 160 rows, but the original 200-row projection scale preserves its proportions.
         SoftwareRaycastRenderer.Render(

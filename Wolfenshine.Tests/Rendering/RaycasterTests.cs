@@ -140,6 +140,25 @@ public sealed class RaycasterTests
         Assert.That(columns[0].IsDoorJamb, Is.True);
     }
 
+    [Test]
+    public void GivenMovingPushwallCheckRayHitsItsContinuousPosition()
+    {
+        var map = CreateMap(19);
+        var wallTiles = (ushort[])map.Walls;
+        var objects = (ushort[])map.Objects;
+        wallTiles[(1 * map.Width) + 2] = 2;
+        objects[(1 * map.Width) + 2] = 98;
+        var camera = RaycastCamera.FromPlayerStart(map);
+        var pushWalls = new WolfensteinPushWalls(map);
+        pushWalls.TryPush(2, 1, 0, -1, (_, _) => true);
+        pushWalls.Update(64.0 / 70.0, (_, _) => true);
+        var columns = new WallColumn[1];
+
+        Raycaster.Cast(map, WolfensteinDoors.FromMap(map), pushWalls, camera, columns);
+
+        Assert.That(columns[0].Distance, Is.EqualTo(1.0).Within(0.0001));
+    }
+
     private static WolfensteinMap CreateMap(ushort playerMarker)
     {
         const int size = 5;

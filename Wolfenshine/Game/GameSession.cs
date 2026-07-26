@@ -53,6 +53,8 @@ public sealed class GameSession
         Map = map;
         Camera = camera;
         Doors = WolfensteinDoors.FromMap(map);
+        PushWalls = new WolfensteinPushWalls(map);
+        SecretTotal = map.Objects.Count(marker => marker == 98);
         m_actors = actors ?? [];
         m_staticObjects = WolfensteinStaticObjects.FromMap(map).ToList();
     }
@@ -60,11 +62,14 @@ public sealed class GameSession
     public WolfensteinMap Map { get; }
     public RaycastCamera Camera { get; private set; }
     public WolfensteinDoors Doors { get; }
+    public WolfensteinPushWalls PushWalls { get; }
     public PlayerWeapon Weapon { get; private set; } = PlayerWeapon.Pistol;
     public int WeaponFrame { get; private set; }
     public int Ammo { get; private set; } = 8;
     public int Score { get; private set; }
     public int TreasureCount { get; private set; }
+    public int SecretCount { get; private set; }
+    public int SecretTotal { get; }
     public bool IsAttacking { get; private set; }
     public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
 
@@ -74,8 +79,9 @@ public sealed class GameSession
             throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
 
         var changed = Doors.Update(elapsedSeconds, CanDoorClose);
+        changed |= PushWalls.Update(elapsedSeconds, CanPushWallEnterTile);
         if (input.Use && !m_useWasDown)
-            changed |= OpenDoorAhead();
+            changed |= OperateAhead();
         m_useWasDown = input.Use;
         changed |= UpdateWeapon(elapsedSeconds, input);
         changed |= CollectPickups(Camera.X, Camera.Y);
@@ -156,11 +162,23 @@ public sealed class GameSession
         var door = Doors.Get(x, y);
         if (door != null)
             return !door.IsFullyOpen;
-        return Map.IsSolid(x, y) || WolfensteinStaticObjects.BlocksMovement(Map.GetObject(x, y));
+        if (PushWalls.IsTileReserved(x, y))
+            return true;
+        return !PushWalls.IsOriginalWallSuppressed(x, y) && Map.IsSolid(x, y) ||
+               WolfensteinStaticObjects.BlocksMovement(Map.GetObject(x, y));
     }
 
-    private bool OpenDoorAhead()
+    private bool OperateAhead()
     {
+        var (directionX, directionY) = GetCardinalDirection();
+        var pushWallX = (int)Math.Floor(Camera.X) + directionX;
+        var pushWallY = (int)Math.Floor(Camera.Y) + directionY;
+        if (PushWalls.TryPush(pushWallX, pushWallY, directionX, directionY, CanPushWallEnterTile))
+        {
+            SecretCount++;
+            return true;
+        }
+
         // Follow a short use ray so slightly angled players can still operate the door they are facing.
         for (var distance = 0.25; distance <= 1.5; distance += 0.1)
         {
@@ -169,11 +187,27 @@ public sealed class GameSession
             var door = Doors.Get(x, y);
             if (door != null)
                 return door.Operate(CanDoorClose(door));
-            if (Map.IsSolid(x, y))
+            if (Map.IsSolid(x, y) && !PushWalls.IsOriginalWallSuppressed(x, y))
                 return false;
         }
 
         return false;
+    }
+
+    private (int X, int Y) GetCardinalDirection() => Math.Abs(Camera.DirectionX) > Math.Abs(Camera.DirectionY)
+        ? (Math.Sign(Camera.DirectionX), 0)
+        : (0, Math.Sign(Camera.DirectionY));
+
+    private bool CanPushWallEnterTile(int x, int y)
+    {
+        if (x < 0 || x >= Map.Width || y < 0 || y >= Map.Height ||
+            Doors.Get(x, y) != null || PushWalls.IsTileReserved(x, y) ||
+            !PushWalls.IsOriginalWallSuppressed(x, y) && Map.IsSolid(x, y) ||
+            WolfensteinStaticObjects.BlocksMovement(Map.GetObject(x, y)))
+        {
+            return false;
+        }
+        return m_actors.All(actor => (int)Math.Floor(actor.X) != x || (int)Math.Floor(actor.Y) != y);
     }
 
     private bool CanDoorClose(WolfensteinDoor door)

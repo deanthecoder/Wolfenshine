@@ -247,6 +247,24 @@ public sealed class GameSessionTests
         Assert.That(session.Doors.Items[0].IsFullyOpen, Is.True);
     }
 
+    [Test]
+    public void GivenPushwallAheadCheckUseActivatesItAndCountsSecret()
+    {
+        var session = CreatePushWallSession();
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, true));
+        session.Update(256.0 / 70.0, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.SecretCount, Is.EqualTo(1));
+            Assert.That(session.SecretTotal, Is.EqualTo(1));
+            Assert.That(session.PushWalls.Items, Has.Count.EqualTo(1));
+            Assert.That(session.PushWalls.Items[0].Distance, Is.EqualTo(2.0));
+            Assert.That(session.PushWalls.Items[0].IsMoving, Is.False);
+        });
+    }
+
     private static GameSession CreateSession()
     {
         const int size = 5;
@@ -302,6 +320,25 @@ public sealed class GameSessionTests
         objects[(2 * size) + 2] = 19;
         var map = new WolfensteinMap(0, "Actor Collision", size, size, walls, objects);
         return new GameSession(map, RaycastCamera.FromPlayerStart(map), new[] { actor });
+    }
+
+    private static GameSession CreatePushWallSession()
+    {
+        const int size = 7;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        for (var index = 0; index < size; index++)
+        {
+            walls[index] = 1;
+            walls[((size - 1) * size) + index] = 1;
+            walls[index * size] = 1;
+            walls[(index * size) + size - 1] = 1;
+        }
+        walls[(4 * size) + 3] = 2;
+        var objects = new ushort[size * size];
+        objects[(5 * size) + 3] = 19;
+        objects[(4 * size) + 3] = 98;
+        var map = new WolfensteinMap(0, "Pushwall Session", size, size, walls, objects);
+        return new GameSession(map, RaycastCamera.FromPlayerStart(map));
     }
 
     private static GameSession CreateSessionWithObject(ushort marker)

@@ -25,6 +25,7 @@
             <local:SoftwareViewport IsVisible="{Binding HasGameData}"
                                     Map="{Binding SelectedMap}"
                                     Doors="{Binding Doors}"
+                                    PushWalls="{Binding PushWalls}"
                                     Camera="{Binding Camera}"
                                     WallTextures="{Binding WallTextures}"
                                     Palette="{Binding Palette}"

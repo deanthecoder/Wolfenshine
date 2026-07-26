@@ -95,6 +95,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WolfensteinMap SelectedMap { get; }
     public RaycastCamera Camera => m_camera;
     public WolfensteinDoors Doors => m_gameSession?.Doors;
+    public WolfensteinPushWalls PushWalls => m_gameSession?.PushWalls;
     public WolfensteinWallTextures WallTextures { get; }
     public WolfensteinPalette Palette { get; }
     public WolfensteinSprite WeaponSprite => m_weaponSprite;
@@ -143,7 +144,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         Logger.Instance.Info(
             $"Player weapon {m_gameSession.Weapon}, frame {m_gameSession.WeaponFrame}, " +
             $"attacking {m_gameSession.IsAttacking}, ammo {m_gameSession.Ammo}, " +
-            $"score {m_gameSession.Score}, treasure {m_gameSession.TreasureCount}.");
+            $"score {m_gameSession.Score}, treasure {m_gameSession.TreasureCount}, " +
+            $"secrets {m_gameSession.SecretCount}/{m_gameSession.SecretTotal}.");
+        foreach (var wall in m_gameSession.PushWalls.Items)
+        {
+            Logger.Instance.Info(
+                $"Pushwall origin ({wall.OriginX}, {wall.OriginY}), position ({wall.X:0.000}, {wall.Y:0.000}), " +
+                $"distance {wall.Distance:0.000}, moving {wall.IsMoving}.");
+        }
         foreach (var door in m_gameSession.Doors.Items)
         {
             Logger.Instance.Info(
