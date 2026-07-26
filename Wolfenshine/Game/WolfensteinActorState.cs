@@ -107,14 +107,16 @@ public sealed class WolfensteinActorState
             return false;
         m_shootAnimationTime += elapsedSeconds;
         var changed = false;
-        while (m_shootAnimationTime >= 20.0 / OriginalTicksPerSecond &&
+        var frameDuration = (Actor.Type == WolfensteinActorType.Dog ? 10.0 : 20.0) / OriginalTicksPerSecond;
+        var frameCount = Actor.Type == WolfensteinActorType.Dog ? 5 : 3;
+        while (m_shootAnimationTime >= frameDuration &&
                Behavior == WolfensteinActorBehavior.Shooting)
         {
-            m_shootAnimationTime -= 20.0 / OriginalTicksPerSecond;
+            m_shootAnimationTime -= frameDuration;
             m_shootFrame++;
             if (m_shootFrame == 1)
                 fired = true;
-            if (m_shootFrame >= 3)
+            if (m_shootFrame >= frameCount)
             {
                 Behavior = WolfensteinActorBehavior.Chasing;
                 CurrentSpriteNumber = GetWalkingSprite(0);
@@ -197,6 +199,14 @@ public sealed class WolfensteinActorState
         WolfensteinActorType.Officer => 285 + frame,
         WolfensteinActorType.Ss => 184 + frame,
         WolfensteinActorType.Mutant => 234 + Math.Min(frame, 3),
+        WolfensteinActorType.Dog => frame switch
+        {
+            0 => 135,
+            1 => 136,
+            2 => 137,
+            3 => 135,
+            _ => 99
+        },
         _ => Actor.BaseSpriteNumber
     };
 }

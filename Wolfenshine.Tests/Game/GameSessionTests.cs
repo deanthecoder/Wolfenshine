@@ -340,6 +340,30 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenDogAtCloseRangeCheckJumpAnimationBitesPlayerAndReturnsToChase()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 1.5, WolfensteinActorType.Dog, 3, false, false, 99));
+
+        session.Update(0.0, default);
+        Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(135));
+
+        session.Update(10.0 / 70.0, default);
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Health, Is.EqualTo(90));
+            Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(136));
+        });
+
+        session.Update(40.0 / 70.0, default);
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Actors[0].Behavior, Is.EqualTo(WolfensteinActorBehavior.Chasing));
+            Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(99));
+        });
+    }
+
+    [Test]
     public void GivenChasingGuardAtCloseRangeCheckItCannotOverlapPlayer()
     {
         var session = CreateSessionWithActor(new WolfensteinActor(

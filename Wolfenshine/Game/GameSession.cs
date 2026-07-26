@@ -39,7 +39,9 @@ public sealed class GameSession
     private const int CombatViewportWidth = 320;
     private const int CrosshairHalfWidth = 20;
     private const double GuardChaseSpeed = 1.64;
+    private const double DogChaseSpeed = 3.2;
     private const double MinimumShootingDistance = 0.75;
+    private const double DogAttackDistance = 1.5;
     private bool m_useWasDown;
     private bool m_attackWasDown;
     private int m_attackStep;
@@ -513,13 +515,15 @@ public sealed class GameSession
         foreach (var actor in m_actors)
         {
             changed |= actor.Update(elapsedSeconds);
-            if (actor.IsDead || actor.Actor.Type != WolfensteinActorType.Guard)
+            if (actor.IsDead || actor.Actor.Type is not WolfensteinActorType.Guard and not WolfensteinActorType.Dog)
                 continue;
             if (actor.Behavior == WolfensteinActorBehavior.Shooting)
             {
                 changed |= actor.UpdateShooting(elapsedSeconds, out var fired);
                 if (fired && HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y))
-                    TakeDamage(5);
+                {
+                    TakeDamage(actor.Actor.Type == WolfensteinActorType.Dog ? 10 : 5);
+                }
                 continue;
             }
 
@@ -535,10 +539,14 @@ public sealed class GameSession
             var distance = Math.Sqrt(
                 Math.Pow(Camera.X - actor.X, 2.0) +
                 Math.Pow(Camera.Y - actor.Y, 2.0));
-            if (distance >= MinimumShootingDistance && actor.AttackCooldown == 0.0 &&
-                HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y))
+            var shouldAttack = actor.Actor.Type == WolfensteinActorType.Dog
+                ? Math.Abs(Camera.X - actor.X) <= DogAttackDistance &&
+                  Math.Abs(Camera.Y - actor.Y) <= DogAttackDistance
+                : distance >= MinimumShootingDistance &&
+                  HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y);
+            if (actor.AttackCooldown == 0.0 && shouldAttack)
             {
-                actor.AttackCooldown = 1.0;
+                actor.AttackCooldown = actor.Actor.Type == WolfensteinActorType.Dog ? 0.5 : 1.0;
                 changed |= actor.BeginShooting();
                 continue;
             }
@@ -608,7 +616,8 @@ public sealed class GameSession
         var distance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
         if (distance <= double.Epsilon)
             return false;
-        var travel = Math.Min(distance, GuardChaseSpeed * elapsedSeconds);
+        var chaseSpeed = actor.Actor.Type == WolfensteinActorType.Dog ? DogChaseSpeed : GuardChaseSpeed;
+        var travel = Math.Min(distance, chaseSpeed * elapsedSeconds);
         var stepCount = Math.Max(1, (int)Math.Ceiling(travel / MaximumMovementStep));
         var stepX = deltaX / distance * travel / stepCount;
         var stepY = deltaY / distance * travel / stepCount;
