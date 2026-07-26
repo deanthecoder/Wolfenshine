@@ -39,6 +39,7 @@ public sealed class SoftwareViewport : Control
     private ProjectedWorldSprite[] m_projectedSprites = [];
     private WolfensteinMap m_renderedMap;
     private RaycastCamera m_renderedCamera;
+    private double m_renderedDeathFade = -1.0;
 
     public static readonly StyledProperty<WolfensteinMap> MapProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinMap>(nameof(Map));
@@ -60,6 +61,8 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, IReadOnlyList<WorldSprite>>(nameof(StaticObjects));
     public static readonly StyledProperty<WolfensteinGraphic> StatusBarProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinGraphic>(nameof(StatusBar));
+    public static readonly StyledProperty<double> DeathFadeProperty =
+        AvaloniaProperty.Register<SoftwareViewport, double>(nameof(DeathFade));
 
     static SoftwareViewport() => AffectsRender<SoftwareViewport>(
         MapProperty,
@@ -71,7 +74,8 @@ public sealed class SoftwareViewport : Control
         WeaponSpriteProperty,
         SpritesProperty,
         StaticObjectsProperty,
-        StatusBarProperty);
+        StatusBarProperty,
+        DeathFadeProperty);
 
     public WolfensteinMap Map
     {
@@ -133,12 +137,19 @@ public sealed class SoftwareViewport : Control
         set => SetValue(StatusBarProperty, value);
     }
 
+    public double DeathFade
+    {
+        get => GetValue(DeathFadeProperty);
+        set => SetValue(DeathFadeProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
         if (Map == null || Doors == null || Camera == null)
             return;
-        if (!ReferenceEquals(m_renderedMap, Map) || !ReferenceEquals(m_renderedCamera, Camera))
+        if (!ReferenceEquals(m_renderedMap, Map) || !ReferenceEquals(m_renderedCamera, Camera) ||
+            m_renderedDeathFade != DeathFade)
             RenderFrame();
         context.DrawImage(m_bitmap, Bounds);
     }
@@ -188,6 +199,8 @@ public sealed class SoftwareViewport : Control
                 ViewportWidth,
                 PlayViewHeight);
         }
+        if (DeathFade > 0.0 && Palette != null)
+            ApplyDeathFade(playViewPixels, DeathFade, Palette.GetColor(4));
         if (StatusBar != null && Palette != null)
             SoftwareRaycastRenderer.DrawGraphic(StatusBar, Palette, 0, PlayViewHeight, m_pixels, ViewportWidth, ViewportHeight);
 
@@ -211,5 +224,22 @@ public sealed class SoftwareViewport : Control
 
         m_renderedMap = Map;
         m_renderedCamera = Camera;
+        m_renderedDeathFade = DeathFade;
+    }
+
+    private static void ApplyDeathFade(Span<byte> pixels, double progress, RgbaColor color)
+    {
+        var threshold = (uint)(Math.Clamp(progress, 0.0, 1.0) * uint.MaxValue);
+        for (var pixel = 0; pixel < pixels.Length / 4; pixel++)
+        {
+            var hash = unchecked((uint)(pixel + 1) * 2654435761u);
+            if (hash > threshold)
+                continue;
+            var offset = pixel * 4;
+            pixels[offset] = color.Red;
+            pixels[offset + 1] = color.Green;
+            pixels[offset + 2] = color.Blue;
+            pixels[offset + 3] = color.Alpha;
+        }
     }
 }

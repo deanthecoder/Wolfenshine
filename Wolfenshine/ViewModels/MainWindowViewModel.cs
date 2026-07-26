@@ -38,6 +38,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int m_hudFace = -1;
     private int m_hudLives = -1;
     private int m_actorRevision = -1;
+    private int m_restartRevision;
+    private bool m_isGameOver;
+    private double m_deathFade;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
 
     public MainWindowViewModel()
@@ -111,6 +114,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string StatusText { get; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;
+    public bool IsGameOver => m_isGameOver;
+    public double DeathFade => m_deathFade;
     public int NativeViewportWidth => 320;
     public int NativeViewportHeight => 200;
     public int PresentationViewportWidth => 320;
@@ -120,7 +125,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (m_gameSession?.Update(elapsedSeconds, input) == true)
         {
+            if (m_restartRevision != m_gameSession.RestartRevision)
+            {
+                m_restartRevision = m_gameSession.RestartRevision;
+                OnPropertyChanged(nameof(Doors));
+                OnPropertyChanged(nameof(PushWalls));
+            }
             SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
+            SetField(ref m_deathFade, m_gameSession.DeathFade, nameof(DeathFade));
             if (m_worldObjects.Count != StaticObjects.Count + Actors.Count ||
                 m_actorRevision != m_gameSession.ActorRevision)
             {
@@ -133,6 +145,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 SetField(ref m_weaponSprite, sprite, nameof(WeaponSprite));
             }
             UpdateHud();
+            SetField(ref m_isGameOver, m_gameSession.IsGameOver, nameof(IsGameOver));
         }
     }
 

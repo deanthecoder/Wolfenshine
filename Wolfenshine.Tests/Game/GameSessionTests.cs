@@ -489,6 +489,83 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenPlayerDeathCheckLifeIsConsumedAndLevelStateRestarts()
+    {
+        var session = CreateSessionWithObjectAndDog(47);
+        InflictFatalDogBites(session);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.IsDying, Is.True);
+            Assert.That(session.FacePictureIndex, Is.EqualTo(21));
+            Assert.That(session.Lives, Is.EqualTo(3));
+        });
+
+        session.Update(1.5, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.IsDying, Is.False);
+            Assert.That(session.IsGameOver, Is.False);
+            Assert.That(session.Lives, Is.EqualTo(2));
+            Assert.That(session.Health, Is.EqualTo(100));
+            Assert.That(session.Ammo, Is.EqualTo(8));
+            Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.Pistol));
+            Assert.That(session.Camera.X, Is.EqualTo(2.5));
+            Assert.That(session.Camera.Y, Is.EqualTo(2.5));
+            Assert.That(session.StaticObjects, Has.Count.EqualTo(1));
+            Assert.That(session.Actors[0].Behavior, Is.EqualTo(WolfensteinActorBehavior.Dormant));
+        });
+    }
+
+    [Test]
+    public void GivenFinalLifeIsLostCheckGameOverIsRaised()
+    {
+        var session = CreateSessionWithObjectAndDog(47);
+        for (var life = 0; life < 3; life++)
+        {
+            InflictFatalDogBites(session);
+            session.Update(1.5, default);
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Lives, Is.Zero);
+            Assert.That(session.IsGameOver, Is.True);
+        });
+    }
+
+    [Test]
+    public void GivenPlayerDeathCheckRedFadeAndOriginalMaximumDelayAreUsed()
+    {
+        var session = CreateSessionWithObjectAndDog(47);
+        InflictFatalDogBites(session);
+
+        session.Update(0.5, default);
+        Assert.That(session.DeathFade, Is.EqualTo(0.5).Within(0.0001));
+
+        session.Update((100.0 / 70.0) - 0.501, default);
+        Assert.That(session.IsDying, Is.True);
+
+        session.Update(0.0011, default);
+        Assert.That(session.IsDying, Is.False);
+        Assert.That(session.Lives, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void GivenRedDeathFadeIsCompleteCheckInputSkipsRemainingDelay()
+    {
+        var session = CreateSessionWithObjectAndDog(47);
+        InflictFatalDogBites(session);
+        session.Update(1.0, default);
+
+        session.Update(0.0, new PlayerInput(true, false, false, false));
+
+        Assert.That(session.IsDying, Is.False);
+        Assert.That(session.Lives, Is.EqualTo(2));
+    }
+
+    [Test]
     public void GivenFullAmmoCheckClipRemainsAvailable()
     {
         var session = CreateSessionWithObject(49);
@@ -708,5 +785,12 @@ public sealed class GameSessionTests
             session.Update(0.4, new PlayerInput(false, false, false, false, Attack: true));
             session.Update(0.0, default);
         }
+    }
+
+    private static void InflictFatalDogBites(GameSession session)
+    {
+        for (var update = 0; update < 30 && session.Health > 0; update++)
+            session.Update(1.0, default);
+        Assert.That(session.Health, Is.Zero, "The test dog did not kill the player in time.");
     }
 }

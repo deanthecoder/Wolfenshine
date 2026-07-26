@@ -146,6 +146,8 @@ public sealed partial class MainWindow : Window
                 m_weaponSelection,
                 m_strafe));
         m_weaponSelection = null;
+        if (viewModel.IsGameOver)
+            Close();
     }
 
     private bool SetKeyState(Key key, bool isDown)

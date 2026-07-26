@@ -42,6 +42,8 @@ public sealed class GameSession
     private const double DogChaseSpeed = 3.2;
     private const double MinimumShootingDistance = 0.75;
     private const double DogAttackDistance = 1.5;
+    private const double DeathFadeDuration = 70.0 / OriginalTicksPerSecond;
+    private const double DeathDuration = 100.0 / OriginalTicksPerSecond;
     private bool m_useWasDown;
     private bool m_attackWasDown;
     private int m_attackStep;
@@ -54,7 +56,10 @@ public sealed class GameSession
     private double m_chaingunGrinTime;
     private int m_faceFrame;
     private uint m_randomState = 0x5f3759df;
-    private readonly IReadOnlyList<WolfensteinActorState> m_actors;
+    private double m_deathTime;
+    private readonly RaycastCamera m_startCamera;
+    private readonly IReadOnlyList<WolfensteinActor> m_actorDefinitions;
+    private IReadOnlyList<WolfensteinActorState> m_actors;
     private readonly List<WorldSprite> m_staticObjects;
 
     public GameSession(
@@ -66,17 +71,19 @@ public sealed class GameSession
         ArgumentNullException.ThrowIfNull(camera);
         Map = map;
         Camera = camera;
+        m_startCamera = camera;
         Doors = WolfensteinDoors.FromMap(map);
         PushWalls = new WolfensteinPushWalls(map);
         SecretTotal = map.Objects.Count(marker => marker == 98);
-        m_actors = (actors ?? []).Select(actor => new WolfensteinActorState(actor)).ToArray();
+        m_actorDefinitions = actors ?? [];
+        m_actors = CreateActorStates();
         m_staticObjects = WolfensteinStaticObjects.FromMap(map).ToList();
     }
 
     public WolfensteinMap Map { get; }
     public RaycastCamera Camera { get; private set; }
-    public WolfensteinDoors Doors { get; }
-    public WolfensteinPushWalls PushWalls { get; }
+    public WolfensteinDoors Doors { get; private set; }
+    public WolfensteinPushWalls PushWalls { get; private set; }
     public PlayerWeapon Weapon { get; private set; } = PlayerWeapon.Pistol;
     public PlayerWeapon BestWeapon => m_bestWeapon;
     public int WeaponFrame { get; private set; }
@@ -88,10 +95,14 @@ public sealed class GameSession
     public int SecretCount { get; private set; }
     public int SecretTotal { get; }
     public bool IsAttacking { get; private set; }
+    public bool IsDying { get; private set; }
+    public bool IsGameOver { get; private set; }
+    public double DeathFade => IsDying ? Math.Min(1.0, m_deathTime / DeathFadeDuration) : 0.0;
     public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
     public IReadOnlyList<WorldSprite> ActorSprites => m_actors.Select(actor => actor.ToWorldSprite()).ToArray();
     public IReadOnlyList<WolfensteinActorState> Actors => m_actors;
     public int ActorRevision { get; private set; }
+    public int RestartRevision { get; private set; }
     public int FacePictureIndex => m_chaingunGrinTime > 0.0
         ? 22
         : Health == 0
@@ -115,6 +126,10 @@ public sealed class GameSession
     {
         if (!double.IsFinite(elapsedSeconds) || elapsedSeconds < 0.0)
             throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
+        if (IsGameOver)
+            return false;
+        if (IsDying)
+            return UpdateDeath(elapsedSeconds, input);
 
         var changed = Doors.Update(elapsedSeconds, CanDoorClose);
         changed |= PushWalls.Update(elapsedSeconds, CanPushWallEnterTile);
@@ -729,5 +744,65 @@ public sealed class GameSession
         if (Health == 0)
             return;
         Health = Math.Max(0, Health - damage);
+        if (Health > 0)
+            return;
+        IsDying = true;
+        IsAttacking = false;
+        WeaponFrame = 0;
+        m_deathTime = 0.0;
     }
+
+    private bool UpdateDeath(double elapsedSeconds, PlayerInput input)
+    {
+        m_deathTime += elapsedSeconds;
+        var skipDelay = m_deathTime >= DeathFadeDuration && HasInput(input);
+        if (m_deathTime < DeathDuration && !skipDelay)
+            return elapsedSeconds > 0.0;
+        Lives--;
+        if (Lives <= 0)
+        {
+            IsGameOver = true;
+            return true;
+        }
+        RestartLevel();
+        return true;
+    }
+
+    private static bool HasInput(PlayerInput input) =>
+        input.MoveForward || input.MoveBackward || input.TurnLeft || input.TurnRight ||
+        input.Use || input.Run || input.Attack || input.Strafe || input.WeaponSelection != null;
+
+    private void RestartLevel()
+    {
+        Camera = m_startCamera;
+        Doors = WolfensteinDoors.FromMap(Map);
+        PushWalls = new WolfensteinPushWalls(Map);
+        m_actors = CreateActorStates();
+        m_staticObjects.Clear();
+        m_staticObjects.AddRange(WolfensteinStaticObjects.FromMap(Map));
+        Health = MaximumHealth;
+        Ammo = 8;
+        Weapon = PlayerWeapon.Pistol;
+        m_chosenWeapon = PlayerWeapon.Pistol;
+        m_bestWeapon = PlayerWeapon.Pistol;
+        WeaponFrame = 0;
+        IsAttacking = false;
+        IsDying = false;
+        m_useWasDown = false;
+        m_attackWasDown = false;
+        m_attackStep = 0;
+        m_attackTimeRemaining = 0.0;
+        m_playerMadeNoise = false;
+        m_faceTime = 0.0;
+        m_nextFaceChange = 1.0;
+        m_chaingunGrinTime = 0.0;
+        m_faceFrame = 0;
+        TreasureCount = 0;
+        SecretCount = 0;
+        ActorRevision++;
+        RestartRevision++;
+    }
+
+    private IReadOnlyList<WolfensteinActorState> CreateActorStates() =>
+        m_actorDefinitions.Select(actor => new WolfensteinActorState(actor)).ToArray();
 }

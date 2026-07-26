@@ -33,6 +33,7 @@
                                     Sprites="{Binding Sprites}"
                                     StaticObjects="{Binding WorldObjects}"
                                     StatusBar="{Binding StatusBar}"
+                                    DeathFade="{Binding DeathFade}"
                                     RenderOptions.BitmapInterpolationMode="LowQuality" />
 
             <StackPanel IsVisible="{Binding !HasGameData}"
