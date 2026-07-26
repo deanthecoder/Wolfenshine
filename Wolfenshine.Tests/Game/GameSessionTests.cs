@@ -353,6 +353,42 @@ public sealed class GameSessionTests
         Assert.That(session.Health, Is.EqualTo(95));
     }
 
+    [TestCase(WolfensteinActorType.Officer, 238, 6, 5, 286)]
+    [TestCase(WolfensteinActorType.Ss, 138, 20, 4, 185)]
+    [TestCase(WolfensteinActorType.Mutant, 187, 6, 6, 235)]
+    public void GivenOtherSoldierAtCloseRangeCheckItsFirstAttackFrameDamagesPlayer(
+        WolfensteinActorType type,
+        int baseSprite,
+        int attackTicks,
+        int expectedDamage,
+        int expectedSprite)
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 1.5, type, 3, false, false, baseSprite));
+
+        session.Update(0.0, default);
+        session.Update(attackTicks / 70.0, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Health, Is.EqualTo(100 - expectedDamage));
+            Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(expectedSprite));
+        });
+    }
+
+    [Test]
+    public void GivenSsAttackCheckFourRoundBurstDamagesPlayerFourTimes()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 1.5, WolfensteinActorType.Ss, 3, false, false, 138));
+        session.Update(0.0, default);
+
+        foreach (var ticks in new[] { 20, 20, 10, 10, 10, 10, 10 })
+            session.Update(ticks / 70.0, default);
+
+        Assert.That(session.Health, Is.EqualTo(84));
+    }
+
     [Test]
     public void GivenDogAtCloseRangeCheckJumpAnimationBitesPlayerAndReturnsToChase()
     {

@@ -21,6 +21,20 @@ namespace Wolfenshine.Tests.Game;
 /// </remarks>
 public sealed class WolfensteinActorStateTests
 {
+    [TestCase(GameDifficulty.Baby, 45)]
+    [TestCase(GameDifficulty.Easy, 55)]
+    [TestCase(GameDifficulty.Normal, 55)]
+    [TestCase(GameDifficulty.Hard, 65)]
+    public void GivenMutantDifficultyCheckOriginalHitPointsAreSelected(
+        GameDifficulty difficulty,
+        int expectedHitPoints)
+    {
+        var actor = new WolfensteinActorState(new WolfensteinActor(
+            1.5, 2.5, WolfensteinActorType.Mutant, 0, false, false, 187), difficulty);
+
+        Assert.That(actor.HitPoints, Is.EqualTo(expectedHitPoints));
+    }
+
     [Test]
     public void GivenNonLethalOfficerDamageCheckPainSpriteReturnsToStandingSprite()
     {

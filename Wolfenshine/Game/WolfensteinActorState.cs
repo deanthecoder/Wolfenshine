@@ -28,18 +28,20 @@ public sealed class WolfensteinActorState
     private double m_shootAnimationTime;
     private int m_shootFrame;
 
-    public WolfensteinActorState(WolfensteinActor actor)
+    public WolfensteinActorState(WolfensteinActor actor, GameDifficulty difficulty = GameDifficulty.Normal)
     {
         Actor = actor;
-        (HitPoints, Score, m_deathFrameDuration, m_deathSprites) = actor.Type switch
+        Profile = WolfensteinEnemyProfile.Create(actor.Type, difficulty);
+        (m_deathFrameDuration, m_deathSprites) = actor.Type switch
         {
-            WolfensteinActorType.Guard => (25, 100, 15.0 / OriginalTicksPerSecond, new[] { 91, 92, 93, 95 }),
-            WolfensteinActorType.Officer => (50, 400, 11.0 / OriginalTicksPerSecond, new[] { 279, 280, 281, 283, 284 }),
-            WolfensteinActorType.Ss => (100, 500, 15.0 / OriginalTicksPerSecond, new[] { 179, 180, 181, 183 }),
-            WolfensteinActorType.Dog => (1, 200, 15.0 / OriginalTicksPerSecond, new[] { 131, 132, 133, 134 }),
-            WolfensteinActorType.Mutant => (55, 700, 7.0 / OriginalTicksPerSecond, new[] { 228, 229, 230, 232, 233 }),
+            WolfensteinActorType.Guard => (15.0 / OriginalTicksPerSecond, new[] { 91, 92, 93, 95 }),
+            WolfensteinActorType.Officer => (11.0 / OriginalTicksPerSecond, new[] { 279, 280, 281, 283, 284 }),
+            WolfensteinActorType.Ss => (15.0 / OriginalTicksPerSecond, new[] { 179, 180, 181, 183 }),
+            WolfensteinActorType.Dog => (15.0 / OriginalTicksPerSecond, new[] { 131, 132, 133, 134 }),
+            WolfensteinActorType.Mutant => (7.0 / OriginalTicksPerSecond, new[] { 228, 229, 230, 232, 233 }),
             _ => throw new ArgumentOutOfRangeException(nameof(actor))
         };
+        HitPoints = Profile.HitPoints;
         CurrentSpriteNumber = actor.BaseSpriteNumber;
         X = actor.X;
         Y = actor.Y;
@@ -47,8 +49,9 @@ public sealed class WolfensteinActorState
     }
 
     public WolfensteinActor Actor { get; }
+    public WolfensteinEnemyProfile Profile { get; }
     public int HitPoints { get; private set; }
-    public int Score { get; }
+    public int Score => Profile.Score;
     public int CurrentSpriteNumber { get; private set; }
     public double X { get; private set; }
     public double Y { get; private set; }
@@ -96,7 +99,7 @@ public sealed class WolfensteinActorState
         Behavior = WolfensteinActorBehavior.Shooting;
         m_shootAnimationTime = 0.0;
         m_shootFrame = 0;
-        CurrentSpriteNumber = GetShootingSprite(0);
+        CurrentSpriteNumber = Profile.AttackSprites[0];
         return true;
     }
 
@@ -107,23 +110,21 @@ public sealed class WolfensteinActorState
             return false;
         m_shootAnimationTime += elapsedSeconds;
         var changed = false;
-        var frameDuration = (Actor.Type == WolfensteinActorType.Dog ? 10.0 : 20.0) / OriginalTicksPerSecond;
-        var frameCount = Actor.Type == WolfensteinActorType.Dog ? 5 : 3;
-        while (m_shootAnimationTime >= frameDuration &&
-               Behavior == WolfensteinActorBehavior.Shooting)
+        while (Behavior == WolfensteinActorBehavior.Shooting &&
+               m_shootAnimationTime >= Profile.AttackFrameTicks[m_shootFrame] / OriginalTicksPerSecond)
         {
-            m_shootAnimationTime -= frameDuration;
+            m_shootAnimationTime -= Profile.AttackFrameTicks[m_shootFrame] / OriginalTicksPerSecond;
             m_shootFrame++;
-            if (m_shootFrame == 1)
+            if (Profile.FiringFrames.Contains(m_shootFrame))
                 fired = true;
-            if (m_shootFrame >= frameCount)
+            if (m_shootFrame >= Profile.AttackSprites.Count)
             {
                 Behavior = WolfensteinActorBehavior.Chasing;
                 CurrentSpriteNumber = GetWalkingSprite(0);
             }
             else
             {
-                CurrentSpriteNumber = GetShootingSprite(m_shootFrame);
+                CurrentSpriteNumber = Profile.AttackSprites[m_shootFrame];
             }
             changed = true;
         }
@@ -193,20 +194,4 @@ public sealed class WolfensteinActorState
         _ => Actor.BaseSpriteNumber
     };
 
-    private int GetShootingSprite(int frame) => Actor.Type switch
-    {
-        WolfensteinActorType.Guard => 96 + frame,
-        WolfensteinActorType.Officer => 285 + frame,
-        WolfensteinActorType.Ss => 184 + frame,
-        WolfensteinActorType.Mutant => 234 + Math.Min(frame, 3),
-        WolfensteinActorType.Dog => frame switch
-        {
-            0 => 135,
-            1 => 136,
-            2 => 137,
-            3 => 135,
-            _ => 99
-        },
-        _ => Actor.BaseSpriteNumber
-    };
 }

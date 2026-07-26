@@ -38,8 +38,6 @@ public sealed class GameSession
     private const double MaximumMovementStep = 0.1;
     private const int CombatViewportWidth = 320;
     private const int CrosshairHalfWidth = 20;
-    private const double GuardChaseSpeed = 1.64;
-    private const double DogChaseSpeed = 3.2;
     private const double MinimumShootingDistance = 0.75;
     private const double DogAttackDistance = 1.5;
     private const double DeathFadeDuration = 70.0 / OriginalTicksPerSecond;
@@ -65,11 +63,13 @@ public sealed class GameSession
     public GameSession(
         WolfensteinMap map,
         RaycastCamera camera,
-        IReadOnlyList<WolfensteinActor> actors = null)
+        IReadOnlyList<WolfensteinActor> actors = null,
+        GameDifficulty difficulty = GameDifficulty.Normal)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(camera);
         Map = map;
+        Difficulty = difficulty;
         Camera = camera;
         m_startCamera = camera;
         Doors = WolfensteinDoors.FromMap(map);
@@ -81,6 +81,7 @@ public sealed class GameSession
     }
 
     public WolfensteinMap Map { get; }
+    public GameDifficulty Difficulty { get; }
     public RaycastCamera Camera { get; private set; }
     public WolfensteinDoors Doors { get; private set; }
     public WolfensteinPushWalls PushWalls { get; private set; }
@@ -547,14 +548,14 @@ public sealed class GameSession
         foreach (var actor in m_actors)
         {
             changed |= actor.Update(elapsedSeconds);
-            if (actor.IsDead || actor.Actor.Type is not WolfensteinActorType.Guard and not WolfensteinActorType.Dog)
+            if (actor.IsDead)
                 continue;
             if (actor.Behavior == WolfensteinActorBehavior.Shooting)
             {
                 changed |= actor.UpdateShooting(elapsedSeconds, out var fired);
                 if (fired && HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y))
                 {
-                    TakeDamage(actor.Actor.Type == WolfensteinActorType.Dog ? 10 : 5);
+                    TakeDamage(actor.Profile.AttackDamage);
                 }
                 continue;
             }
@@ -578,7 +579,7 @@ public sealed class GameSession
                   HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y);
             if (actor.AttackCooldown == 0.0 && shouldAttack)
             {
-                actor.AttackCooldown = actor.Actor.Type == WolfensteinActorType.Dog ? 0.5 : 1.0;
+                actor.AttackCooldown = actor.Profile.AttackCooldown;
                 changed |= actor.BeginShooting();
                 continue;
             }
@@ -648,8 +649,7 @@ public sealed class GameSession
         var distance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
         if (distance <= double.Epsilon)
             return false;
-        var chaseSpeed = actor.Actor.Type == WolfensteinActorType.Dog ? DogChaseSpeed : GuardChaseSpeed;
-        var travel = Math.Min(distance, chaseSpeed * elapsedSeconds);
+        var travel = Math.Min(distance, actor.Profile.ChaseSpeed * elapsedSeconds);
         var stepCount = Math.Max(1, (int)Math.Ceiling(travel / MaximumMovementStep));
         var stepX = deltaX / distance * travel / stepCount;
         var stepY = deltaY / distance * travel / stepCount;
@@ -804,5 +804,5 @@ public sealed class GameSession
     }
 
     private IReadOnlyList<WolfensteinActorState> CreateActorStates() =>
-        m_actorDefinitions.Select(actor => new WolfensteinActorState(actor)).ToArray();
+        m_actorDefinitions.Select(actor => new WolfensteinActorState(actor, Difficulty)).ToArray();
 }
