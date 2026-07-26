@@ -138,6 +138,19 @@ public sealed class WolfensteinAudioPlayer : IDisposable
     public void SetMusicFade(double fade) =>
         AL.Source(m_musicSource, ALSourcef.Gain, MusicGain * (float)(1.0 - Math.Clamp(fade, 0.0, 1.0)));
 
+    /// <summary>
+    /// Pauses or resumes the current music without restarting its sequence.
+    /// </summary>
+    public void SetPaused(bool isPaused)
+    {
+        if (m_isDisposed)
+            return;
+        if (isPaused)
+            AL.SourcePause(m_musicSource);
+        else
+            AL.SourcePlay(m_musicSource);
+    }
+
     public void Dispose()
     {
         if (m_isDisposed)

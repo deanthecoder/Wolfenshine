@@ -55,6 +55,11 @@
                                       Selection="{Binding SelectedDifficultyIndex}"
                                       RenderOptions.BitmapInterpolationMode="LowQuality" />
 
+            <local:PauseViewport IsVisible="{Binding IsPaused}"
+                                 Graphic="{Binding PauseGraphic}"
+                                 Palette="{Binding Palette}"
+                                 RenderOptions.BitmapInterpolationMode="LowQuality" />
+
             <StackPanel IsVisible="{Binding !HasGameData}"
                         Width="280"
                         HorizontalAlignment="Center"

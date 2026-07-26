@@ -63,6 +63,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool m_difficultyInputReleased = true;
     private int m_selectedDifficultyIndex = 2;
     private GameDifficulty m_difficulty = GameDifficulty.Normal;
+    private bool m_isPaused;
 
     public MainWindowViewModel()
         : this(new WolfensteinDataNotFoundException(
@@ -139,6 +140,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public WolfensteinGraphic StatusBar => m_statusBar;
     public WolfensteinIntermissionGraphics IntermissionGraphics { get; }
     public WolfensteinDifficultyGraphics DifficultyGraphics { get; }
+    public WolfensteinGraphic PauseGraphic => DifficultyGraphics?.Pause;
     public IReadOnlyList<WorldSprite> StaticObjects { get; private set; }
     public IReadOnlyList<WolfensteinActor> Actors { get; private set; }
     public IReadOnlyList<WorldSprite> WorldObjects => m_worldObjects;
@@ -151,6 +153,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public double LevelFade => m_levelFade;
     public bool IsShowingLevelStats => m_isShowingLevelStats;
     public bool IsSelectingDifficulty => m_isSelectingDifficulty;
+    public bool IsPaused => m_isPaused;
     public int SelectedDifficultyIndex => m_selectedDifficultyIndex;
     public GameDifficulty Difficulty => m_difficulty;
     public WolfensteinLevelStats LevelStats => m_levelStats;
@@ -162,6 +165,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {
+        if (m_isPaused)
+            return;
         if (m_isSelectingDifficulty)
         {
             UpdateDifficultySelection(input);
@@ -229,6 +234,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_isGameOver, m_gameSession.IsGameOver, nameof(IsGameOver));
     }
 
+    public void TogglePause()
+    {
+        if (m_gameSession == null || m_isSelectingDifficulty || m_isShowingLevelStats || m_gameSession.IsDying)
+            return;
+        SetField(ref m_isPaused, !m_isPaused, nameof(IsPaused));
+        m_audioPlayer?.SetPaused(m_isPaused);
+        StatusText = m_isPaused
+            ? "Paused · press P to continue"
+            : $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
+              "1–4 select weapons · Space opens doors";
+        OnPropertyChanged(nameof(StatusText));
+    }
+
     private void UpdateDifficultySelection(PlayerInput input)
     {
         var hasInput = HasInput(input);
@@ -278,6 +296,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void ReturnToDifficultySelection()
     {
+        if (m_isPaused)
+            m_audioPlayer?.SetPaused(false);
+        m_isPaused = false;
         m_gameSession = null;
         SelectedMap = Maps.Maps.FirstOrDefault();
         Actors = [];

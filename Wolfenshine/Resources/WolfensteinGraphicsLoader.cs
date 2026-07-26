@@ -39,6 +39,7 @@ public static class WolfensteinGraphicsLoader
     private const int DifficultyMouseLegendChunk = 29;
     private const int FirstDifficultyFaceChunk = 30;
     private const int MenuFontChunk = 2;
+    private const int PausePictureOffset = 47;
 
     public static WolfensteinHudGraphics LoadHudGraphics(WolfensteinResources resources)
     {
@@ -127,8 +128,11 @@ public static class WolfensteinGraphicsLoader
             .Select(chunk => ReadPicture(reader, offsets, dictionary, pictures, chunk))
             .ToArray();
         var font = ReadFont(ReadChunk(reader, offsets, MenuFontChunk, dictionary));
-        Logger.Instance.Info("Loaded the original cursor, mouse legend, portraits, and font for the difficulty menu.");
-        return new WolfensteinDifficultyGraphics(cursor, mouseLegend, faces, font);
+        var statusChunk = FindPictureChunk(pictures, StatusBarWidth, StatusBarHeight);
+        var pause = ReadPicture(reader, offsets, dictionary, pictures, statusChunk + PausePictureOffset);
+        Logger.Instance.Info(
+            "Loaded the original cursor, mouse legend, portraits, font, and pause graphic from VGAGRAPH.");
+        return new WolfensteinDifficultyGraphics(cursor, mouseLegend, faces, font, pause);
     }
 
     private static WolfensteinFont ReadFont(ReadOnlySpan<byte> data)

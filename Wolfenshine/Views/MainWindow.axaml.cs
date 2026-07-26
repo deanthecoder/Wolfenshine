@@ -36,6 +36,7 @@ public sealed partial class MainWindow : Window
     private bool m_run;
     private bool m_attack;
     private bool m_strafe;
+    private bool m_pauseKeyDown;
     private PlayerWeapon? m_weaponSelection;
 #if DEBUG
     private MapWindow m_mapWindow;
@@ -55,6 +56,14 @@ public sealed partial class MainWindow : Window
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (e.Key == Key.P)
+        {
+            if (!m_pauseKeyDown && DataContext is MainWindowViewModel viewModel)
+                viewModel.TogglePause();
+            m_pauseKeyDown = true;
+            e.Handled = true;
+            return;
+        }
 #if DEBUG
         if (!m_debugKeysDown.Add(e.Key))
         {
@@ -102,6 +111,12 @@ public sealed partial class MainWindow : Window
     protected override void OnKeyUp(KeyEventArgs e)
     {
         base.OnKeyUp(e);
+        if (e.Key == Key.P)
+        {
+            m_pauseKeyDown = false;
+            e.Handled = true;
+            return;
+        }
 #if DEBUG
         m_debugKeysDown.Remove(e.Key);
 #endif
@@ -237,6 +252,7 @@ public sealed partial class MainWindow : Window
         m_run = false;
         m_attack = false;
         m_strafe = false;
+        m_pauseKeyDown = false;
         m_weaponSelection = null;
     }
 }

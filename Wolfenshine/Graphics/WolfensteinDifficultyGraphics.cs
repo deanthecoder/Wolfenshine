@@ -17,4 +17,5 @@ public sealed record WolfensteinDifficultyGraphics(
     WolfensteinGraphic Cursor,
     WolfensteinGraphic MouseLegend,
     IReadOnlyList<WolfensteinGraphic> Faces,
-    WolfensteinFont Font);
+    WolfensteinFont Font,
+    WolfensteinGraphic Pause);
