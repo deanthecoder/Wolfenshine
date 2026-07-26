@@ -60,6 +60,8 @@ public sealed class WolfensteinStaticObjectsTests
     }
 
     [TestCase(8, WolfensteinPickupType.DogFood)]
+    [TestCase(22, WolfensteinPickupType.GoldKey)]
+    [TestCase(23, WolfensteinPickupType.SilverKey)]
     [TestCase(28, WolfensteinPickupType.AmmoClip)]
     [TestCase(26, WolfensteinPickupType.Food)]
     [TestCase(27, WolfensteinPickupType.FirstAid)]

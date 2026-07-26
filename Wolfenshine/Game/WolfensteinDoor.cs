@@ -43,6 +43,7 @@ public sealed class WolfensteinDoor
     public double OpenAmount { get; private set; }
     public bool IsFullyOpen => OpenAmount >= 1.0;
     public bool IsLocked => Tile is >= 92 and <= 99;
+    public int? RequiredKeyIndex => IsLocked ? ((Tile - 90) / 2) - 1 : null;
     public bool IsOpening => m_state == DoorState.Opening;
     public bool IsClosing => m_state == DoorState.Closing;
 
@@ -59,16 +60,29 @@ public sealed class WolfensteinDoor
         return true;
     }
 
-    public bool Operate(bool canClose)
+    public bool Operate(bool canClose, int keyMask = 0)
     {
-        if (IsLocked)
+        if (RequiredKeyIndex is { } keyIndex && (keyMask & (1 << keyIndex)) == 0)
             return false;
         return m_state switch
         {
-            DoorState.Closed or DoorState.Closing => Open(),
+            DoorState.Closed or DoorState.Closing => OpenUnlocked(),
             DoorState.Open => Close(canClose),
             _ => false
         };
+    }
+
+    private bool OpenUnlocked()
+    {
+        if (IsOpening)
+            return false;
+        if (m_state == DoorState.Open)
+        {
+            m_openTime = 0.0;
+            return true;
+        }
+        m_state = DoorState.Opening;
+        return true;
     }
 
     public bool Update(double elapsedSeconds, bool canClose = true)

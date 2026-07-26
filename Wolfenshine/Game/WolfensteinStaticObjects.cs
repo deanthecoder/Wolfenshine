@@ -61,6 +61,8 @@ public static class WolfensteinStaticObjects
     public static WolfensteinPickupType GetPickupType(int spriteNumber) => spriteNumber switch
     {
         8 => WolfensteinPickupType.DogFood,
+        22 => WolfensteinPickupType.GoldKey,
+        23 => WolfensteinPickupType.SilverKey,
         26 => WolfensteinPickupType.Food,
         27 => WolfensteinPickupType.FirstAid,
         28 => WolfensteinPickupType.AmmoClip,

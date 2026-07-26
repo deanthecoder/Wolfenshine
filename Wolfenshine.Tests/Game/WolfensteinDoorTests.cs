@@ -55,6 +55,21 @@ public sealed class WolfensteinDoorTests
         Assert.That(door.OpenAmount, Is.Zero);
     }
 
+    [TestCase(92, 0)]
+    [TestCase(93, 0)]
+    [TestCase(94, 1)]
+    [TestCase(95, 1)]
+    public void GivenLockedDoorAndMatchingKeyCheckItOpens(int tile, int keyIndex)
+    {
+        var door = new WolfensteinDoor(1, 2, (ushort)tile);
+
+        var opened = door.Operate(canClose: true, keyMask: 1 << keyIndex);
+        door.Update(1.0);
+
+        Assert.That(opened, Is.True);
+        Assert.That(door.IsFullyOpen, Is.True);
+    }
+
     [TestCase(100)]
     [TestCase(101)]
     public void GivenElevatorDoorCheckItCanOpen(int tile)

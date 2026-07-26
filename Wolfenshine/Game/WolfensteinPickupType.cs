@@ -20,6 +20,8 @@ public enum WolfensteinPickupType
     Food,
     FirstAid,
     FullHeal,
+    GoldKey,
+    SilverKey,
     AmmoClip,
     MachineGun,
     Chaingun,

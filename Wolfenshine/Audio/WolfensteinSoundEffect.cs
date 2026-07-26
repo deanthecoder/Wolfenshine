@@ -23,6 +23,7 @@ public enum WolfensteinSoundEffect
     PlayerDeath = 9,
     DogDeath = 10,
     AttackGatling = 11,
+    GetKey = 12,
     OpenDoor = 18,
     CloseDoor = 19,
     DoNothing = 20,

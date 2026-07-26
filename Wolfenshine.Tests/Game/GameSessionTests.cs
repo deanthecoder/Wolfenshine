@@ -593,6 +593,28 @@ public sealed class GameSessionTests
         });
     }
 
+    [TestCase(43, true, false)]
+    [TestCase(44, false, true)]
+    public void GivenKeyPickupCheckMatchingLevelKeyIsGrantedAndPickupIsRemoved(
+        int marker,
+        bool expectedGoldKey,
+        bool expectedSilverKey)
+    {
+        var session = CreateSessionWithObject((ushort)marker);
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+        var sounds = session.DrainSoundEvents();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.HasGoldKey, Is.EqualTo(expectedGoldKey));
+            Assert.That(session.HasSilverKey, Is.EqualTo(expectedSilverKey));
+            Assert.That(session.StaticObjects, Is.Empty);
+            Assert.That(sounds, Has.One.Matches<WolfensteinSoundEvent>(sound =>
+                sound.Effect == WolfensteinSoundEffect.GetKey));
+        });
+    }
+
     [TestCase(47)]
     [TestCase(48)]
     public void GivenHealthPickupAfterDogBiteCheckHealthIsRestoredAndPickupRemoved(int marker)

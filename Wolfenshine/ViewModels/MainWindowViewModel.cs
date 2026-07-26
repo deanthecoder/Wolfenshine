@@ -43,6 +43,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private int m_hudHealth = -1;
     private int m_hudFace = -1;
     private int m_hudLives = -1;
+    private bool m_hudGoldKey;
+    private bool m_hudSilverKey;
     private int m_actorRevision = -1;
     private int m_restartRevision;
     private bool m_isGameOver;
@@ -487,7 +489,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (m_hudGraphics == null || m_gameSession == null ||
             m_hudWeapon == m_gameSession.Weapon && m_hudAmmo == m_gameSession.Ammo &&
             m_hudScore == m_gameSession.Score && m_hudHealth == m_gameSession.Health &&
-            m_hudFace == m_gameSession.FacePictureIndex && m_hudLives == m_gameSession.Lives)
+            m_hudFace == m_gameSession.FacePictureIndex && m_hudLives == m_gameSession.Lives &&
+            m_hudGoldKey == m_gameSession.HasGoldKey && m_hudSilverKey == m_gameSession.HasSilverKey)
         {
             return;
         }
@@ -497,6 +500,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_hudHealth = m_gameSession.Health;
         m_hudFace = m_gameSession.FacePictureIndex;
         m_hudLives = m_gameSession.Lives;
+        m_hudGoldKey = m_gameSession.HasGoldKey;
+        m_hudSilverKey = m_gameSession.HasSilverKey;
         SetField(
             ref m_statusBar,
             m_hudGraphics.Render(
@@ -505,7 +510,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 m_hudScore,
                 m_hudHealth,
                 m_hudFace,
-                m_hudLives),
+                m_hudLives,
+                m_hudGoldKey,
+                m_hudSilverKey),
             nameof(StatusBar));
     }
 

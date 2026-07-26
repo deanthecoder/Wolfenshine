@@ -28,6 +28,8 @@ public static class WolfensteinGraphicsLoader
     private const int StatusBarHeight = 40;
     private const int FirstWeaponPictureOffset = 5;
     private const int NoKeyPictureOffset = 9;
+    private const int GoldKeyPictureOffset = 10;
+    private const int SilverKeyPictureOffset = 11;
     private const int BlankDigitPictureOffset = 12;
     private const int ZeroDigitPictureOffset = 13;
     private const int FirstFacePictureOffset = 23;
@@ -57,6 +59,8 @@ public static class WolfensteinGraphicsLoader
             var pictures = ReadPictureTable(pictureTableData);
             var statusBar = ReadPicture(reader, offsets, dictionary, pictures, chunk);
             var noKey = ReadPicture(reader, offsets, dictionary, pictures, chunk + NoKeyPictureOffset);
+            var goldKey = ReadPicture(reader, offsets, dictionary, pictures, chunk + GoldKeyPictureOffset);
+            var silverKey = ReadPicture(reader, offsets, dictionary, pictures, chunk + SilverKeyPictureOffset);
             var blankDigit = ReadPicture(reader, offsets, dictionary, pictures, chunk + BlankDigitPictureOffset);
             var weaponIcons = Enumerable.Range(FirstWeaponPictureOffset, 4)
                 .Select(relativeChunk => ReadPicture(reader, offsets, dictionary, pictures, chunk + relativeChunk))
@@ -68,7 +72,8 @@ public static class WolfensteinGraphicsLoader
                 .Select(relativeChunk => ReadPicture(reader, offsets, dictionary, pictures, chunk + relativeChunk))
                 .ToArray();
             Logger.Instance.Info($"Loaded {width} x {height} HUD graphics from VGAGRAPH chunk {chunk}.");
-            return new WolfensteinHudGraphics(statusBar, weaponIcons, noKey, blankDigit, digits, faces);
+            return new WolfensteinHudGraphics(
+                statusBar, weaponIcons, noKey, goldKey, silverKey, blankDigit, digits, faces);
         }
 
         throw new InvalidDataException("VGAGRAPH.WL6 does not contain a 320 x 40 status-bar picture.");

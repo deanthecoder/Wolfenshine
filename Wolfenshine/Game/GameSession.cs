@@ -69,6 +69,7 @@ public sealed class GameSession
     private double m_wallHitSoundTime;
     private double? m_killerX;
     private double? m_killerY;
+    private int m_keyMask;
     private readonly RaycastCamera m_startCamera;
     private readonly IReadOnlyList<WolfensteinActor> m_actorDefinitions;
     private IReadOnlyList<WolfensteinActorState> m_actors;
@@ -124,6 +125,8 @@ public sealed class GameSession
     public int Health { get; private set; } = MaximumHealth;
     public int Lives { get; private set; } = 3;
     public int Score { get; private set; }
+    public bool HasGoldKey => (m_keyMask & 1) != 0;
+    public bool HasSilverKey => (m_keyMask & 2) != 0;
     public int TreasureCount { get; private set; }
     public int TreasureTotal { get; }
     public int KillCount { get; private set; }
@@ -348,7 +351,7 @@ public sealed class GameSession
             if (door != null)
             {
                 var wasOpen = door.IsFullyOpen;
-                if (!door.Operate(CanDoorClose(door)))
+                if (!door.Operate(CanDoorClose(door), m_keyMask))
                 {
                     PlaySound(WolfensteinSoundEffect.CannotUse);
                     return true;
@@ -457,6 +460,14 @@ public sealed class GameSession
                     Lives++;
                     TreasureCount++;
                     PlaySound(WolfensteinSoundEffect.ExtraLife);
+                    break;
+                case WolfensteinPickupType.GoldKey:
+                    m_keyMask |= 1;
+                    PlaySound(WolfensteinSoundEffect.GetKey);
+                    break;
+                case WolfensteinPickupType.SilverKey:
+                    m_keyMask |= 2;
+                    PlaySound(WolfensteinSoundEffect.GetKey);
                     break;
                 case WolfensteinPickupType.AmmoClip:
                     GiveAmmo(8);
@@ -1090,6 +1101,7 @@ public sealed class GameSession
         Weapon = PlayerWeapon.Pistol;
         m_chosenWeapon = PlayerWeapon.Pistol;
         m_bestWeapon = PlayerWeapon.Pistol;
+        m_keyMask = 0;
         WeaponFrame = 0;
         IsAttacking = false;
         IsDying = false;

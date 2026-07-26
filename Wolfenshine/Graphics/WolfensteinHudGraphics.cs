@@ -25,6 +25,8 @@ public sealed class WolfensteinHudGraphics
     private readonly WolfensteinGraphic m_background;
     private readonly IReadOnlyList<WolfensteinGraphic> m_weaponIcons;
     private readonly WolfensteinGraphic m_noKey;
+    private readonly WolfensteinGraphic m_goldKey;
+    private readonly WolfensteinGraphic m_silverKey;
     private readonly WolfensteinGraphic m_blankDigit;
     private readonly IReadOnlyList<WolfensteinGraphic> m_digits;
     private readonly IReadOnlyList<WolfensteinGraphic> m_faces;
@@ -33,6 +35,8 @@ public sealed class WolfensteinHudGraphics
         WolfensteinGraphic background,
         IReadOnlyList<WolfensteinGraphic> weaponIcons,
         WolfensteinGraphic noKey,
+        WolfensteinGraphic goldKey,
+        WolfensteinGraphic silverKey,
         WolfensteinGraphic blankDigit,
         IReadOnlyList<WolfensteinGraphic> digits,
         IReadOnlyList<WolfensteinGraphic> faces)
@@ -40,6 +44,8 @@ public sealed class WolfensteinHudGraphics
         ArgumentNullException.ThrowIfNull(background);
         ArgumentNullException.ThrowIfNull(weaponIcons);
         ArgumentNullException.ThrowIfNull(noKey);
+        ArgumentNullException.ThrowIfNull(goldKey);
+        ArgumentNullException.ThrowIfNull(silverKey);
         ArgumentNullException.ThrowIfNull(blankDigit);
         ArgumentNullException.ThrowIfNull(digits);
         ArgumentNullException.ThrowIfNull(faces);
@@ -54,6 +60,8 @@ public sealed class WolfensteinHudGraphics
         m_background = background;
         m_weaponIcons = weaponIcons;
         m_noKey = noKey;
+        m_goldKey = goldKey;
+        m_silverKey = silverKey;
         m_blankDigit = blankDigit;
         m_digits = digits;
         m_faces = faces;
@@ -65,7 +73,9 @@ public sealed class WolfensteinHudGraphics
         int score,
         int health,
         int facePictureIndex = 0,
-        int lives = 3)
+        int lives = 3,
+        bool hasGoldKey = false,
+        bool hasSilverKey = false)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(ammo);
         ArgumentOutOfRangeException.ThrowIfNegative(score);
@@ -75,8 +85,8 @@ public sealed class WolfensteinHudGraphics
         var indices = CopyIndices(m_background);
         DrawPicture(indices, m_faces[facePictureIndex], 17 * 8, 4);
         DrawPicture(indices, m_weaponIcons[(int)weapon], 32 * 8, 8);
-        DrawPicture(indices, m_noKey, 30 * 8, 4);
-        DrawPicture(indices, m_noKey, 30 * 8, 20);
+        DrawPicture(indices, hasGoldKey ? m_goldKey : m_noKey, 30 * 8, 4);
+        DrawPicture(indices, hasSilverKey ? m_silverKey : m_noKey, 30 * 8, 20);
         DrawNumber(indices, 2, 16, 2, 1);
         DrawNumber(indices, 6, 16, 6, score);
         DrawNumber(indices, 14, 16, 1, lives);

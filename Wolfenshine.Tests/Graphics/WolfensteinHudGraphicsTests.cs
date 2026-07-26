@@ -32,11 +32,14 @@ public sealed class WolfensteinHudGraphicsTests
             background,
             weaponIcons,
             CreateGraphic(1, 1, 1),
+            CreateGraphic(1, 1, 3),
+            CreateGraphic(1, 1, 4),
             CreateGraphic(8, 16, 2),
             digits,
             Enumerable.Range(0, 23).Select(index => CreateGraphic(1, 1, (byte)(40 + index))).ToArray());
 
-        var rendered = hud.Render(PlayerWeapon.Chaingun, 42, 1234, 87, 22);
+        var rendered = hud.Render(
+            PlayerWeapon.Chaingun, 42, 1234, 87, 22, hasGoldKey: true, hasSilverKey: true);
 
         Assert.Multiple(() =>
         {
@@ -48,6 +51,8 @@ public sealed class WolfensteinHudGraphicsTests
             Assert.That(rendered.GetIndex(22 * 8, 16), Is.EqualTo(28));
             Assert.That(rendered.GetIndex(23 * 8, 16), Is.EqualTo(27));
             Assert.That(rendered.GetIndex(17 * 8, 4), Is.EqualTo(62));
+            Assert.That(rendered.GetIndex(30 * 8, 4), Is.EqualTo(3));
+            Assert.That(rendered.GetIndex(30 * 8, 20), Is.EqualTo(4));
         });
     }
 
