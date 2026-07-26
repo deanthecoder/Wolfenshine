@@ -79,6 +79,26 @@ public sealed class RaycasterTests
     }
 
     [Test]
+    public void GivenUnenclosedMapPaddingCheckBoundaryIsRenderedAsSolid()
+    {
+        const int size = 3;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        var objects = new ushort[size * size];
+        var map = new WolfensteinMap(0, "Open Map", size, size, walls, objects);
+        var camera = new RaycastCamera(1.5, 1.5, 1.0, 0.0, 0.0, 0.0);
+        var columns = new WallColumn[1];
+
+        Raycaster.Cast(map, WolfensteinDoors.FromMap(map), camera, columns);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(columns[0].Tile, Is.EqualTo(1));
+            Assert.That(columns[0].Side, Is.EqualTo(WallSide.Vertical));
+            Assert.That(columns[0].Distance, Is.EqualTo(1.5).Within(0.0001));
+        });
+    }
+
+    [Test]
     public void GivenSymmetricRoomCheckRayDistancesAreSymmetric()
     {
         var map = CreateMap(19);

@@ -21,6 +21,8 @@ namespace Wolfenshine.Rendering;
 /// </remarks>
 public static class Raycaster
 {
+    private const ushort BoundaryWallTile = 1;
+
     public static void Cast(
         WolfensteinMap map,
         WolfensteinDoors doors,
@@ -108,8 +110,13 @@ public static class Raycaster
                 side = WallSide.Horizontal;
             }
 
+            // Retail maps can contain non-solid padding connected to playable space. Treat the outer map
+            // boundary as a wall, matching collision behavior, rather than allowing one such ray to crash.
             if (mapX < 0 || mapX >= map.Width || mapY < 0 || mapY >= map.Height)
-                throw new InvalidDataException("A ray left the map without hitting an enclosing wall.");
+            {
+                tile = BoundaryWallTile;
+                break;
+            }
             var door = doors.Get(mapX, mapY);
             if (door != null)
             {
