@@ -50,6 +50,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool m_isGameOver;
     private double m_deathFade;
     private double m_damageFlash;
+    private double m_muzzleFlash;
     private double m_levelFade;
     private bool m_isShowingLevelStats;
     private bool m_statsInputReleased;
@@ -152,6 +153,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool IsGameOver => m_isGameOver;
     public double DeathFade => m_deathFade;
     public double DamageFlash => m_damageFlash;
+    public double MuzzleFlash => m_muzzleFlash;
     public double LevelFade => m_levelFade;
     public bool IsShowingLevelStats => m_isShowingLevelStats;
     public bool IsSelectingDifficulty => m_isSelectingDifficulty;
@@ -219,6 +221,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
         SetField(ref m_deathFade, m_gameSession.DeathFade, nameof(DeathFade));
         SetField(ref m_damageFlash, m_gameSession.DamageFlash, nameof(DamageFlash));
+        SetField(ref m_muzzleFlash, m_gameSession.MuzzleFlash, nameof(MuzzleFlash));
         SetField(ref m_levelFade, m_gameSession.LevelFade, nameof(LevelFade));
         SetField(ref m_elevatorSwitch, m_gameSession.ElevatorSwitch, nameof(ElevatorSwitch));
         var staticObjectsChanged = m_worldObjects.Count != StaticObjects.Count + Actors.Count;

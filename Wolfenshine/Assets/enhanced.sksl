@@ -30,15 +30,32 @@ uniform float4 deathColor;        // Original palette red used by the death tran
 //   W = wall orientation: 0 vertical, 1 horizontal
 uniform float4 wallColumns[320];
 
+// The thirty-two nearest light-emitting map objects:
+//   X/Y = position in map tiles
+//   Z = upward brightness
+//   W = downward brightness
+// Unused records have zero brightness. Encoding emitted light rather than an
+// object type lets future map objects participate without changing this shader.
+uniform float4 sceneLights[32];
+uniform float2 sceneLightRadii[32]; // Upward and downward radius in map tiles.
+uniform float2 playerPosition;
+uniform float2 cameraDirection;
+uniform float2 cameraPlane;
+uniform float muzzleFlash; // Brief 0..1 player weapon flash.
+
 // A 64-pixel-wide atlas containing every decoded VSWAP wall page. Each page is
 // 64 x 64 and pages are stacked vertically. CPU palette lookup currently makes
 // this an RGBA atlas; a future version can instead send indices plus a palette.
 uniform shader wallTextureAtlas;
 
-// A transparent 320 x 200 image containing world sprites, enemies, weapon, and
-// HUD. Software projection is retained for now, then composited after wall light
+// A transparent 320 x 200 image containing world sprites, enemies, and the HUD.
+// Software projection is retained for now, then composited after wall light
 // so an enemy is not accidentally shaded using the wall behind it.
 uniform shader softwareSpriteOverlay;
+
+// The weapon is separate so nearby downward light can illuminate it without
+// changing the brightness of enemies or the fixed HUD.
+uniform shader softwareWeaponOverlay;
 
 float randomHash(float2 position)
 {
@@ -48,6 +65,50 @@ float randomHash(float2 position)
 float distanceIllumination(float distance)
 {
     return max(0.20, 1.0 / (1.0 + distance * 0.22));
+}
+
+float weaponIllumination()
+{
+    // The weapon starts darker than its original palette values. Downward
+    // brightness raises it toward full brightness beneath ceiling light cones.
+    float illumination = 0.60;
+    for (int index = 0; index < 32; index++)
+    {
+        float4 light = sceneLights[index];
+        float distance = length(playerPosition - light.xy);
+        float conePosition = clamp(distance / 1.5, 0.0, 1.0);
+        float cone = 1.0 - (conePosition * conePosition * (3.0 - 2.0 * conePosition));
+        illumination += light.w * cone * 0.80;
+    }
+    illumination += muzzleFlash * 0.40;
+    return clamp(illumination, 0.20, 1.0);
+}
+
+float muzzleIllumination(float2 worldPosition)
+{
+    const float radius = 2.50;
+    float2 flashPosition = playerPosition + (cameraDirection * 0.35);
+    float distance = length(worldPosition - flashPosition);
+    float conePosition = clamp(distance / radius, 0.0, 1.0);
+    float falloff = 1.0 - (conePosition * conePosition * (3.0 - 2.0 * conePosition));
+    return muzzleFlash * falloff * 0.90;
+}
+
+float surfaceIllumination(float2 worldPosition, float upward)
+{
+    float illumination = 0.0;
+    for (int index = 0; index < 32; index++)
+    {
+        float4 light = sceneLights[index];
+        float brightness = mix(light.w, light.z, upward);
+        float2 radii = sceneLightRadii[index];
+        float radius = max(mix(radii.y, radii.x, upward), 0.0001);
+        float distance = length(worldPosition - light.xy);
+        float conePosition = clamp(distance / radius, 0.0, 1.0);
+        float cone = 1.0 - (conePosition * conePosition * (3.0 - 2.0 * conePosition));
+        illumination += brightness * cone * 0.65;
+    }
+    return illumination;
 }
 
 float4 main(float2 fragment)
@@ -69,6 +130,8 @@ float4 main(float2 fragment)
         scenePosition.y = clamp(scenePosition.y - viewBob, 0.5, nativePlayHeight - 0.5);
 
     int columnIndex = clamp(int(scenePosition.x), 0, 319);
+    float cameraX = (2.0 * (scenePosition.x + 0.5) / nativeWidth) - 1.0;
+    float2 rayDirection = cameraDirection + (cameraPlane * cameraX);
     float4 column = wallColumns[columnIndex];
     float distance = max(column.x, 0.0001);
     float projectedHeight = nativeHeight / distance;
@@ -85,13 +148,21 @@ float4 main(float2 fragment)
         // Intersect the view ray with the unit-height ceiling plane. The camera
         // is halfway between floor and ceiling, giving a 100-pixel projection height.
         float ceilingDistance = 100.0 / max(80.0 - scenePosition.y, 0.5);
-        color.rgb *= distanceIllumination(ceilingDistance);
+        float2 ceilingPosition = playerPosition + (rayDirection * ceilingDistance);
+        float illumination = distanceIllumination(ceilingDistance);
+        illumination += surfaceIllumination(ceilingPosition, 1.0);
+        illumination += muzzleIllumination(ceilingPosition);
+        color.rgb *= min(illumination, 1.0);
     }
     else if (scenePosition.y >= wallTop + projectedHeight)
     {
         color = floorColor;
         float floorDistance = 100.0 / max(scenePosition.y - 80.0, 0.5);
-        color.rgb *= distanceIllumination(floorDistance);
+        float2 floorPosition = playerPosition + (rayDirection * floorDistance);
+        float illumination = distanceIllumination(floorDistance);
+        illumination += surfaceIllumination(floorPosition, 0.0);
+        illumination += muzzleIllumination(floorPosition);
+        color.rgb *= min(illumination, 1.0);
     }
     else
     {
@@ -106,12 +177,24 @@ float4 main(float2 fragment)
         // not bow across the screen and can later be combined with real lights.
         float illumination = distanceIllumination(distance);
         illumination *= mix(1.0, 0.92, column.w);
-        color.rgb *= illumination;
+        float2 wallPosition = playerPosition + (rayDirection * distance);
+        // Vertical walls receive a restrained blend of the upward and downward
+        // components. This lets local sources such as treasure softly illuminate
+        // nearby walls without overpowering their directional floor/ceiling light.
+        illumination += surfaceIllumination(wallPosition, 0.5) * 0.60;
+        illumination += muzzleIllumination(wallPosition);
+        color.rgb *= min(illumination, 1.0);
     }
 
-    // World sprites and the weapon follow view bob; the HUD remains fixed.
+    // World sprites follow view bob; the HUD remains fixed.
     float4 overlay = sample(softwareSpriteOverlay, isPlayView ? scenePosition : nativePosition);
     color = float4(mix(color.rgb, overlay.rgb, overlay.a), 1.0);
+
+    // Composite the separately rendered weapon after world sprites, matching the
+    // software draw order while allowing only the weapon to react to overhead light.
+    float4 weapon = sample(softwareWeaponOverlay, scenePosition);
+    weapon.rgb *= weaponIllumination();
+    color = float4(mix(color.rgb, weapon.rgb, weapon.a), 1.0);
 
     // Preserve the original full-frame feedback ordering after scene composition.
     if (isPlayView && randomHash(nativePosition) < deathFade)

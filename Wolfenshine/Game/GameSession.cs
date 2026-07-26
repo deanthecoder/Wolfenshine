@@ -139,6 +139,7 @@ public sealed class GameSession
     public bool IsGameOver { get; private set; }
     public bool IsCompletingLevel => m_isCompletingLevel;
     public bool IsReadyForNextLevel => m_isCompletingLevel && m_levelFade >= 1.0;
+    public double MuzzleFlash => Weapon != PlayerWeapon.Knife && WeaponFrame == 3 ? 1.0 : 0.0;
     public double LevelFade => m_levelFade;
     public double DeathFade => IsDying ? Math.Min(1.0, m_deathTime / DeathFadeDuration) : 0.0;
     public double DamageFlash => m_damageCount > 0.0

@@ -54,6 +54,7 @@
                                     StaticObjects="{Binding WorldObjects}"
                                     StatusBar="{Binding StatusBar}"
                                     DamageFlash="{Binding DamageFlash}"
+                                    MuzzleFlash="{Binding MuzzleFlash}"
                                     DeathFade="{Binding DeathFade}"
                                     LevelFade="{Binding LevelFade}" />
 

@@ -15,6 +15,7 @@ using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using SkiaSharp;
+using Wolfenshine.Game;
 using Wolfenshine.Graphics;
 using Wolfenshine.Rendering;
 
@@ -31,8 +32,23 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const byte CeilingPaletteIndex = 0x1D;
     private const byte FloorPaletteIndex = 0x19;
     private const int ColumnChannelCount = 4;
+    private const int LightCount = 32;
+    private const int LightChannelCount = 4;
+    private const int LightRadiusChannelCount = 2;
     private readonly float[] m_wallColumns = new float[ViewportWidth * ColumnChannelCount];
+    private readonly float[] m_sceneLights = new float[LightCount * LightChannelCount];
+    private readonly float[] m_sceneLightRadii = new float[LightCount * LightRadiusChannelCount];
+    private readonly double[] m_sceneLightDistances = new double[LightCount];
+    private readonly float[] m_playerPosition = new float[2];
+    private readonly float[] m_cameraDirection = new float[2];
+    private readonly float[] m_cameraPlane = new float[2];
+    private readonly byte[] m_weaponPixels = new byte[ViewportWidth * ViewportHeight * 4];
     private readonly SKBitmap m_overlayBitmap = new(new SKImageInfo(
+        ViewportWidth,
+        ViewportHeight,
+        SKColorType.Rgba8888,
+        SKAlphaType.Unpremul));
+    private readonly SKBitmap m_weaponOverlayBitmap = new(new SKImageInfo(
         ViewportWidth,
         ViewportHeight,
         SKColorType.Rgba8888,
@@ -44,8 +60,10 @@ public sealed class EnhancedViewport : SoftwareViewport
 
     public static readonly StyledProperty<double> ViewBobProperty =
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(ViewBob));
+    public static readonly StyledProperty<double> MuzzleFlashProperty =
+        AvaloniaProperty.Register<EnhancedViewport, double>(nameof(MuzzleFlash));
 
-    static EnhancedViewport() => AffectsRender<EnhancedViewport>(ViewBobProperty);
+    static EnhancedViewport() => AffectsRender<EnhancedViewport>(ViewBobProperty, MuzzleFlashProperty);
 
     public EnhancedViewport()
     {
@@ -62,6 +80,12 @@ public sealed class EnhancedViewport : SoftwareViewport
         set => SetValue(ViewBobProperty, value);
     }
 
+    public double MuzzleFlash
+    {
+        get => GetValue(MuzzleFlashProperty);
+        set => SetValue(MuzzleFlashProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         if (Map == null || Doors == null || Camera == null || WallTextures == null || Palette == null)
@@ -69,13 +93,27 @@ public sealed class EnhancedViewport : SoftwareViewport
 
         EnsureWallAtlas();
         BuildColumnBuffer();
-        BuildSpriteOverlay();
+        BuildLightBuffer();
+        BuildSoftwareOverlays();
+        m_playerPosition[0] = (float)Camera.X;
+        m_playerPosition[1] = (float)Camera.Y;
+        m_cameraDirection[0] = (float)Camera.DirectionX;
+        m_cameraDirection[1] = (float)Camera.DirectionY;
+        m_cameraPlane[0] = (float)Camera.PlaneX;
+        m_cameraPlane[1] = (float)Camera.PlaneY;
         context.Custom(new ShaderDrawOperation(
             new Rect(Bounds.Size),
             m_effect,
             m_wallAtlas,
             m_overlayBitmap,
+            m_weaponOverlayBitmap,
             m_wallColumns,
+            m_sceneLights,
+            m_sceneLightRadii,
+            m_playerPosition,
+            m_cameraDirection,
+            m_cameraPlane,
+            (float)MuzzleFlash,
             (float)ViewBob,
             (float)DamageFlash,
             (float)DeathFade,
@@ -89,6 +127,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     {
         base.OnDetachedFromVisualTree(e);
         m_overlayBitmap.Dispose();
+        m_weaponOverlayBitmap.Dispose();
         m_wallAtlas?.Dispose();
         m_effect.Dispose();
     }
@@ -135,9 +174,68 @@ public sealed class EnhancedViewport : SoftwareViewport
         }
     }
 
-    private void BuildSpriteOverlay()
+    private void BuildLightBuffer()
+    {
+        Array.Clear(m_sceneLights);
+        Array.Clear(m_sceneLightRadii);
+        Array.Fill(m_sceneLightDistances, double.PositiveInfinity);
+        if (StaticObjects == null)
+            return;
+
+        foreach (var sprite in StaticObjects)
+        {
+            var (upward, downward) = WolfensteinStaticObjects.GetLightBrightness(sprite.SpriteNumber);
+            var (upwardRadius, downwardRadius) = WolfensteinStaticObjects.GetLightRadii(sprite.SpriteNumber);
+            if (upward <= 0.0f && downward <= 0.0f)
+                continue;
+
+            var deltaX = sprite.X - Camera.X;
+            var deltaY = sprite.Y - Camera.Y;
+            var distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
+            var insertAt = -1;
+            for (var index = 0; index < LightCount; index++)
+            {
+                if (distanceSquared >= m_sceneLightDistances[index])
+                    continue;
+                insertAt = index;
+                break;
+            }
+            if (insertAt < 0)
+                continue;
+
+            for (var index = LightCount - 1; index > insertAt; index--)
+            {
+                m_sceneLightDistances[index] = m_sceneLightDistances[index - 1];
+                Array.Copy(
+                    m_sceneLights,
+                    (index - 1) * LightChannelCount,
+                    m_sceneLights,
+                    index * LightChannelCount,
+                    LightChannelCount);
+                Array.Copy(
+                    m_sceneLightRadii,
+                    (index - 1) * LightRadiusChannelCount,
+                    m_sceneLightRadii,
+                    index * LightRadiusChannelCount,
+                    LightRadiusChannelCount);
+            }
+
+            m_sceneLightDistances[insertAt] = distanceSquared;
+            var target = insertAt * LightChannelCount;
+            m_sceneLights[target] = (float)sprite.X;
+            m_sceneLights[target + 1] = (float)sprite.Y;
+            m_sceneLights[target + 2] = upward;
+            m_sceneLights[target + 3] = downward;
+            var radiusTarget = insertAt * LightRadiusChannelCount;
+            m_sceneLightRadii[radiusTarget] = upwardRadius;
+            m_sceneLightRadii[radiusTarget + 1] = downwardRadius;
+        }
+    }
+
+    private void BuildSoftwareOverlays()
     {
         Array.Clear(m_pixels);
+        Array.Clear(m_weaponPixels);
         var playViewPixels = m_pixels.AsSpan(0, ViewportWidth * PlayViewHeight * 4);
         if (Sprites != null && StaticObjects != null)
         {
@@ -167,7 +265,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ViewportWidth / 2,
                 PlayViewHeight,
                 PlayViewHeight + 1,
-                playViewPixels,
+                m_weaponPixels.AsSpan(0, ViewportWidth * PlayViewHeight * 4),
                 ViewportWidth,
                 PlayViewHeight);
         }
@@ -182,13 +280,19 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ViewportWidth,
                 ViewportHeight);
         }
+        CopyPixelsToBitmap(m_pixels, m_overlayBitmap);
+        CopyPixelsToBitmap(m_weaponPixels, m_weaponOverlayBitmap);
+    }
+
+    private static void CopyPixelsToBitmap(byte[] pixels, SKBitmap bitmap)
+    {
         var sourceRowBytes = ViewportWidth * 4;
         for (var y = 0; y < ViewportHeight; y++)
         {
             Marshal.Copy(
-                m_pixels,
+                pixels,
                 y * sourceRowBytes,
-                IntPtr.Add(m_overlayBitmap.GetPixels(), y * m_overlayBitmap.RowBytes),
+                IntPtr.Add(bitmap.GetPixels(), y * bitmap.RowBytes),
                 sourceRowBytes);
         }
     }
@@ -201,7 +305,14 @@ public sealed class EnhancedViewport : SoftwareViewport
         SKRuntimeEffect effect,
         SKBitmap wallTextures,
         SKBitmap spriteOverlay,
+        SKBitmap weaponOverlay,
         float[] wallColumns,
+        float[] sceneLights,
+        float[] sceneLightRadii,
+        float[] playerPosition,
+        float[] cameraDirection,
+        float[] cameraPlane,
+        float muzzleFlash,
         float viewBob,
         float damageFlash,
         float deathFade,
@@ -228,10 +339,17 @@ public sealed class EnhancedViewport : SoftwareViewport
             using var lease = leaseFeature.Lease();
             using var textureShader = wallTextures.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             using var overlayShader = spriteOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+            using var weaponShader = weaponOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             var uniforms = new SKRuntimeEffectUniforms(effect)
             {
                 ["outputResolution"] = new[] { (float)Bounds.Width, (float)Bounds.Height },
                 ["wallColumns"] = wallColumns,
+                ["sceneLights"] = sceneLights,
+                ["sceneLightRadii"] = sceneLightRadii,
+                ["playerPosition"] = playerPosition,
+                ["cameraDirection"] = cameraDirection,
+                ["cameraPlane"] = cameraPlane,
+                ["muzzleFlash"] = muzzleFlash,
                 ["viewBob"] = viewBob,
                 ["damageFlash"] = damageFlash,
                 ["deathFade"] = deathFade,
@@ -243,7 +361,8 @@ public sealed class EnhancedViewport : SoftwareViewport
             var children = new SKRuntimeEffectChildren(effect)
             {
                 ["wallTextureAtlas"] = textureShader,
-                ["softwareSpriteOverlay"] = overlayShader
+                ["softwareSpriteOverlay"] = overlayShader,
+                ["softwareWeaponOverlay"] = weaponShader
             };
             using var shader = effect.ToShader(false, uniforms, children);
             using var paint = new SKPaint { Shader = shader, IsAntialias = false };

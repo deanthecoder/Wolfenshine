@@ -77,4 +77,36 @@ public sealed class WolfensteinStaticObjectsTests
     {
         Assert.That(WolfensteinStaticObjects.GetPickupType(spriteNumber), Is.EqualTo(expected));
     }
+
+    [TestCase(5, 0.90f, 0.80f)] // Floor lamp.
+    [TestCase(6, 0.10f, 1.00f)] // Chandelier.
+    [TestCase(16, 0.55f, 1.00f)] // Green ceiling light.
+    [TestCase(31, 0.30f, 0.40f)] // Treasure.
+    [TestCase(2, 0.00f, 0.00f)] // Non-light scenery.
+    public void GivenStaticSpriteCheckDirectionalLightBrightnessIsIdentified(
+        int spriteNumber,
+        float expectedUpward,
+        float expectedDownward)
+    {
+        var (upward, downward) = WolfensteinStaticObjects.GetLightBrightness(spriteNumber);
+
+        Assert.That(upward, Is.EqualTo(expectedUpward));
+        Assert.That(downward, Is.EqualTo(expectedDownward));
+    }
+
+    [TestCase(5, 2.75f, 2.75f)] // Floor lamp.
+    [TestCase(6, 2.75f, 2.75f)] // Chandelier.
+    [TestCase(16, 1.10f, 2.75f)] // Green ceiling light.
+    [TestCase(31, 1.25f, 1.25f)] // Treasure.
+    [TestCase(2, 0.00f, 0.00f)] // Non-light scenery.
+    public void GivenStaticSpriteCheckDirectionalLightRadiiAreIdentified(
+        int spriteNumber,
+        float expectedUpward,
+        float expectedDownward)
+    {
+        var (upward, downward) = WolfensteinStaticObjects.GetLightRadii(spriteNumber);
+
+        Assert.That(upward, Is.EqualTo(expectedUpward));
+        Assert.That(downward, Is.EqualTo(expectedDownward));
+    }
 }

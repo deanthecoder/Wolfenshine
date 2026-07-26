@@ -75,4 +75,30 @@ public static class WolfensteinStaticObjects
         35 => WolfensteinPickupType.FullHeal,
         _ => WolfensteinPickupType.None
     };
+
+    /// <summary>
+    /// Gets the upward and downward light emitted by a static sprite.
+    /// </summary>
+    /// <remarks>
+    /// Directional brightness keeps the shader independent of Wolfenstein-specific object types.
+    /// </remarks>
+    public static (float Upward, float Downward) GetLightBrightness(int spriteNumber) => spriteNumber switch
+    {
+        5 => (0.90f, 0.80f), // Floor lamp.
+        6 => (0.10f, 1.00f), // Chandelier.
+        16 => (0.55f, 1.00f), // Green ceiling light.
+        31 or 32 or 33 or 34 => (0.30f, 0.40f), // Treasure glow.
+        _ => (0.0f, 0.0f)
+    };
+
+    /// <summary>
+    /// Gets the upward and downward light radius of a static sprite in map tiles.
+    /// </summary>
+    public static (float Upward, float Downward) GetLightRadii(int spriteNumber) => spriteNumber switch
+    {
+        5 or 6 => (2.75f, 2.75f), // Floor lamp or chandelier.
+        16 => (1.10f, 2.75f), // Green ceiling light with a narrow upward shine.
+        31 or 32 or 33 or 34 => (1.25f, 1.25f), // Localized treasure glow.
+        _ => (0.0f, 0.0f)
+    };
 }

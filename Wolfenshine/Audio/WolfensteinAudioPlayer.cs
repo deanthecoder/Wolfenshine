@@ -178,7 +178,7 @@ public sealed class WolfensteinAudioPlayer : IDisposable
     private static int CreateMusicBuffer(WolfensteinMusicTrack track)
     {
         var framesPerTick = MusicSampleRate / MusicTicksPerSecond;
-        var frameCount = checked(track.Commands.Sum(command => (int)command.Delay) * framesPerTick);
+        var frameCount = checked(track.Commands.Sum(command => command.Delay) * framesPerTick);
         if (frameCount == 0)
             throw new InvalidDataException("The IMF music sequence contains no timed samples.");
         var samples = new short[checked(frameCount * 2)];
