@@ -59,6 +59,7 @@ public sealed class WolfensteinStaticObjectsTests
         Assert.That(WolfensteinStaticObjects.BlocksMovement((ushort)marker), Is.False);
     }
 
+    [TestCase(8, WolfensteinPickupType.DogFood)]
     [TestCase(28, WolfensteinPickupType.AmmoClip)]
     [TestCase(26, WolfensteinPickupType.Food)]
     [TestCase(27, WolfensteinPickupType.FirstAid)]

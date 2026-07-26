@@ -496,6 +496,23 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenDogFoodAfterDogBiteCheckFourHealthIsRestoredAndPickupRemoved()
+    {
+        var session = CreateSessionWithObjectAndDog(29);
+        session.Update(0.0, default);
+        session.Update(10.0 / 70.0, default);
+        Assert.That(session.Health, Is.EqualTo(90));
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Health, Is.EqualTo(94));
+            Assert.That(session.StaticObjects, Is.Empty);
+        });
+    }
+
+    [Test]
     public void GivenFullHealPickupCheckHealthAmmoLifeAndTreasureCountAreGranted()
     {
         var session = CreateSessionWithObjectAndDog(56);

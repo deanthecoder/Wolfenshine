@@ -341,7 +341,8 @@ public sealed class GameSession
             var pickupType = WolfensteinStaticObjects.GetPickupType(item.SpriteNumber);
             if (pickupType == WolfensteinPickupType.None ||
                 pickupType == WolfensteinPickupType.AmmoClip && Ammo == MaximumAmmo ||
-                pickupType is WolfensteinPickupType.Food or WolfensteinPickupType.FirstAid &&
+                pickupType is WolfensteinPickupType.DogFood or WolfensteinPickupType.Food or
+                    WolfensteinPickupType.FirstAid &&
                 Health == MaximumHealth)
             {
                 continue;
@@ -349,6 +350,9 @@ public sealed class GameSession
 
             switch (pickupType)
             {
+                case WolfensteinPickupType.DogFood:
+                    Heal(4);
+                    break;
                 case WolfensteinPickupType.Food:
                     Heal(10);
                     break;
