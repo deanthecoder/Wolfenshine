@@ -14,6 +14,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Wolfenshine.Game;
 using Wolfenshine.Graphics;
 using Wolfenshine.Maps;
 using Wolfenshine.Rendering;
@@ -41,10 +42,13 @@ public sealed class MapViewport : Control
         AvaloniaProperty.Register<MapViewport, WolfensteinWallTextures>(nameof(WallTextures));
     public static readonly StyledProperty<WolfensteinPalette> PaletteProperty =
         AvaloniaProperty.Register<MapViewport, WolfensteinPalette>(nameof(Palette));
+    public static readonly StyledProperty<IReadOnlyList<WorldSprite>> StaticObjectsProperty =
+        AvaloniaProperty.Register<MapViewport, IReadOnlyList<WorldSprite>>(nameof(StaticObjects));
 
     static MapViewport()
     {
-        AffectsRender<MapViewport>(MapProperty, CameraProperty, WallTexturesProperty, PaletteProperty);
+        AffectsRender<MapViewport>(
+            MapProperty, CameraProperty, WallTexturesProperty, PaletteProperty, StaticObjectsProperty);
         AffectsMeasure<MapViewport>(MapProperty);
     }
 
@@ -72,6 +76,12 @@ public sealed class MapViewport : Control
         set => SetValue(PaletteProperty, value);
     }
 
+    public IReadOnlyList<WorldSprite> StaticObjects
+    {
+        get => GetValue(StaticObjectsProperty);
+        set => SetValue(StaticObjectsProperty, value);
+    }
+
     protected override Size MeasureOverride(Size availableSize) => Map == null
         ? default
         : new Size(Map.Width * MapOverviewRenderer.TileSize, Map.Height * MapOverviewRenderer.TileSize);
@@ -83,6 +93,7 @@ public sealed class MapViewport : Control
             return;
         EnsureMapBitmap();
         context.DrawImage(m_bitmap, new Rect(0, 0, m_bitmap.PixelSize.Width, m_bitmap.PixelSize.Height));
+        DrawKeyMarkers(context);
         if (Camera == null)
             return;
 
@@ -91,6 +102,28 @@ public sealed class MapViewport : Control
             Camera.Y * MapOverviewRenderer.TileSize);
         context.DrawEllipse(Brushes.Black, null, center, 3.5, 3.5);
         context.DrawEllipse(Brushes.White, null, center, 2.5, 2.5);
+    }
+
+    private void DrawKeyMarkers(DrawingContext context)
+    {
+        if (StaticObjects == null)
+            return;
+        foreach (var item in StaticObjects)
+        {
+            var pickupType = WolfensteinStaticObjects.GetPickupType(item.SpriteNumber);
+            var brush = pickupType switch
+            {
+                WolfensteinPickupType.GoldKey => Brushes.Gold,
+                WolfensteinPickupType.SilverKey => Brushes.LightCyan,
+                _ => null
+            };
+            if (brush == null)
+                continue;
+
+            var center = new Point(item.X * MapOverviewRenderer.TileSize, item.Y * MapOverviewRenderer.TileSize);
+            context.DrawEllipse(Brushes.Black, null, center, 3.5, 3.5);
+            context.DrawEllipse(brush, null, center, 2.5, 2.5);
+        }
     }
 
     private void EnsureMapBitmap()

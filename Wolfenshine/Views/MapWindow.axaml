@@ -20,7 +20,8 @@
         <local:MapViewport Map="{Binding SelectedMap}"
                            Camera="{Binding Camera}"
                            WallTextures="{Binding WallTextures}"
-                           Palette="{Binding Palette}" />
+                           Palette="{Binding Palette}"
+                           StaticObjects="{Binding StaticObjects}" />
       </Border>
     </ScrollViewer>
 
@@ -35,6 +36,14 @@
       <StackPanel Orientation="Horizontal" Spacing="5">
         <Border Width="10" Height="10" Background="#40F060" />
         <TextBlock Text="Exit" Foreground="#D7D9DC" FontSize="11" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="5">
+        <Border Width="10" Height="10" Background="Gold" CornerRadius="5" />
+        <TextBlock Text="Gold key" Foreground="#D7D9DC" FontSize="11" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="5">
+        <Border Width="10" Height="10" Background="LightCyan" CornerRadius="5" />
+        <TextBlock Text="Silver key" Foreground="#D7D9DC" FontSize="11" />
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="5">
         <Border Width="10" Height="10" Background="White" CornerRadius="5" />

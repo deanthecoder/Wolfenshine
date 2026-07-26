@@ -186,11 +186,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_damageFlash, m_gameSession.DamageFlash, nameof(DamageFlash));
         SetField(ref m_levelFade, m_gameSession.LevelFade, nameof(LevelFade));
         SetField(ref m_elevatorSwitch, m_gameSession.ElevatorSwitch, nameof(ElevatorSwitch));
-        if (m_worldObjects.Count != StaticObjects.Count + Actors.Count ||
+        var staticObjectsChanged = m_worldObjects.Count != StaticObjects.Count + Actors.Count;
+        if (staticObjectsChanged ||
             m_actorRevision != m_gameSession.ActorRevision)
         {
             m_actorRevision = m_gameSession.ActorRevision;
             SetField(ref m_worldObjects, CreateWorldObjects(), nameof(WorldObjects));
+            if (staticObjectsChanged)
+                OnPropertyChanged(nameof(StaticObjects));
         }
         if (Sprites != null)
         {
