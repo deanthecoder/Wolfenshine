@@ -39,6 +39,7 @@ public sealed partial class MainWindow : Window
     private PlayerWeapon? m_weaponSelection;
 #if DEBUG
     private MapWindow m_mapWindow;
+    private readonly HashSet<Key> m_debugKeysDown = [];
 #endif
 
     public MainWindow()
@@ -55,6 +56,11 @@ public sealed partial class MainWindow : Window
     {
         base.OnKeyDown(e);
 #if DEBUG
+        if (!m_debugKeysDown.Add(e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.M)
         {
             ToggleMapWindow();
@@ -75,6 +81,20 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             return;
         }
+        if (e.Key == Key.S)
+        {
+            if (DataContext is MainWindowViewModel viewModel)
+                viewModel.SaveDebugPosition();
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.L)
+        {
+            if (DataContext is MainWindowViewModel viewModel)
+                viewModel.LoadDebugPosition();
+            e.Handled = true;
+            return;
+        }
 #endif
         e.Handled = SetKeyState(e.Key, true) || e.Handled;
     }
@@ -82,6 +102,9 @@ public sealed partial class MainWindow : Window
     protected override void OnKeyUp(KeyEventArgs e)
     {
         base.OnKeyUp(e);
+#if DEBUG
+        m_debugKeysDown.Remove(e.Key);
+#endif
         e.Handled = SetKeyState(e.Key, false) || e.Handled;
     }
 
@@ -97,6 +120,7 @@ public sealed partial class MainWindow : Window
 #if DEBUG
         m_mapWindow?.Close();
         m_mapWindow = null;
+        m_debugKeysDown.Clear();
 #endif
         m_gameTimer.Stop();
         m_gameClock.Stop();
@@ -123,6 +147,9 @@ public sealed partial class MainWindow : Window
 
     private void OnDeactivated(object sender, EventArgs e)
     {
+#if DEBUG
+        m_debugKeysDown.Clear();
+#endif
         ClearInput();
         m_gameClock.Restart();
     }

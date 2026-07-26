@@ -29,6 +29,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private GameSession m_gameSession;
     private readonly WolfensteinAudioPlayer m_audioPlayer;
+    private readonly WolfenshineSettings m_settings;
     private readonly WolfensteinHudGraphics m_hudGraphics;
     private RaycastCamera m_camera;
     private WolfensteinSprite m_weaponSprite;
@@ -62,7 +63,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         WolfensteinSprite weaponSprite = null,
         WolfensteinSpriteSet sprites = null,
         WolfensteinHudGraphics hudGraphics = null,
-        WolfensteinAudioPlayer audioPlayer = null)
+        WolfensteinAudioPlayer audioPlayer = null,
+        WolfenshineSettings settings = null)
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(maps);
@@ -73,6 +75,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         Sprites = sprites;
         m_hudGraphics = hudGraphics;
         m_audioPlayer = audioPlayer;
+        m_settings = settings;
         m_weaponSprite = weaponSprite;
         SelectedMap = maps.Maps.FirstOrDefault();
         if (SelectedMap != null)
@@ -158,7 +161,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_isGameOver, m_gameSession.IsGameOver, nameof(IsGameOver));
     }
 
-    public void Dispose() => m_audioPlayer?.Dispose();
+    public void Dispose()
+    {
+        m_audioPlayer?.Dispose();
+        m_settings?.Dispose();
+    }
 
     private void AdvanceMap()
     {
@@ -174,6 +181,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         var nextMap = Maps.Maps[(currentIndex + 1) % Maps.Maps.Count];
         var playerState = m_gameSession.CapturePlayerState();
         StartMap(nextMap, playerState, startFaded: true);
+        NotifyMapChanged();
+    }
+
+    private void NotifyMapChanged()
+    {
         OnPropertyChanged(nameof(SelectedMap));
         OnPropertyChanged(nameof(Camera));
         OnPropertyChanged(nameof(Actors));
@@ -190,11 +202,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private void StartMap(
         WolfensteinMap map,
         WolfensteinPlayerState? playerState,
-        bool startFaded)
+        bool startFaded,
+        RaycastCamera camera = null)
     {
         SelectedMap = map;
         Actors = WolfensteinActors.FromMap(map, GameDifficulty.Normal);
-        m_camera = RaycastCamera.FromPlayerStart(map);
+        m_camera = camera ?? RaycastCamera.FromPlayerStart(map);
         m_gameSession = new GameSession(
             map,
             m_camera,
@@ -216,6 +229,55 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
 #if DEBUG
+    public void SaveDebugPosition()
+    {
+        if (m_gameSession == null || m_settings == null)
+            return;
+        m_settings.SavedMapSlot = SelectedMap.Slot;
+        m_settings.SavedX = Camera.X;
+        m_settings.SavedY = Camera.Y;
+        m_settings.SavedDirectionX = Camera.DirectionX;
+        m_settings.SavedDirectionY = Camera.DirectionY;
+        Logger.Instance.Info(
+            $"Saved debug position on map {SelectedMap.Slot} at ({Camera.X:0.000}, {Camera.Y:0.000}).");
+    }
+
+    public void LoadDebugPosition()
+    {
+        if (m_settings == null || m_settings.SavedMapSlot < 0)
+        {
+            Logger.Instance.Info("No debug position has been saved.");
+            return;
+        }
+        var map = Maps.Maps.FirstOrDefault(item => item.Slot == m_settings.SavedMapSlot);
+        if (map == null)
+        {
+            Logger.Instance.Warn($"Saved debug map slot {m_settings.SavedMapSlot} is unavailable.");
+            return;
+        }
+        var directionLength = Math.Sqrt(
+            (m_settings.SavedDirectionX * m_settings.SavedDirectionX) +
+            (m_settings.SavedDirectionY * m_settings.SavedDirectionY));
+        if (directionLength <= double.Epsilon)
+        {
+            Logger.Instance.Warn("Saved debug direction is invalid.");
+            return;
+        }
+        var directionX = m_settings.SavedDirectionX / directionLength;
+        var directionY = m_settings.SavedDirectionY / directionLength;
+        var camera = new RaycastCamera(
+            m_settings.SavedX,
+            m_settings.SavedY,
+            directionX,
+            directionY,
+            -directionY * 0.66,
+            directionX * 0.66);
+        StartMap(map, null, startFaded: false, camera);
+        NotifyMapChanged();
+        Logger.Instance.Info(
+            $"Loaded debug position on map {map.Slot} at ({camera.X:0.000}, {camera.Y:0.000}).");
+    }
+
     public void ReloadDebugState()
     {
         if (m_gameSession?.ReloadDebugState() != true)

@@ -37,6 +37,7 @@ public sealed class App : Application
             Logger.Instance.SysInfo();
             Logger.Instance.Info("Starting Wolfenshine.");
             MainWindowViewModel viewModel;
+            var settings = new WolfenshineSettings();
             try
             {
                 var resources = WolfensteinResourceLocator.LoadDefault();
@@ -64,7 +65,8 @@ public sealed class App : Application
                     sprites.PistolReady,
                     sprites,
                     hudGraphics,
-                    audioPlayer);
+                    audioPlayer,
+                    settings);
                 Logger.Instance.Info(
                     $"Loaded {viewModel.StaticObjects.Count} static world objects for {viewModel.SelectedMap.Name}.");
                 Logger.Instance.Info(
@@ -72,6 +74,7 @@ public sealed class App : Application
             }
             catch (WolfensteinDataNotFoundException exception)
             {
+                settings.Dispose();
                 viewModel = new MainWindowViewModel(exception);
             }
 
