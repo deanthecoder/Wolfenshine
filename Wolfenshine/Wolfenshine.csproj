@@ -34,9 +34,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <LocalWolfensteinData Include="$(MSBuildProjectDirectory)/../local/game-data/wolf3d/*.WL6" />
-    <LocalWolfensteinPalette Include="$(MSBuildProjectDirectory)/../local/reference/wolf3d-source/WOLFSRC/OBJ/GAMEPAL.OBJ"
-                             Condition="Exists('$(MSBuildProjectDirectory)/../local/reference/wolf3d-source/WOLFSRC/OBJ/GAMEPAL.OBJ')" />
+    <LocalWolfensteinData Include="$(MSBuildProjectDirectory)/../local/game-data/*.WL6" />
+    <LocalWolfensteinPalette Include="$(MSBuildProjectDirectory)/../local/game-data/GAMEPAL.OBJ"
+                             Condition="Exists('$(MSBuildProjectDirectory)/../local/game-data/GAMEPAL.OBJ')" />
   </ItemGroup>
 
   <Target Name="CopyLocalWolfensteinData" AfterTargets="Build" Condition="'@(LocalWolfensteinData)' != ''">

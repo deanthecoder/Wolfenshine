@@ -2,45 +2,88 @@
 
 # Wolfenshine
 
-A modern C# reimplementation of Wolfenstein 3D, beginning with a faithful 320×200 software renderer and leaving room for enhanced GPU rendering later.
+A modern C# port of the original Wolfenstein 3D experience.
 
-## Status
+Wolfenshine rebuilds the complete game around a clean, cross-platform .NET codebase while loading the artwork, maps, music, and sounds from your own copy of Wolfenstein 3D. It currently includes the original-style difficulty menu, all six episodes, textured software rendering, enemies, weapons, pickups, doors, secret walls, elevators, sound, music, death and respawning, and end-of-level statistics.
 
-Sound effects are played through OpenAL. Doors and supported weapon effects use spatially positioned original digitized samples, while remaining effects are rendered from the original AdLib instruments and note streams through OPL emulation.
+The first goal is to reproduce how the 1992 game looks and plays. That gives us a trustworthy foundation for a later enhanced renderer with lighting, fog, shaders, and other modern effects—without losing the original version along the way.
 
-The game opens at an original-style difficulty screen using the retail portraits, cursor, font, palette, menu music, and sounds. Use the arrow keys to choose and Enter, Space, or Command to start. Press P during play to pause or resume. Losing the final life returns here to begin a new game from E1M1. Difficulty controls map-specific enemy placement and enemy health, while Baby mode quarters incoming damage. Enemy gunfire follows the original range, visibility, running, and SS-accuracy calculations; player weapon damage does not vary by difficulty in the original game.
+![Wolfenshine gameplay](img/gameplay.png)
 
-Wolfenshine currently loads and decompresses all 60 maps from the original six-episode data, locates the E1M1 player start, and provides arrow-key navigation through a textured 320×160 software-raycast view above the original 320×40 status bar. It uses the original indexed wall art, static world objects, shootable direction-aware enemies with death animations and drops, animated weapons, HUD artwork, VGA palette, and walking/running movement rates. Guards, officers, SS soldiers, mutants, and dogs detect the player by sight or connected-area gunfire and chase through doors. Human enemies use their distinct shooting sequences, including the SS burst and mutant double shot, while dogs use their original jump-and-bite attack. Ammunition, weapons, food, first-aid kits, full-heal extra lives, treasure, and level-local gold and silver keys can be collected, with the original limits and values shown on the HUD. Matching keys open locked doors and are cleared on death or level completion. Death consumes a life and restarts the current level; losing the final life returns to the difficulty screen. Operating an elevator switch from the correct side fades into a Wolf3D-inspired completion screen with the original par times, ratios, bonus rules, and end-level music. A fresh gameplay-key press then advances to the next loaded map while preserving player progress, wrapping to the first map after the last. The complete 320×200 native image is presented at the original 4:3 display aspect ratio, accounting for Mode 13h's non-square pixels. Hold Alt with Left/Right to strafe, Shift to run, Command to attack on macOS, use 1–4 to select an owned weapon, press P to pause, and press Space to operate ordinary sliding doors, locked doors, elevator switches, or secret pushwalls. Open doors close automatically after the original delay and wait or reopen when obstructed. Pushwalls move up to two tiles and remain permanently at their final position. Bosses and wider gameplay are not implemented yet.
+## What works today
 
-In Debug builds, press `I` during play to log a diagnostic snapshot containing the camera, weapon, doors, actors, resolved directional sprites, projection values, and nearby decorations. Press `R` to restore health to 100, ammo to 99, and unlock all weapons. Press `M` to toggle a textured level overview showing the live player position, secret walls, and elevator exits. Press `S` to save the current level, position, and direction to the user settings, then press `L` to restart that level at the saved position. Debug shortcuts trigger once per key press and are omitted from Release builds.
+- All 60 maps from the six-episode edition load directly from the original data files.
+- The 320×200 presentation retains the original 4:3 display proportions and indexed VGA artwork.
+- Guards, officers, SS soldiers, mutants, and dogs see, hear, chase, attack, take damage, and die.
+- Weapons, ammunition, health, treasure, keys, doors, pushwalls, elevators, death, and level progression work.
+- Original digitized and AdLib effects are played spatially through OpenAL; original IMF music is rendered through OPL emulation.
+- Difficulty affects enemy placement, health, behavior, and incoming damage in the same places it did originally.
+- An authentic-looking difficulty screen, HUD, pause plaque, and intermission screen complete the experience.
 
-## Building
+Wolfenshine is still under development. Bosses, episode endings, save games, and some less common gameplay details remain to be implemented.
 
-Clone the repository and its submodules, then build the solution:
+![Difficulty selection](img/difficulty-selection.png)
+
+## Add the original game resources
+
+Wolfenshine does not distribute Wolfenstein 3D's copyrighted game data. You need a legitimately obtained copy of the full six-episode edition, plus its original VGA palette.
+
+Create this private, Git-ignored directory inside your checkout:
+
+```text
+local/game-data/
+```
+
+Copy these eight files from the installed game into it:
+
+```text
+AUDIOHED.WL6
+AUDIOT.WL6
+GAMEMAPS.WL6
+MAPHEAD.WL6
+VGADICT.WL6
+VGAGRAPH.WL6
+VGAHEAD.WL6
+VSWAP.WL6
+```
+
+Then download [GAMEPAL.OBJ](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/OBJ/GAMEPAL.OBJ) from id Software's official source release and place that single file in the same directory:
+
+```text
+GAMEPAL.OBJ
+```
+
+`GAMEPAL.OBJ` supplies the original VGA palette used by the indexed game resources; no original C source or source checkout is needed. The build copies these private files into the application's output directory when they are present. If any are missing, Wolfenshine still builds and opens, then reports exactly which files it needs.
+
+Only the full `.WL6` data set is supported at present. Shareware `.WL1` and data from other releases may follow later.
+
+## Controls
+
+| Action | Key                        |
+|---|----------------------------|
+| Move and turn | Arrow keys                 |
+| Run | Shift                      |
+| Strafe | Alt + Left/Right           |
+| Use doors, switches, and secret walls | Space                      |
+| Fire | Control / Command |
+| Select an owned weapon | 1–4                        |
+| Pause or resume | P                          |
+
+## Build and run
+
+Wolfenshine requires the .NET 8 SDK. Clone the repository and its submodules, add the resources above, then run it:
 
 ```shell
 git clone --recurse-submodules https://github.com/deanthecoder/Wolfenshine.git
 cd Wolfenshine
-dotnet build Wolfenshine.slnx
+dotnet run --project Wolfenshine/Wolfenshine.csproj
 ```
 
-Wolfenshine does not include the commercial Wolfenstein 3D data. During development, place a legitimately obtained six-episode data set in:
+![Starting an episode](img/episode-start.png)
 
-```text
-local/game-data/wolf3d/
-```
+## Why C#?
 
-The original VGA palette is available in id Software's released source tree. Clone that alongside the game data at:
-
-```shell
-git clone https://github.com/id-Software/wolf3d.git local/reference/wolf3d-source
-```
-
-The `local/` directory is ignored by Git. When present, the build copies the `.WL6` files and `WOLFSRC/OBJ/GAMEPAL.OBJ` into the application's `GameData` output directory. Without the required resources, Wolfenshine still builds and starts, but displays a message listing the missing files and expected location.
-
-## Original source reference
-
-The original Wolfenstein 3D source release is available from the official [id Software Wolf3D repository](https://github.com/id-Software/wolf3d). Wolfenshine links to that repository as a format and behavioral reference; the original C source is not included here.
+Wolfenstein 3D has many excellent source ports already, but rebuilding it in modern C# makes a particularly approachable playground for old-school rendering, binary file formats, game AI, audio emulation, and future shader experiments. The project deliberately favors clear components and testable behavior over a mechanical C-to-C# translation.
 
 ## Beyond the basics
 
@@ -63,9 +106,21 @@ These are ideas rather than compatibility requirements. A faithful rendering pat
 
 ## Developer notes
 
-### Original behavior reminders
+### Relationship to the original source
 
-- Picking up the chaingun triggers BJ's special grinning face animation. Picking up the machine gun does not.
+id Software's [original Wolfenstein 3D source release](https://github.com/id-Software/wolf3d) is an invaluable historical and behavioral reference. Wolfenshine does not contain, compile, or require that C source. Its implementation is independently written in modern C#; we consult the released source to understand original gameplay rules and verify that Wolfenshine behaves similarly.
+
+### Debug shortcuts
+
+Debug builds provide a few development conveniences that are omitted from Release builds:
+
+| Key | Action |
+|---|---|
+| `I` | Log the camera, weapon, doors, actors, sprite resolution, projection values, and nearby decorations. |
+| `R` | Restore health and ammunition and unlock all weapons. |
+| `M` | Toggle the textured map overview. |
+| `S` | Save the current level, position, and direction as a quick test location. |
+| `L` | Restart at the saved test location. |
 
 ### Wolfenstein 3D data files
 
@@ -81,7 +136,7 @@ The `.WL6` suffix identifies data for the full six-episode edition. The sharewar
 | `VGAHEAD.WL6` | A table of 24-bit offsets locating graphics chunks within `VGAGRAPH.WL6`. |
 | `VGAGRAPH.WL6` | Huffman-compressed UI artwork, fonts, tiles, and other screen graphics. Chunk identifiers vary between game versions. |
 | `VSWAP.WL6` | A page-oriented container holding wall textures, sprites, and digitized sound samples. |
-| `GAMEPAL.OBJ` | The original source release's 16-bit OMF object containing the 256-color VGA palette. This is copied from the ignored local source checkout rather than committed to Wolfenshine. |
+| `GAMEPAL.OBJ` | A 16-bit OMF object containing the original 256-color VGA palette. |
 
 `CONFIG.WL6` is generated configuration state rather than a required asset. `WOLF3D.EXE` is useful as a behavioral reference but is not loaded by Wolfenshine.
 

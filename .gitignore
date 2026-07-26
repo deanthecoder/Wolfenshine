@@ -12,7 +12,10 @@
 *.env
 
 # Local reference source and original game data.
-/local/
+/local/*
+!/local/game-data/
+/local/game-data/*
+!/local/game-data/README.md
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
