@@ -26,7 +26,7 @@ namespace Wolfenshine.ViewModels;
 /// </remarks>
 public sealed class MainWindowViewModel : ViewModelBase
 {
-    private readonly GameSession m_gameSession;
+    private GameSession m_gameSession;
     private readonly WolfensteinHudGraphics m_hudGraphics;
     private RaycastCamera m_camera;
     private WolfensteinSprite m_weaponSprite;
@@ -41,6 +41,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int m_restartRevision;
     private bool m_isGameOver;
     private double m_deathFade;
+    private double m_levelFade;
+    private WolfensteinElevatorSwitch m_elevatorSwitch;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
 
     public MainWindowViewModel()
@@ -67,19 +69,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         Palette = palette;
         Sprites = sprites;
         m_hudGraphics = hudGraphics;
+        m_weaponSprite = weaponSprite;
         SelectedMap = maps.Maps.FirstOrDefault();
-        Actors = SelectedMap == null ? [] : WolfensteinActors.FromMap(SelectedMap);
         if (SelectedMap != null)
-        {
-            m_camera = RaycastCamera.FromPlayerStart(SelectedMap);
-            m_gameSession = new GameSession(SelectedMap, m_camera, Actors);
-            StaticObjects = m_gameSession.StaticObjects;
-            m_worldObjects = CreateWorldObjects();
-            m_weaponSprite = sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? weaponSprite;
-            UpdateHud();
-        }
+            StartMap(SelectedMap, null, startFaded: false);
         else
         {
+            Actors = [];
             StaticObjects = [];
         }
         StatusText = SelectedMap == null
@@ -99,23 +95,25 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string Title => "Wolfenshine";
     public WolfensteinResources Resources { get; }
     public WolfensteinMapSet Maps { get; }
-    public WolfensteinMap SelectedMap { get; }
+    public WolfensteinMap SelectedMap { get; private set; }
     public RaycastCamera Camera => m_camera;
     public WolfensteinDoors Doors => m_gameSession?.Doors;
     public WolfensteinPushWalls PushWalls => m_gameSession?.PushWalls;
+    public WolfensteinElevatorSwitch ElevatorSwitch => m_elevatorSwitch;
     public WolfensteinWallTextures WallTextures { get; }
     public WolfensteinPalette Palette { get; }
     public WolfensteinSprite WeaponSprite => m_weaponSprite;
     public WolfensteinSpriteSet Sprites { get; }
     public WolfensteinGraphic StatusBar => m_statusBar;
-    public IReadOnlyList<WorldSprite> StaticObjects { get; }
-    public IReadOnlyList<WolfensteinActor> Actors { get; }
+    public IReadOnlyList<WorldSprite> StaticObjects { get; private set; }
+    public IReadOnlyList<WolfensteinActor> Actors { get; private set; }
     public IReadOnlyList<WorldSprite> WorldObjects => m_worldObjects;
-    public string StatusText { get; }
+    public string StatusText { get; private set; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;
     public bool IsGameOver => m_isGameOver;
     public double DeathFade => m_deathFade;
+    public double LevelFade => m_levelFade;
     public int NativeViewportWidth => 320;
     public int NativeViewportHeight => 200;
     public int PresentationViewportWidth => 320;
@@ -123,30 +121,86 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {
-        if (m_gameSession?.Update(elapsedSeconds, input) == true)
+        if (m_gameSession?.Update(elapsedSeconds, input) != true)
+            return;
+        if (m_gameSession.IsReadyForNextLevel)
+            AdvanceMap();
+        if (m_restartRevision != m_gameSession.RestartRevision)
         {
-            if (m_restartRevision != m_gameSession.RestartRevision)
-            {
-                m_restartRevision = m_gameSession.RestartRevision;
-                OnPropertyChanged(nameof(Doors));
-                OnPropertyChanged(nameof(PushWalls));
-            }
-            SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
-            SetField(ref m_deathFade, m_gameSession.DeathFade, nameof(DeathFade));
-            if (m_worldObjects.Count != StaticObjects.Count + Actors.Count ||
-                m_actorRevision != m_gameSession.ActorRevision)
-            {
-                m_actorRevision = m_gameSession.ActorRevision;
-                SetField(ref m_worldObjects, CreateWorldObjects(), nameof(WorldObjects));
-            }
-            if (Sprites != null)
-            {
-                var sprite = Sprites.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame);
-                SetField(ref m_weaponSprite, sprite, nameof(WeaponSprite));
-            }
-            UpdateHud();
-            SetField(ref m_isGameOver, m_gameSession.IsGameOver, nameof(IsGameOver));
+            m_restartRevision = m_gameSession.RestartRevision;
+            OnPropertyChanged(nameof(Doors));
+            OnPropertyChanged(nameof(PushWalls));
         }
+        SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
+        SetField(ref m_deathFade, m_gameSession.DeathFade, nameof(DeathFade));
+        SetField(ref m_levelFade, m_gameSession.LevelFade, nameof(LevelFade));
+        SetField(ref m_elevatorSwitch, m_gameSession.ElevatorSwitch, nameof(ElevatorSwitch));
+        if (m_worldObjects.Count != StaticObjects.Count + Actors.Count ||
+            m_actorRevision != m_gameSession.ActorRevision)
+        {
+            m_actorRevision = m_gameSession.ActorRevision;
+            SetField(ref m_worldObjects, CreateWorldObjects(), nameof(WorldObjects));
+        }
+        if (Sprites != null)
+        {
+            var sprite = Sprites.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame);
+            SetField(ref m_weaponSprite, sprite, nameof(WeaponSprite));
+        }
+        UpdateHud();
+        SetField(ref m_isGameOver, m_gameSession.IsGameOver, nameof(IsGameOver));
+    }
+
+    private void AdvanceMap()
+    {
+        var currentIndex = 0;
+        for (var index = 0; index < Maps.Maps.Count; index++)
+        {
+            if (ReferenceEquals(Maps.Maps[index], SelectedMap))
+            {
+                currentIndex = index;
+                break;
+            }
+        }
+        var nextMap = Maps.Maps[(currentIndex + 1) % Maps.Maps.Count];
+        var playerState = m_gameSession.CapturePlayerState();
+        StartMap(nextMap, playerState, startFaded: true);
+        OnPropertyChanged(nameof(SelectedMap));
+        OnPropertyChanged(nameof(Camera));
+        OnPropertyChanged(nameof(Actors));
+        OnPropertyChanged(nameof(StaticObjects));
+        OnPropertyChanged(nameof(WorldObjects));
+        OnPropertyChanged(nameof(WeaponSprite));
+        OnPropertyChanged(nameof(StatusBar));
+        OnPropertyChanged(nameof(Doors));
+        OnPropertyChanged(nameof(PushWalls));
+        OnPropertyChanged(nameof(ElevatorSwitch));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void StartMap(
+        WolfensteinMap map,
+        WolfensteinPlayerState? playerState,
+        bool startFaded)
+    {
+        SelectedMap = map;
+        Actors = WolfensteinActors.FromMap(map, GameDifficulty.Normal);
+        m_camera = RaycastCamera.FromPlayerStart(map);
+        m_gameSession = new GameSession(
+            map,
+            m_camera,
+            Actors,
+            GameDifficulty.Normal,
+            playerState,
+            startFaded);
+        m_elevatorSwitch = m_gameSession.ElevatorSwitch;
+        StaticObjects = m_gameSession.StaticObjects;
+        m_actorRevision = m_gameSession.ActorRevision;
+        m_restartRevision = m_gameSession.RestartRevision;
+        m_worldObjects = CreateWorldObjects();
+        m_weaponSprite = Sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? m_weaponSprite;
+        StatusText = $"{map.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
+                     "1–4 select weapons · Space opens doors";
+        UpdateHud();
     }
 
 #if DEBUG

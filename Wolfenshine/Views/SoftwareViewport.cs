@@ -39,7 +39,9 @@ public sealed class SoftwareViewport : Control
     private ProjectedWorldSprite[] m_projectedSprites = [];
     private WolfensteinMap m_renderedMap;
     private RaycastCamera m_renderedCamera;
+    private WolfensteinElevatorSwitch m_renderedElevatorSwitch;
     private double m_renderedDeathFade = -1.0;
+    private double m_renderedLevelFade = -1.0;
 
     public static readonly StyledProperty<WolfensteinMap> MapProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinMap>(nameof(Map));
@@ -49,6 +51,8 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinDoors>(nameof(Doors));
     public static readonly StyledProperty<WolfensteinPushWalls> PushWallsProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinPushWalls>(nameof(PushWalls));
+    public static readonly StyledProperty<WolfensteinElevatorSwitch> ElevatorSwitchProperty =
+        AvaloniaProperty.Register<SoftwareViewport, WolfensteinElevatorSwitch>(nameof(ElevatorSwitch));
     public static readonly StyledProperty<WolfensteinWallTextures> WallTexturesProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinWallTextures>(nameof(WallTextures));
     public static readonly StyledProperty<WolfensteinPalette> PaletteProperty =
@@ -63,19 +67,23 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinGraphic>(nameof(StatusBar));
     public static readonly StyledProperty<double> DeathFadeProperty =
         AvaloniaProperty.Register<SoftwareViewport, double>(nameof(DeathFade));
+    public static readonly StyledProperty<double> LevelFadeProperty =
+        AvaloniaProperty.Register<SoftwareViewport, double>(nameof(LevelFade));
 
     static SoftwareViewport() => AffectsRender<SoftwareViewport>(
         MapProperty,
         CameraProperty,
         DoorsProperty,
         PushWallsProperty,
+        ElevatorSwitchProperty,
         WallTexturesProperty,
         PaletteProperty,
         WeaponSpriteProperty,
         SpritesProperty,
         StaticObjectsProperty,
         StatusBarProperty,
-        DeathFadeProperty);
+        DeathFadeProperty,
+        LevelFadeProperty);
 
     public WolfensteinMap Map
     {
@@ -99,6 +107,12 @@ public sealed class SoftwareViewport : Control
     {
         get => GetValue(PushWallsProperty);
         set => SetValue(PushWallsProperty, value);
+    }
+
+    public WolfensteinElevatorSwitch ElevatorSwitch
+    {
+        get => GetValue(ElevatorSwitchProperty);
+        set => SetValue(ElevatorSwitchProperty, value);
     }
 
     public WolfensteinWallTextures WallTextures
@@ -143,13 +157,20 @@ public sealed class SoftwareViewport : Control
         set => SetValue(DeathFadeProperty, value);
     }
 
+    public double LevelFade
+    {
+        get => GetValue(LevelFadeProperty);
+        set => SetValue(LevelFadeProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
         if (Map == null || Doors == null || Camera == null)
             return;
         if (!ReferenceEquals(m_renderedMap, Map) || !ReferenceEquals(m_renderedCamera, Camera) ||
-            m_renderedDeathFade != DeathFade)
+            !ReferenceEquals(m_renderedElevatorSwitch, ElevatorSwitch) ||
+            m_renderedDeathFade != DeathFade || m_renderedLevelFade != LevelFade)
             RenderFrame();
         context.DrawImage(m_bitmap, Bounds);
     }
@@ -157,7 +178,7 @@ public sealed class SoftwareViewport : Control
     private void RenderFrame()
     {
         // Raycasting and shading produce the complete native-resolution image independently of Avalonia.
-        Raycaster.Cast(Map, Doors, PushWalls, Camera, m_columns);
+        Raycaster.Cast(Map, Doors, PushWalls, ElevatorSwitch, Camera, m_columns);
         var playViewPixels = m_pixels.AsSpan(0, ViewportWidth * PlayViewHeight * 4);
         // The HUD clips the play view to 160 rows, but the original 200-row projection scale preserves its proportions.
         SoftwareRaycastRenderer.Render(
@@ -203,6 +224,8 @@ public sealed class SoftwareViewport : Control
             ApplyDeathFade(playViewPixels, DeathFade, Palette.GetColor(4));
         if (StatusBar != null && Palette != null)
             SoftwareRaycastRenderer.DrawGraphic(StatusBar, Palette, 0, PlayViewHeight, m_pixels, ViewportWidth, ViewportHeight);
+        if (LevelFade > 0.0)
+            ApplyBlackFade(m_pixels, LevelFade);
 
         // The viewport size never changes, so retain its native bitmap and update only the locked pixel memory.
         m_bitmap ??= new WriteableBitmap(
@@ -224,7 +247,9 @@ public sealed class SoftwareViewport : Control
 
         m_renderedMap = Map;
         m_renderedCamera = Camera;
+        m_renderedElevatorSwitch = ElevatorSwitch;
         m_renderedDeathFade = DeathFade;
+        m_renderedLevelFade = LevelFade;
     }
 
     private static void ApplyDeathFade(Span<byte> pixels, double progress, RgbaColor color)
@@ -240,6 +265,17 @@ public sealed class SoftwareViewport : Control
             pixels[offset + 1] = color.Green;
             pixels[offset + 2] = color.Blue;
             pixels[offset + 3] = color.Alpha;
+        }
+    }
+
+    private static void ApplyBlackFade(Span<byte> pixels, double progress)
+    {
+        var scale = 1.0 - Math.Clamp(progress, 0.0, 1.0);
+        for (var offset = 0; offset < pixels.Length; offset += 4)
+        {
+            pixels[offset] = (byte)(pixels[offset] * scale);
+            pixels[offset + 1] = (byte)(pixels[offset + 1] * scale);
+            pixels[offset + 2] = (byte)(pixels[offset + 2] * scale);
         }
     }
 }

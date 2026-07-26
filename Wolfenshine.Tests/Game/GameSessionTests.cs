@@ -696,6 +696,47 @@ public sealed class GameSessionTests
         });
     }
 
+    [Test]
+    public void GivenElevatorSwitchUsedFromSideCheckLevelFadesToCompletion()
+    {
+        var session = CreateElevatorSession(directionX: 1.0, directionY: 0.0, switchX: 3, switchY: 2);
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, Use: true));
+        Span<WallColumn> columns = stackalloc WallColumn[1];
+        Raycaster.Cast(
+            session.Map,
+            session.Doors,
+            session.PushWalls,
+            session.ElevatorSwitch,
+            session.Camera,
+            columns);
+        var renderedSwitchTile = columns[0].Tile;
+        session.Update(0.25, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.IsCompletingLevel, Is.True);
+            Assert.That(session.IsReadyForNextLevel, Is.False);
+            Assert.That(session.LevelFade, Is.EqualTo(0.5).Within(0.0001));
+            Assert.That(session.ElevatorSwitch, Is.Not.Null);
+            Assert.That(renderedSwitchTile, Is.EqualTo(22));
+        });
+
+        session.Update(0.25, default);
+        Assert.That(session.IsReadyForNextLevel, Is.True);
+        Assert.That(session.LevelFade, Is.EqualTo(1.0));
+    }
+
+    [Test]
+    public void GivenElevatorSwitchUsedVerticallyCheckItDoesNotCompleteLevel()
+    {
+        var session = CreateElevatorSession(directionX: 0.0, directionY: -1.0, switchX: 2, switchY: 1);
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, Use: true));
+
+        Assert.That(session.IsCompletingLevel, Is.False);
+    }
+
     private static GameSession CreateSession()
     {
         const int size = 5;
@@ -712,6 +753,30 @@ public sealed class GameSessionTests
         objects[(2 * size) + 2] = 19;
         var map = new WolfensteinMap(0, "Test Map", size, size, walls, objects);
         return new GameSession(map, RaycastCamera.FromPlayerStart(map));
+    }
+
+    private static GameSession CreateElevatorSession(
+        double directionX,
+        double directionY,
+        int switchX,
+        int switchY)
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)140, size * size).ToArray();
+        for (var index = 0; index < size; index++)
+        {
+            walls[index] = 1;
+            walls[((size - 1) * size) + index] = 1;
+            walls[index * size] = 1;
+            walls[(index * size) + size - 1] = 1;
+        }
+        walls[(switchY * size) + switchX] = 21;
+        var map = new WolfensteinMap(0, "Elevator", size, size, walls, new ushort[size * size]);
+        var planeX = -directionY * 0.66;
+        var planeY = directionX * 0.66;
+        return new GameSession(
+            map,
+            new RaycastCamera(2.5, 2.5, directionX, directionY, planeX, planeY));
     }
 
     private static GameSession CreateDoorSession()

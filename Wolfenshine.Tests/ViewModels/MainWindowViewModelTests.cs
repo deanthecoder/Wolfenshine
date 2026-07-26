@@ -94,4 +94,47 @@ public sealed class MainWindowViewModelTests
         Assert.That(viewModel.Camera, Is.Not.SameAs(originalCamera));
         Assert.That(changedProperty, Is.EqualTo(nameof(MainWindowViewModel.Camera)));
     }
+
+    [Test]
+    public void GivenElevatorCompletionCheckNextMapLoadsAndFinalMapWrapsToFirst()
+    {
+        var firstMap = CreateElevatorMap(0, "E1M1");
+        var secondMap = CreateElevatorMap(1, "E1M2");
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { firstMap, secondMap });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+
+        CompleteLevel(viewModel);
+        Assert.That(viewModel.SelectedMap, Is.SameAs(secondMap));
+
+        viewModel.UpdateGame(0.5, default);
+        CompleteLevel(viewModel);
+        Assert.That(viewModel.SelectedMap, Is.SameAs(firstMap));
+    }
+
+    private static WolfensteinMap CreateElevatorMap(int slot, string name)
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)140, size * size).ToArray();
+        for (var index = 0; index < size; index++)
+        {
+            walls[index] = 1;
+            walls[((size - 1) * size) + index] = 1;
+            walls[index * size] = 1;
+            walls[(index * size) + size - 1] = 1;
+        }
+        walls[(2 * size) + 3] = 21;
+        var objects = new ushort[size * size];
+        objects[(2 * size) + 2] = 20;
+        return new WolfensteinMap(slot, name, size, size, walls, objects);
+    }
+
+    private static void CompleteLevel(MainWindowViewModel viewModel)
+    {
+        viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
+        viewModel.UpdateGame(0.5, default);
+    }
 }

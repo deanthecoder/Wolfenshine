@@ -25,12 +25,20 @@ public static class Raycaster
         WolfensteinMap map,
         WolfensteinDoors doors,
         RaycastCamera camera,
-        Span<WallColumn> columns) => Cast(map, doors, null, camera, columns);
+        Span<WallColumn> columns) => Cast(map, doors, null, null, camera, columns);
 
     public static void Cast(
         WolfensteinMap map,
         WolfensteinDoors doors,
         WolfensteinPushWalls pushWalls,
+        RaycastCamera camera,
+        Span<WallColumn> columns) => Cast(map, doors, pushWalls, null, camera, columns);
+
+    public static void Cast(
+        WolfensteinMap map,
+        WolfensteinDoors doors,
+        WolfensteinPushWalls pushWalls,
+        WolfensteinElevatorSwitch elevatorSwitch,
         RaycastCamera camera,
         Span<WallColumn> columns)
     {
@@ -48,7 +56,7 @@ public static class Raycaster
             var cameraX = (2.0 * (column + 0.5) / columns.Length) - 1.0;
             var rayDirectionX = camera.DirectionX + (camera.PlaneX * cameraX);
             var rayDirectionY = camera.DirectionY + (camera.PlaneY * cameraX);
-            var wallColumn = CastRay(map, doors, pushWalls, camera, rayDirectionX, rayDirectionY);
+            var wallColumn = CastRay(map, doors, pushWalls, elevatorSwitch, camera, rayDirectionX, rayDirectionY);
             if (TryHitPushWall(pushWalls, camera, rayDirectionX, rayDirectionY, out var pushWallColumn) &&
                 pushWallColumn.Distance < wallColumn.Distance)
             {
@@ -63,6 +71,7 @@ public static class Raycaster
         WolfensteinMap map,
         WolfensteinDoors doors,
         WolfensteinPushWalls pushWalls,
+        WolfensteinElevatorSwitch elevatorSwitch,
         RaycastCamera camera,
         double rayDirectionX,
         double rayDirectionY)
@@ -110,7 +119,8 @@ public static class Raycaster
             }
             if (map.IsSolid(mapX, mapY) && pushWalls?.IsOriginalWallSuppressed(mapX, mapY) != true)
             {
-                tile = map.GetWall(mapX, mapY);
+                var sourceTile = map.GetWall(mapX, mapY);
+                tile = elevatorSwitch?.ResolveTile(mapX, mapY, sourceTile) ?? sourceTile;
                 break;
             }
         }

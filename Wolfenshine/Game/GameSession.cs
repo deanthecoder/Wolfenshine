@@ -42,6 +42,8 @@ public sealed class GameSession
     private const double DogAttackDistance = 1.5;
     private const double DeathFadeDuration = 70.0 / OriginalTicksPerSecond;
     private const double DeathDuration = 100.0 / OriginalTicksPerSecond;
+    private const ushort ElevatorSwitchTile = 21;
+    private const double LevelFadeDuration = 0.5;
     private bool m_useWasDown;
     private bool m_attackWasDown;
     private int m_attackStep;
@@ -54,6 +56,9 @@ public sealed class GameSession
     private double m_chaingunGrinTime;
     private int m_faceFrame;
     private uint m_randomState = 0x5f3759df;
+    private double m_levelFade;
+    private bool m_isCompletingLevel;
+    private bool m_isFadingIn;
     private double m_deathTime;
     private readonly RaycastCamera m_startCamera;
     private readonly IReadOnlyList<WolfensteinActor> m_actorDefinitions;
@@ -64,7 +69,9 @@ public sealed class GameSession
         WolfensteinMap map,
         RaycastCamera camera,
         IReadOnlyList<WolfensteinActor> actors = null,
-        GameDifficulty difficulty = GameDifficulty.Normal)
+        GameDifficulty difficulty = GameDifficulty.Normal,
+        WolfensteinPlayerState? playerState = null,
+        bool startFaded = false)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(camera);
@@ -78,6 +85,18 @@ public sealed class GameSession
         m_actorDefinitions = actors ?? [];
         m_actors = CreateActorStates();
         m_staticObjects = WolfensteinStaticObjects.FromMap(map).ToList();
+        if (playerState is { } state)
+        {
+            Health = state.Health;
+            Ammo = state.Ammo;
+            Lives = state.Lives;
+            Score = state.Score;
+            Weapon = state.Weapon;
+            m_chosenWeapon = state.ChosenWeapon;
+            m_bestWeapon = state.BestWeapon;
+        }
+        m_isFadingIn = startFaded;
+        m_levelFade = startFaded ? 1.0 : 0.0;
     }
 
     public WolfensteinMap Map { get; }
@@ -85,6 +104,7 @@ public sealed class GameSession
     public RaycastCamera Camera { get; private set; }
     public WolfensteinDoors Doors { get; private set; }
     public WolfensteinPushWalls PushWalls { get; private set; }
+    public WolfensteinElevatorSwitch ElevatorSwitch { get; private set; }
     public PlayerWeapon Weapon { get; private set; } = PlayerWeapon.Pistol;
     public PlayerWeapon BestWeapon => m_bestWeapon;
     public int WeaponFrame { get; private set; }
@@ -98,6 +118,9 @@ public sealed class GameSession
     public bool IsAttacking { get; private set; }
     public bool IsDying { get; private set; }
     public bool IsGameOver { get; private set; }
+    public bool IsCompletingLevel => m_isCompletingLevel;
+    public bool IsReadyForNextLevel => m_isCompletingLevel && m_levelFade >= 1.0;
+    public double LevelFade => m_levelFade;
     public double DeathFade => IsDying ? Math.Min(1.0, m_deathTime / DeathFadeDuration) : 0.0;
     public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
     public IReadOnlyList<WorldSprite> ActorSprites => m_actors.Select(actor => actor.ToWorldSprite()).ToArray();
@@ -131,6 +154,14 @@ public sealed class GameSession
             return false;
         if (IsDying)
             return UpdateDeath(elapsedSeconds, input);
+        if (m_isCompletingLevel)
+            return UpdateLevelFade(elapsedSeconds);
+        if (m_isFadingIn)
+        {
+            m_levelFade = Math.Max(0.0, m_levelFade - (elapsedSeconds / LevelFadeDuration));
+            m_isFadingIn = m_levelFade > 0.0;
+            return elapsedSeconds > 0.0;
+        }
 
         var changed = Doors.Update(elapsedSeconds, CanDoorClose);
         changed |= PushWalls.Update(elapsedSeconds, CanPushWallEnterTile);
@@ -233,6 +264,14 @@ public sealed class GameSession
         if (PushWalls.TryPush(pushWallX, pushWallY, directionX, directionY, CanPushWallEnterTile))
         {
             SecretCount++;
+            return true;
+        }
+
+        if (directionX != 0 && Map.GetWall(pushWallX, pushWallY) == ElevatorSwitchTile)
+        {
+            ElevatorSwitch = new WolfensteinElevatorSwitch(pushWallX, pushWallY);
+            m_isCompletingLevel = true;
+            m_levelFade = 0.0;
             return true;
         }
 
@@ -772,11 +811,30 @@ public sealed class GameSession
         input.MoveForward || input.MoveBackward || input.TurnLeft || input.TurnRight ||
         input.Use || input.Run || input.Attack || input.Strafe || input.WeaponSelection != null;
 
+    private bool UpdateLevelFade(double elapsedSeconds)
+    {
+        m_levelFade = Math.Min(1.0, m_levelFade + (elapsedSeconds / LevelFadeDuration));
+        return elapsedSeconds > 0.0;
+    }
+
+    /// <summary>
+    /// Captures player progress that should survive a successful level transition.
+    /// </summary>
+    public WolfensteinPlayerState CapturePlayerState() => new(
+        Health,
+        Ammo,
+        Lives,
+        Score,
+        Weapon,
+        m_chosenWeapon,
+        m_bestWeapon);
+
     private void RestartLevel()
     {
         Camera = m_startCamera;
         Doors = WolfensteinDoors.FromMap(Map);
         PushWalls = new WolfensteinPushWalls(Map);
+        ElevatorSwitch = null;
         m_actors = CreateActorStates();
         m_staticObjects.Clear();
         m_staticObjects.AddRange(WolfensteinStaticObjects.FromMap(Map));
