@@ -29,8 +29,8 @@ public sealed class GameSession
     private const double BackwardMovementScale = 100.0;
     private const double AngleScale = 20.0;
     private const double AttackFrameDuration = 6.0 / OriginalTicksPerSecond;
-    private const int RenewedAmmo = 99;
     private const int MaximumAmmo = 99;
+    private const int MaximumHealth = 100;
     private const double PickupDistance = 0.5;
     private const double MinimumActorDistance = 1.0;
     private const double PlayerRadius = 0.2;
@@ -40,6 +40,7 @@ public sealed class GameSession
     private bool m_attackWasDown;
     private int m_attackStep;
     private double m_attackTimeRemaining;
+    private PlayerWeapon m_chosenWeapon = PlayerWeapon.Pistol;
     private readonly IReadOnlyList<WolfensteinActor> m_actors;
     private readonly List<WorldSprite> m_staticObjects;
 
@@ -66,12 +67,24 @@ public sealed class GameSession
     public PlayerWeapon Weapon { get; private set; } = PlayerWeapon.Pistol;
     public int WeaponFrame { get; private set; }
     public int Ammo { get; private set; } = 8;
+    public int Health { get; private set; } = MaximumHealth;
     public int Score { get; private set; }
     public int TreasureCount { get; private set; }
     public int SecretCount { get; private set; }
     public int SecretTotal { get; }
     public bool IsAttacking { get; private set; }
     public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
+
+#if DEBUG
+    public bool ReloadDebugState()
+    {
+        var changed = Ammo != MaximumAmmo || Health != MaximumHealth ||
+                      !IsAttacking && Weapon != m_chosenWeapon;
+        GiveAmmo(MaximumAmmo);
+        Health = MaximumHealth;
+        return changed;
+    }
+#endif
 
     public bool Update(double elapsedSeconds, PlayerInput input)
     {
@@ -251,7 +264,7 @@ public sealed class GameSession
             switch (pickupType)
             {
                 case WolfensteinPickupType.AmmoClip:
-                    Ammo = Math.Min(MaximumAmmo, Ammo + 8);
+                    GiveAmmo(8);
                     break;
                 case WolfensteinPickupType.Cross:
                     CollectTreasure(100);
@@ -288,8 +301,9 @@ public sealed class GameSession
     private bool UpdateWeapon(double elapsedSeconds, PlayerInput input)
     {
         var changed = false;
-        if (!IsAttacking && input.WeaponSelection is { } selection && selection != Weapon)
+        if (!IsAttacking && Ammo > 0 && input.WeaponSelection is { } selection && selection != Weapon)
         {
+            m_chosenWeapon = selection;
             Weapon = selection;
             WeaponFrame = 0;
             changed = true;
@@ -297,6 +311,8 @@ public sealed class GameSession
 
         if (!IsAttacking && input.Attack && !m_attackWasDown)
         {
+            if (Weapon != PlayerWeapon.Knife && Ammo == 0)
+                Weapon = PlayerWeapon.Knife;
             IsAttacking = true;
             m_attackStep = 0;
             WeaponFrame = 1;
@@ -320,12 +336,12 @@ public sealed class GameSession
                     FireCurrentWeapon();
                     SetAttackStep(2);
                     break;
-                case 2 when Weapon == PlayerWeapon.MachineGun && input.Attack:
+                case 2 when Weapon == PlayerWeapon.MachineGun && input.Attack && Ammo > 0:
                     SetAttackStep(1);
                     break;
-                case 2 when Weapon == PlayerWeapon.Chaingun:
+                case 2 when Weapon == PlayerWeapon.Chaingun && Ammo > 0:
                     FireCurrentWeapon();
-                    SetAttackStep(input.Attack ? 1 : 3);
+                    SetAttackStep(input.Attack && Ammo > 0 ? 1 : 3);
                     break;
                 case 2:
                     SetAttackStep(3);
@@ -333,6 +349,10 @@ public sealed class GameSession
                 default:
                     IsAttacking = false;
                     WeaponFrame = 0;
+                    if (Weapon != PlayerWeapon.Knife && Ammo == 0)
+                        Weapon = PlayerWeapon.Knife;
+                    else if (Ammo > 0 && Weapon != m_chosenWeapon)
+                        Weapon = m_chosenWeapon;
                     break;
             }
         }
@@ -348,10 +368,19 @@ public sealed class GameSession
 
     private void FireCurrentWeapon()
     {
-        if (Weapon == PlayerWeapon.Knife)
+        if (Weapon == PlayerWeapon.Knife || Ammo == 0)
             return;
         Ammo--;
-        if (Ammo <= 0)
-            Ammo = RenewedAmmo;
+    }
+
+    private void GiveAmmo(int amount)
+    {
+        var wasEmpty = Ammo == 0;
+        Ammo = Math.Min(MaximumAmmo, Ammo + amount);
+        if (wasEmpty && !IsAttacking)
+        {
+            Weapon = m_chosenWeapon;
+            WeaponFrame = 0;
+        }
     }
 }

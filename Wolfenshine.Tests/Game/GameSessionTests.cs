@@ -88,7 +88,7 @@ public sealed class GameSessionTests
     }
 
     [Test]
-    public void GivenSandboxAmmoReachesZeroCheckItIsRenewed()
+    public void GivenAmmoReachesZeroCheckItRemainsEmpty()
     {
         var session = CreateSession();
         for (var shot = 0; shot < 8; shot++)
@@ -98,8 +98,97 @@ public sealed class GameSessionTests
             session.Update(0.0, default);
         }
 
-        Assert.That(session.Ammo, Is.EqualTo(99));
+        session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        session.Update(0.4, new PlayerInput(false, false, false, false, Attack: true));
+
+        Assert.That(session.Ammo, Is.Zero);
     }
+
+    [TestCase(PlayerWeapon.Pistol)]
+    [TestCase(PlayerWeapon.MachineGun)]
+    [TestCase(PlayerWeapon.Chaingun)]
+    public void GivenFinalRoundAndHeldAttackCheckGunStopsAndReturnsToKnife(PlayerWeapon weapon)
+    {
+        var session = CreateSession();
+        FireShots(session, 7);
+        session.Update(0.0, new PlayerInput(false, false, false, false, WeaponSelection: weapon));
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        session.Update(1.0, new PlayerInput(false, false, false, false, Attack: true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Ammo, Is.Zero);
+            Assert.That(session.IsAttacking, Is.False);
+            Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.Knife));
+            Assert.That(session.WeaponFrame, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void GivenEmptyGunCheckAttackUsesKnifeWithoutConsumingAmmo()
+    {
+        var session = CreateSession();
+        FireShots(session, 8);
+        session.Update(0.0, new PlayerInput(
+            false,
+            false,
+            false,
+            false,
+            Attack: true,
+            WeaponSelection: PlayerWeapon.Chaingun));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Ammo, Is.Zero);
+            Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.Knife));
+            Assert.That(session.IsAttacking, Is.True);
+        });
+    }
+
+    [Test]
+    public void GivenAmmoCollectedAfterExhaustionCheckPreviouslyChosenGunIsRestored()
+    {
+        var session = CreateSessionWithObject(49);
+        FireShots(session, 7);
+        session.Update(0.0, new PlayerInput(
+            false,
+            false,
+            false,
+            false,
+            WeaponSelection: PlayerWeapon.MachineGun));
+        session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        session.Update(0.5, new PlayerInput(false, false, false, false, Attack: true));
+        session.Update(0.0, default);
+        Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.Knife));
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Ammo, Is.EqualTo(8));
+            Assert.That(session.Weapon, Is.EqualTo(PlayerWeapon.MachineGun));
+            Assert.That(session.WeaponFrame, Is.Zero);
+        });
+    }
+
+#if DEBUG
+    [Test]
+    public void GivenDebugReloadCheckAmmoAndHealthAreMaximized()
+    {
+        var session = CreateSession();
+        FireShots(session, 3);
+
+        var changed = session.ReloadDebugState();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(changed, Is.True);
+            Assert.That(session.Ammo, Is.EqualTo(99));
+            Assert.That(session.Health, Is.EqualTo(100));
+        });
+    }
+#endif
 
     [Test]
     public void GivenRightTurnCheckPlayerRotatesClockwise()
@@ -178,7 +267,11 @@ public sealed class GameSessionTests
     public void GivenFullAmmoCheckClipRemainsAvailable()
     {
         var session = CreateSessionWithObject(49);
-        FireShots(session, 8);
+#if DEBUG
+        session.ReloadDebugState();
+#else
+        Assert.Ignore("Debug reload supplies the full-ammo test state.");
+#endif
 
         session.Update(0.2, new PlayerInput(true, false, false, false));
 

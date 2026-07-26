@@ -52,6 +52,13 @@ public sealed partial class MainWindow : Window
     {
         base.OnKeyDown(e);
 #if DEBUG
+        if (e.Key == Key.R)
+        {
+            if (DataContext is MainWindowViewModel viewModel)
+                viewModel.ReloadDebugState();
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.I)
         {
             if (DataContext is MainWindowViewModel viewModel)

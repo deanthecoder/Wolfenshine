@@ -57,10 +57,11 @@ public sealed class WolfensteinHudGraphics
         m_healthyFace = healthyFace;
     }
 
-    public WolfensteinGraphic Render(PlayerWeapon weapon, int ammo, int score)
+    public WolfensteinGraphic Render(PlayerWeapon weapon, int ammo, int score, int health)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(ammo);
         ArgumentOutOfRangeException.ThrowIfNegative(score);
+        ArgumentOutOfRangeException.ThrowIfNegative(health);
         var indices = CopyIndices(m_background);
         DrawPicture(indices, m_healthyFace, 17 * 8, 4);
         DrawPicture(indices, m_weaponIcons[(int)weapon], 32 * 8, 8);
@@ -69,7 +70,7 @@ public sealed class WolfensteinHudGraphics
         DrawNumber(indices, 2, 16, 2, 1);
         DrawNumber(indices, 6, 16, 6, score);
         DrawNumber(indices, 14, 16, 1, 3);
-        DrawNumber(indices, 21, 16, 3, 100);
+        DrawNumber(indices, 21, 16, 3, health);
         DrawNumber(indices, 27, 16, 2, ammo);
         return new WolfensteinGraphic(Width, Height, indices);
     }
