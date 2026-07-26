@@ -42,7 +42,7 @@ public sealed class WolfensteinDoor
     public DoorOrientation Orientation { get; }
     public double OpenAmount { get; private set; }
     public bool IsFullyOpen => OpenAmount >= 1.0;
-    public bool IsLocked => Tile is not 90 and not 91;
+    public bool IsLocked => Tile is >= 92 and <= 99;
     public bool IsOpening => m_state == DoorState.Opening;
     public bool IsClosing => m_state == DoorState.Closing;
 

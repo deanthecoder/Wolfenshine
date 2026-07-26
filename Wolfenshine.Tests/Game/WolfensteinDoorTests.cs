@@ -55,6 +55,19 @@ public sealed class WolfensteinDoorTests
         Assert.That(door.OpenAmount, Is.Zero);
     }
 
+    [TestCase(100)]
+    [TestCase(101)]
+    public void GivenElevatorDoorCheckItCanOpen(int tile)
+    {
+        var door = new WolfensteinDoor(1, 2, (ushort)tile);
+
+        var opened = door.Open();
+        door.Update(1.0);
+
+        Assert.That(opened, Is.True);
+        Assert.That(door.IsFullyOpen, Is.True);
+    }
+
     [Test]
     public void GivenFullyOpenDoorCheckItWaitsThreeHundredOriginalTicksBeforeClosing()
     {
