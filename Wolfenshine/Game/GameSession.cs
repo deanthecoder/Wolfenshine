@@ -34,6 +34,7 @@ public sealed class GameSession
     private const double PickupDistance = 0.5;
     private const double MinimumActorDistance = 1.0;
     private const double PlayerRadius = 0.2;
+    private const double OriginalPlayerRadius = 0x5800 / FixedUnitsPerTile;
     private const double MaximumMovementStep = 0.1;
     private bool m_useWasDown;
     private bool m_attackWasDown;
@@ -72,7 +73,7 @@ public sealed class GameSession
         if (!double.IsFinite(elapsedSeconds) || elapsedSeconds < 0.0)
             throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
 
-        var changed = Doors.Update(elapsedSeconds);
+        var changed = Doors.Update(elapsedSeconds, CanDoorClose);
         if (input.Use && !m_useWasDown)
             changed |= OpenDoorAhead();
         m_useWasDown = input.Use;
@@ -167,12 +168,34 @@ public sealed class GameSession
             var y = (int)Math.Floor(Camera.Y + (Camera.DirectionY * distance));
             var door = Doors.Get(x, y);
             if (door != null)
-                return door.Open();
+                return door.Operate(CanDoorClose(door));
             if (Map.IsSolid(x, y))
                 return false;
         }
 
         return false;
+    }
+
+    private bool CanDoorClose(WolfensteinDoor door)
+    {
+        if (OccupiesDoorway(Camera.X, Camera.Y, door))
+            return false;
+        return m_actors.All(actor => !OccupiesDoorway(actor.X, actor.Y, door));
+    }
+
+    private static bool OccupiesDoorway(double x, double y, WolfensteinDoor door)
+    {
+        var tileX = (int)Math.Floor(x);
+        var tileY = (int)Math.Floor(y);
+        if (tileX == door.X && tileY == door.Y)
+            return true;
+        return door.Orientation == DoorOrientation.Vertical
+            ? tileY == door.Y &&
+              ((int)Math.Floor(x - OriginalPlayerRadius) == door.X ||
+               (int)Math.Floor(x + OriginalPlayerRadius) == door.X)
+            : tileX == door.X &&
+              ((int)Math.Floor(y - OriginalPlayerRadius) == door.Y ||
+               (int)Math.Floor(y + OriginalPlayerRadius) == door.Y);
     }
 
     private bool CollectPickups(double x, double y)

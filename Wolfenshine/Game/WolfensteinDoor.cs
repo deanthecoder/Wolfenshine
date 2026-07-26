@@ -19,6 +19,10 @@ namespace Wolfenshine.Game;
 public sealed class WolfensteinDoor
 {
     private const double OpeningSpeed = 1.0;
+    private const double OriginalTicksPerSecond = 70.0;
+    private const double OpenDuration = 300.0 / OriginalTicksPerSecond;
+    private DoorState m_state;
+    private double m_openTime;
 
     public WolfensteinDoor(int x, int y, ushort tile)
     {
@@ -39,23 +43,75 @@ public sealed class WolfensteinDoor
     public double OpenAmount { get; private set; }
     public bool IsFullyOpen => OpenAmount >= 1.0;
     public bool IsLocked => Tile is not 90 and not 91;
-    public bool IsOpening { get; private set; }
+    public bool IsOpening => m_state == DoorState.Opening;
+    public bool IsClosing => m_state == DoorState.Closing;
 
     public bool Open()
     {
-        if (IsLocked || IsOpening || IsFullyOpen)
+        if (IsLocked || IsOpening)
             return false;
-        IsOpening = true;
+        if (m_state == DoorState.Open)
+        {
+            m_openTime = 0.0;
+            return true;
+        }
+        m_state = DoorState.Opening;
         return true;
     }
 
-    public bool Update(double elapsedSeconds)
+    public bool Operate(bool canClose)
     {
-        if (!IsOpening)
+        if (IsLocked)
             return false;
-        OpenAmount = Math.Min(1.0, OpenAmount + (OpeningSpeed * elapsedSeconds));
-        if (IsFullyOpen)
-            IsOpening = false;
+        return m_state switch
+        {
+            DoorState.Closed or DoorState.Closing => Open(),
+            DoorState.Open => Close(canClose),
+            _ => false
+        };
+    }
+
+    public bool Update(double elapsedSeconds, bool canClose = true)
+    {
+        switch (m_state)
+        {
+            case DoorState.Opening:
+                OpenAmount = Math.Min(1.0, OpenAmount + (OpeningSpeed * elapsedSeconds));
+                if (IsFullyOpen)
+                {
+                    m_state = DoorState.Open;
+                    m_openTime = 0.0;
+                }
+                return true;
+            case DoorState.Open:
+                m_openTime += elapsedSeconds;
+                return m_openTime >= OpenDuration && Close(canClose);
+            case DoorState.Closing when !canClose:
+                m_state = DoorState.Opening;
+                return true;
+            case DoorState.Closing:
+                OpenAmount = Math.Max(0.0, OpenAmount - (OpeningSpeed * elapsedSeconds));
+                if (OpenAmount == 0.0)
+                    m_state = DoorState.Closed;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private bool Close(bool canClose)
+    {
+        if (!canClose)
+            return false;
+        m_state = DoorState.Closing;
         return true;
+    }
+
+    private enum DoorState
+    {
+        Closed,
+        Opening,
+        Open,
+        Closing
     }
 }

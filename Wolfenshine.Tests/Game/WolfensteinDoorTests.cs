@@ -17,7 +17,7 @@ namespace Wolfenshine.Tests.Game;
 /// Verifies original door-tile interpretation and opening animation.
 /// </summary>
 /// <remarks>
-/// Ordinary doors can open now; lock and elevator behavior remains reserved for later gameplay work.
+/// Ordinary doors follow the original opening, waiting, obstruction, and closing cycle.
 /// </remarks>
 public sealed class WolfensteinDoorTests
 {
@@ -53,5 +53,49 @@ public sealed class WolfensteinDoorTests
 
         Assert.That(opened, Is.False);
         Assert.That(door.OpenAmount, Is.Zero);
+    }
+
+    [Test]
+    public void GivenFullyOpenDoorCheckItWaitsThreeHundredOriginalTicksBeforeClosing()
+    {
+        var door = new WolfensteinDoor(1, 2, 90);
+        door.Open();
+        door.Update(1.0);
+
+        door.Update((300.0 / 70.0) - 0.01);
+        Assert.That(door.IsClosing, Is.False);
+
+        door.Update(0.01);
+        Assert.That(door.IsClosing, Is.True);
+        door.Update(0.1);
+        Assert.That(door.OpenAmount, Is.EqualTo(0.9).Within(0.0001));
+    }
+
+    [Test]
+    public void GivenObstructedOpenDoorCheckItWaitsUntilClearBeforeClosing()
+    {
+        var door = new WolfensteinDoor(1, 2, 90);
+        door.Open();
+        door.Update(1.0);
+
+        door.Update(5.0, canClose: false);
+        Assert.That(door.IsFullyOpen, Is.True);
+
+        door.Update(0.01, canClose: true);
+        Assert.That(door.IsClosing, Is.True);
+    }
+
+    [Test]
+    public void GivenObstructionDuringClosingCheckDoorReopens()
+    {
+        var door = new WolfensteinDoor(1, 2, 90);
+        door.Open();
+        door.Update(1.0);
+        door.Update(5.0);
+        door.Update(0.2);
+
+        door.Update(0.01, canClose: false);
+
+        Assert.That(door.IsOpening, Is.True);
     }
 }

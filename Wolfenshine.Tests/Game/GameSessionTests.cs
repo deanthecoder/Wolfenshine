@@ -233,6 +233,20 @@ public sealed class GameSessionTests
         Assert.That(session.Camera.Y, Is.LessThan(2.2));
     }
 
+    [Test]
+    public void GivenPlayerInDoorwayCheckAutomaticClosingWaitsUntilPlayerLeaves()
+    {
+        var session = CreateDoorSession();
+        session.Update(0.01, new PlayerInput(false, false, false, false, true));
+        session.Update(1.0, default);
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        session.Update(5.0, default);
+
+        Assert.That(session.Doors.Items[0].IsClosing, Is.False);
+        Assert.That(session.Doors.Items[0].IsFullyOpen, Is.True);
+    }
+
     private static GameSession CreateSession()
     {
         const int size = 5;

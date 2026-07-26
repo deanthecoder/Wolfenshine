@@ -148,7 +148,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             Logger.Instance.Info(
                 $"Door ({door.X}, {door.Y}), tile {door.Tile}, orientation {door.Orientation}, " +
-                $"open {door.OpenAmount:0.000}.");
+                $"open {door.OpenAmount:0.000}, opening {door.IsOpening}, closing {door.IsClosing}.");
         }
 
         foreach (var actor in Actors.OrderBy(actor => DistanceToCamera(actor.X, actor.Y)))

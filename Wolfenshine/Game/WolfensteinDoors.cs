@@ -56,11 +56,14 @@ public sealed class WolfensteinDoors
             ? null
             : m_doorsByTile[(y * Map.Width) + x];
 
-    public bool Update(double elapsedSeconds)
+    public bool Update(double elapsedSeconds) => Update(elapsedSeconds, _ => true);
+
+    public bool Update(double elapsedSeconds, Func<WolfensteinDoor, bool> canClose)
     {
+        ArgumentNullException.ThrowIfNull(canClose);
         var changed = false;
         foreach (var door in Items)
-            changed |= door.Update(elapsedSeconds);
+            changed |= door.Update(elapsedSeconds, canClose(door));
         return changed;
     }
 }
