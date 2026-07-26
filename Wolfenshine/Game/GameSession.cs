@@ -82,6 +82,7 @@ public sealed class GameSession
     public int WeaponFrame { get; private set; }
     public int Ammo { get; private set; } = 8;
     public int Health { get; private set; } = MaximumHealth;
+    public int Lives { get; private set; } = 3;
     public int Score { get; private set; }
     public int TreasureCount { get; private set; }
     public int SecretCount { get; private set; }
@@ -284,13 +285,27 @@ public sealed class GameSession
 
             var pickupType = WolfensteinStaticObjects.GetPickupType(item.SpriteNumber);
             if (pickupType == WolfensteinPickupType.None ||
-                pickupType == WolfensteinPickupType.AmmoClip && Ammo == MaximumAmmo)
+                pickupType == WolfensteinPickupType.AmmoClip && Ammo == MaximumAmmo ||
+                pickupType is WolfensteinPickupType.Food or WolfensteinPickupType.FirstAid &&
+                Health == MaximumHealth)
             {
                 continue;
             }
 
             switch (pickupType)
             {
+                case WolfensteinPickupType.Food:
+                    Heal(10);
+                    break;
+                case WolfensteinPickupType.FirstAid:
+                    Heal(25);
+                    break;
+                case WolfensteinPickupType.FullHeal:
+                    Heal(99);
+                    GiveAmmo(25);
+                    Lives++;
+                    TreasureCount++;
+                    break;
                 case WolfensteinPickupType.AmmoClip:
                     GiveAmmo(8);
                     break;
@@ -324,6 +339,8 @@ public sealed class GameSession
         Score += points;
         TreasureCount++;
     }
+
+    private void Heal(int amount) => Health = Math.Min(MaximumHealth, Health + amount);
 
     private static (double X, double Y) Rotate(double x, double y, double angle)
     {

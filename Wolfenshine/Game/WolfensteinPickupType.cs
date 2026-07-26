@@ -16,6 +16,9 @@ namespace Wolfenshine.Game;
 public enum WolfensteinPickupType
 {
     None,
+    Food,
+    FirstAid,
+    FullHeal,
     AmmoClip,
     MachineGun,
     Chaingun,

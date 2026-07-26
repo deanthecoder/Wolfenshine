@@ -427,6 +427,53 @@ public sealed class GameSessionTests
         });
     }
 
+    [TestCase(47)]
+    [TestCase(48)]
+    public void GivenHealthPickupAfterDogBiteCheckHealthIsRestoredAndPickupRemoved(int marker)
+    {
+        var session = CreateSessionWithObjectAndDog((ushort)marker);
+        session.Update(0.0, default);
+        session.Update(10.0 / 70.0, default);
+        Assert.That(session.Health, Is.EqualTo(90));
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Health, Is.EqualTo(100));
+            Assert.That(session.StaticObjects, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void GivenFullHealPickupCheckHealthAmmoLifeAndTreasureCountAreGranted()
+    {
+        var session = CreateSessionWithObjectAndDog(56);
+        session.Update(0.0, default);
+        session.Update(10.0 / 70.0, default);
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Health, Is.EqualTo(100));
+            Assert.That(session.Ammo, Is.EqualTo(33));
+            Assert.That(session.Lives, Is.EqualTo(4));
+            Assert.That(session.TreasureCount, Is.EqualTo(1));
+            Assert.That(session.StaticObjects, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void GivenFullHealthCheckFoodRemainsForLater()
+    {
+        var session = CreateSessionWithObject(47);
+
+        session.Update(0.2, new PlayerInput(true, false, false, false));
+
+        Assert.That(session.StaticObjects, Has.Count.EqualTo(1));
+    }
+
     [Test]
     public void GivenFullAmmoCheckClipRemainsAvailable()
     {
@@ -615,6 +662,28 @@ public sealed class GameSessionTests
         objects[(1 * size) + 2] = marker;
         var map = new WolfensteinMap(0, "Decoration Collision", size, size, walls, objects);
         return new GameSession(map, RaycastCamera.FromPlayerStart(map));
+    }
+
+    private static GameSession CreateSessionWithObjectAndDog(ushort marker)
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        for (var index = 0; index < size; index++)
+        {
+            walls[index] = 1;
+            walls[((size - 1) * size) + index] = 1;
+            walls[index * size] = 1;
+            walls[(index * size) + size - 1] = 1;
+        }
+        var objects = new ushort[size * size];
+        objects[(2 * size) + 2] = 19;
+        objects[(1 * size) + 2] = marker;
+        var map = new WolfensteinMap(0, "Health Pickup", size, size, walls, objects);
+        WolfensteinActor[] actors =
+        [
+            new(3.6, 2.5, WolfensteinActorType.Dog, 2, false, false, 99)
+        ];
+        return new GameSession(map, RaycastCamera.FromPlayerStart(map), actors);
     }
 
     private static void FireShots(GameSession session, int count)

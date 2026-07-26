@@ -60,6 +60,8 @@ public static class WolfensteinStaticObjects
     /// </summary>
     public static WolfensteinPickupType GetPickupType(int spriteNumber) => spriteNumber switch
     {
+        26 => WolfensteinPickupType.Food,
+        27 => WolfensteinPickupType.FirstAid,
         28 => WolfensteinPickupType.AmmoClip,
         29 => WolfensteinPickupType.MachineGun,
         30 => WolfensteinPickupType.Chaingun,
@@ -67,6 +69,7 @@ public static class WolfensteinStaticObjects
         32 => WolfensteinPickupType.Chalice,
         33 => WolfensteinPickupType.Bible,
         34 => WolfensteinPickupType.Crown,
+        35 => WolfensteinPickupType.FullHeal,
         _ => WolfensteinPickupType.None
     };
 }

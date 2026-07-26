@@ -36,6 +36,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int m_hudScore = -1;
     private int m_hudHealth = -1;
     private int m_hudFace = -1;
+    private int m_hudLives = -1;
     private int m_actorRevision = -1;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
 
@@ -158,7 +159,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             $"plane ({Camera.PlaneX:0.000}, {Camera.PlaneY:0.000}).");
         Logger.Instance.Info(
             $"Player weapon {m_gameSession.Weapon}, frame {m_gameSession.WeaponFrame}, " +
-            $"attacking {m_gameSession.IsAttacking}, health {m_gameSession.Health}, ammo {m_gameSession.Ammo}, " +
+            $"attacking {m_gameSession.IsAttacking}, health {m_gameSession.Health}, lives {m_gameSession.Lives}, " +
+            $"ammo {m_gameSession.Ammo}, " +
             $"score {m_gameSession.Score}, treasure {m_gameSession.TreasureCount}, " +
             $"secrets {m_gameSession.SecretCount}/{m_gameSession.SecretTotal}.");
         foreach (var wall in m_gameSession.PushWalls.Items)
@@ -201,7 +203,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (m_hudGraphics == null || m_gameSession == null ||
             m_hudWeapon == m_gameSession.Weapon && m_hudAmmo == m_gameSession.Ammo &&
             m_hudScore == m_gameSession.Score && m_hudHealth == m_gameSession.Health &&
-            m_hudFace == m_gameSession.FacePictureIndex)
+            m_hudFace == m_gameSession.FacePictureIndex && m_hudLives == m_gameSession.Lives)
         {
             return;
         }
@@ -210,9 +212,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         m_hudScore = m_gameSession.Score;
         m_hudHealth = m_gameSession.Health;
         m_hudFace = m_gameSession.FacePictureIndex;
+        m_hudLives = m_gameSession.Lives;
         SetField(
             ref m_statusBar,
-            m_hudGraphics.Render(m_hudWeapon, m_hudAmmo, m_hudScore, m_hudHealth, m_hudFace),
+            m_hudGraphics.Render(
+                m_hudWeapon,
+                m_hudAmmo,
+                m_hudScore,
+                m_hudHealth,
+                m_hudFace,
+                m_hudLives),
             nameof(StatusBar));
     }
 
