@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using NUnit.Framework;
+using Wolfenshine.Audio;
 using Wolfenshine.Game;
 using Wolfenshine.Maps;
 using Wolfenshine.Rendering;
@@ -77,7 +78,6 @@ public sealed class GameSessionTests
         var session = CreateSessionWithObject((ushort)marker);
 
         session.Update(0.2, new PlayerInput(true, false, false, false));
-
         Assert.Multiple(() =>
         {
             Assert.That(session.BestWeapon, Is.EqualTo(weapon));
@@ -99,10 +99,13 @@ public sealed class GameSessionTests
         Assert.That(session.WeaponFrame, Is.EqualTo(2));
 
         session.Update(6.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
+        var sounds = session.DrainSoundEvents();
         Assert.Multiple(() =>
         {
             Assert.That(session.WeaponFrame, Is.EqualTo(3));
             Assert.That(session.Ammo, Is.EqualTo(7));
+            Assert.That(sounds, Has.One.Matches<WolfensteinSoundEvent>(sound =>
+                sound.Effect == WolfensteinSoundEffect.AttackPistol && sound.X == null && sound.Y == null));
         });
     }
 
@@ -348,13 +351,19 @@ public sealed class GameSessionTests
             2.5, 1.5, WolfensteinActorType.Guard, 3, false, false, 50));
 
         session.Update(0.0, default);
-        session.Update(20.0 / 70.0, default);
+        session.Update(40.0 / 70.0, default);
+        var sounds = session.DrainSoundEvents();
 
-        Assert.That(session.Health, Is.EqualTo(95));
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Health, Is.EqualTo(95));
+            Assert.That(sounds, Has.One.Matches<WolfensteinSoundEvent>(sound =>
+                sound.Effect == WolfensteinSoundEffect.GuardFire && sound.X == 2.5 && sound.Y == 1.5));
+        });
     }
 
-    [TestCase(WolfensteinActorType.Officer, 238, 6, 5, 286)]
-    [TestCase(WolfensteinActorType.Ss, 138, 20, 4, 185)]
+    [TestCase(WolfensteinActorType.Officer, 238, 26, 5, 287)]
+    [TestCase(WolfensteinActorType.Ss, 138, 40, 4, 186)]
     [TestCase(WolfensteinActorType.Mutant, 187, 6, 6, 235)]
     public void GivenOtherSoldierAtCloseRangeCheckItsFirstAttackFrameDamagesPlayer(
         WolfensteinActorType type,
@@ -383,7 +392,7 @@ public sealed class GameSessionTests
             2.5, 1.5, WolfensteinActorType.Ss, 3, false, false, 138));
         session.Update(0.0, default);
 
-        foreach (var ticks in new[] { 20, 20, 10, 10, 10, 10, 10 })
+        foreach (var ticks in new[] { 20, 20, 10, 10, 10, 10, 10, 10 })
             session.Update(ticks / 70.0, default);
 
         Assert.That(session.Health, Is.EqualTo(84));
@@ -398,11 +407,11 @@ public sealed class GameSessionTests
         session.Update(0.0, default);
         Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(135));
 
-        session.Update(10.0 / 70.0, default);
+        session.Update(20.0 / 70.0, default);
         Assert.Multiple(() =>
         {
             Assert.That(session.Health, Is.EqualTo(90));
-            Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(136));
+            Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(137));
         });
 
         session.Update(40.0 / 70.0, default);
@@ -469,11 +478,14 @@ public sealed class GameSessionTests
         var session = CreateSessionWithObject(49);
 
         session.Update(0.2, new PlayerInput(true, false, false, false));
+        var sounds = session.DrainSoundEvents();
 
         Assert.Multiple(() =>
         {
             Assert.That(session.Ammo, Is.EqualTo(16));
             Assert.That(session.StaticObjects, Is.Empty);
+            Assert.That(sounds, Has.One.Matches<WolfensteinSoundEvent>(sound =>
+                sound.Effect == WolfensteinSoundEffect.GetAmmo));
         });
     }
 
@@ -483,7 +495,7 @@ public sealed class GameSessionTests
     {
         var session = CreateSessionWithObjectAndDog((ushort)marker);
         session.Update(0.0, default);
-        session.Update(10.0 / 70.0, default);
+        session.Update(20.0 / 70.0, default);
         Assert.That(session.Health, Is.EqualTo(90));
 
         session.Update(0.2, new PlayerInput(true, false, false, false));
@@ -500,7 +512,7 @@ public sealed class GameSessionTests
     {
         var session = CreateSessionWithObjectAndDog(29);
         session.Update(0.0, default);
-        session.Update(10.0 / 70.0, default);
+        session.Update(20.0 / 70.0, default);
         Assert.That(session.Health, Is.EqualTo(90));
 
         session.Update(0.2, new PlayerInput(true, false, false, false));
@@ -517,7 +529,7 @@ public sealed class GameSessionTests
     {
         var session = CreateSessionWithObjectAndDog(56);
         session.Update(0.0, default);
-        session.Update(10.0 / 70.0, default);
+        session.Update(20.0 / 70.0, default);
 
         session.Update(0.2, new PlayerInput(true, false, false, false));
 
@@ -673,12 +685,15 @@ public sealed class GameSessionTests
         var session = CreateDoorSession();
 
         session.Update(0.01, new PlayerInput(false, false, false, false, true));
+        var sounds = session.DrainSoundEvents();
         session.Update(1.0, new PlayerInput(false, false, false, false, true));
         session.Update(0.5, new PlayerInput(true, false, false, false));
 
         Assert.That(session.Doors.Items, Has.Count.EqualTo(1));
         Assert.That(session.Doors.Items[0].IsFullyOpen, Is.True);
         Assert.That(session.Camera.Y, Is.LessThan(2.2));
+        Assert.That(sounds, Has.One.Matches<WolfensteinSoundEvent>(sound =>
+            sound.Effect == WolfensteinSoundEffect.OpenDoor && sound.X != null && sound.Y != null));
     }
 
     [Test]

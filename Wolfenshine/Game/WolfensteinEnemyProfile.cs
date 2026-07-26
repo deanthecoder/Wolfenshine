@@ -47,7 +47,7 @@ public sealed record WolfensteinEnemyProfile(
             WolfensteinActorType.Dog => new(1, 200, 3.2, 0.5, 10,
                 [135, 136, 137, 135, 99], [10, 10, 10, 10, 10], new HashSet<int> { 1 }),
             WolfensteinActorType.Mutant => new(mutantHealth, 700, 1.64, 0.8, 6,
-                [234, 235, 236, 237], [6, 20, 10, 20], new HashSet<int> { 1, 3 }),
+                [234, 235, 236, 237], [6, 20, 10, 20], new HashSet<int> { 0, 2 }),
             _ => throw new ArgumentOutOfRangeException(nameof(type))
         };
     }

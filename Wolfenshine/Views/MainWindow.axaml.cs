@@ -100,6 +100,7 @@ public sealed partial class MainWindow : Window
 #endif
         m_gameTimer.Stop();
         m_gameClock.Stop();
+        (DataContext as IDisposable)?.Dispose();
     }
 
 #if DEBUG

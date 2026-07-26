@@ -12,6 +12,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using DTC.Core;
+using Wolfenshine.Audio;
 using Wolfenshine.Maps;
 using Wolfenshine.Resources;
 using Wolfenshine.ViewModels;
@@ -44,6 +45,15 @@ public sealed class App : Application
                 var sprites = WolfensteinVSwapLoader.LoadSprites(resources);
                 var palette = WolfensteinPaletteLoader.Load(resources);
                 var hudGraphics = WolfensteinGraphicsLoader.LoadHudGraphics(resources);
+                WolfensteinAudioPlayer audioPlayer = null;
+                try
+                {
+                    audioPlayer = new WolfensteinAudioPlayer(WolfensteinSoundLoader.Load(resources));
+                }
+                catch (Exception exception)
+                {
+                    Logger.Instance.Warn($"Sound initialization failed; continuing without audio: {exception.Message}");
+                }
                 viewModel = new MainWindowViewModel(
                     resources,
                     maps,
@@ -51,7 +61,8 @@ public sealed class App : Application
                     palette,
                     sprites.PistolReady,
                     sprites,
-                    hudGraphics);
+                    hudGraphics,
+                    audioPlayer);
                 Logger.Instance.Info(
                     $"Loaded {viewModel.StaticObjects.Count} static world objects for {viewModel.SelectedMap.Name}.");
                 Logger.Instance.Info(

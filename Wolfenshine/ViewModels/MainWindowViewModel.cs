@@ -10,6 +10,7 @@
 
 using DTC.Core.ViewModels;
 using DTC.Core;
+using Wolfenshine.Audio;
 using Wolfenshine.Game;
 using Wolfenshine.Graphics;
 using Wolfenshine.Maps;
@@ -24,9 +25,10 @@ namespace Wolfenshine.ViewModels;
 /// <remarks>
 /// The native viewport remains 320 x 200, while its presentation size accounts for DOS-era non-square pixels.
 /// </remarks>
-public sealed class MainWindowViewModel : ViewModelBase
+public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private GameSession m_gameSession;
+    private readonly WolfensteinAudioPlayer m_audioPlayer;
     private readonly WolfensteinHudGraphics m_hudGraphics;
     private RaycastCamera m_camera;
     private WolfensteinSprite m_weaponSprite;
@@ -59,7 +61,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         WolfensteinPalette palette = null,
         WolfensteinSprite weaponSprite = null,
         WolfensteinSpriteSet sprites = null,
-        WolfensteinHudGraphics hudGraphics = null)
+        WolfensteinHudGraphics hudGraphics = null,
+        WolfensteinAudioPlayer audioPlayer = null)
     {
         ArgumentNullException.ThrowIfNull(resources);
         ArgumentNullException.ThrowIfNull(maps);
@@ -69,6 +72,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         Palette = palette;
         Sprites = sprites;
         m_hudGraphics = hudGraphics;
+        m_audioPlayer = audioPlayer;
         m_weaponSprite = weaponSprite;
         SelectedMap = maps.Maps.FirstOrDefault();
         if (SelectedMap != null)
@@ -123,6 +127,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (m_gameSession?.Update(elapsedSeconds, input) != true)
             return;
+        foreach (var soundEvent in m_gameSession.DrainSoundEvents())
+            m_audioPlayer?.Play(soundEvent, m_gameSession.Camera);
         if (m_gameSession.IsReadyForNextLevel)
             AdvanceMap();
         if (m_restartRevision != m_gameSession.RestartRevision)
@@ -149,6 +155,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         UpdateHud();
         SetField(ref m_isGameOver, m_gameSession.IsGameOver, nameof(IsGameOver));
     }
+
+    public void Dispose() => m_audioPlayer?.Dispose();
 
     private void AdvanceMap()
     {

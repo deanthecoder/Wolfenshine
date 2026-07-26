@@ -8,6 +8,7 @@
 //
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
+using Wolfenshine.Audio;
 using Wolfenshine.Maps;
 using Wolfenshine.Rendering;
 
@@ -64,6 +65,7 @@ public sealed class GameSession
     private readonly IReadOnlyList<WolfensteinActor> m_actorDefinitions;
     private IReadOnlyList<WolfensteinActorState> m_actors;
     private readonly List<WorldSprite> m_staticObjects;
+    private readonly List<WolfensteinSoundEvent> m_soundEvents = [];
 
     public GameSession(
         WolfensteinMap map,
@@ -133,6 +135,15 @@ public sealed class GameSession
             ? 21
             : Math.Min(6, (MaximumHealth - Health) / 16) * 3 + m_faceFrame;
 
+    public IReadOnlyList<WolfensteinSoundEvent> DrainSoundEvents()
+    {
+        if (m_soundEvents.Count == 0)
+            return [];
+        var events = m_soundEvents.ToArray();
+        m_soundEvents.Clear();
+        return events;
+    }
+
 #if DEBUG
     public bool ReloadDebugState()
     {
@@ -163,7 +174,10 @@ public sealed class GameSession
             return elapsedSeconds > 0.0;
         }
 
+        var doorsClosingBeforeUpdate = Doors.Items.Where(door => door.IsClosing).ToHashSet();
         var changed = Doors.Update(elapsedSeconds, CanDoorClose);
+        foreach (var door in Doors.Items.Where(door => door.IsClosing && !doorsClosingBeforeUpdate.Contains(door)))
+            PlaySound(WolfensteinSoundEffect.CloseDoor, door.X + 0.5, door.Y + 0.5);
         changed |= PushWalls.Update(elapsedSeconds, CanPushWallEnterTile);
         if (input.Use && !m_useWasDown)
             changed |= OperateAhead();
@@ -282,7 +296,16 @@ public sealed class GameSession
             var y = (int)Math.Floor(Camera.Y + (Camera.DirectionY * distance));
             var door = Doors.Get(x, y);
             if (door != null)
-                return door.Operate(CanDoorClose(door));
+            {
+                var wasOpen = door.IsFullyOpen;
+                if (!door.Operate(CanDoorClose(door)))
+                    return false;
+                PlaySound(
+                    wasOpen ? WolfensteinSoundEffect.CloseDoor : WolfensteinSoundEffect.OpenDoor,
+                    door.X + 0.5,
+                    door.Y + 0.5);
+                return true;
+            }
             if (Map.IsSolid(x, y) && !PushWalls.IsOriginalWallSuppressed(x, y))
                 return false;
         }
@@ -352,39 +375,50 @@ public sealed class GameSession
             {
                 case WolfensteinPickupType.DogFood:
                     Heal(4);
+                    PlaySound(WolfensteinSoundEffect.Health);
                     break;
                 case WolfensteinPickupType.Food:
                     Heal(10);
+                    PlaySound(WolfensteinSoundEffect.Health);
                     break;
                 case WolfensteinPickupType.FirstAid:
                     Heal(25);
+                    PlaySound(WolfensteinSoundEffect.FirstAid);
                     break;
                 case WolfensteinPickupType.FullHeal:
                     Heal(99);
                     GiveAmmo(25);
                     Lives++;
                     TreasureCount++;
+                    PlaySound(WolfensteinSoundEffect.ExtraLife);
                     break;
                 case WolfensteinPickupType.AmmoClip:
                     GiveAmmo(8);
+                    PlaySound(WolfensteinSoundEffect.GetAmmo);
                     break;
                 case WolfensteinPickupType.MachineGun:
                     GiveWeapon(PlayerWeapon.MachineGun);
+                    PlaySound(WolfensteinSoundEffect.GetMachineGun);
                     break;
                 case WolfensteinPickupType.Chaingun:
                     GiveWeapon(PlayerWeapon.Chaingun);
+                    PlaySound(WolfensteinSoundEffect.GetGatling);
                     break;
                 case WolfensteinPickupType.Cross:
                     CollectTreasure(100);
+                    PlaySound(WolfensteinSoundEffect.BonusCross);
                     break;
                 case WolfensteinPickupType.Chalice:
                     CollectTreasure(500);
+                    PlaySound(WolfensteinSoundEffect.BonusChalice);
                     break;
                 case WolfensteinPickupType.Bible:
                     CollectTreasure(1000);
+                    PlaySound(WolfensteinSoundEffect.BonusBible);
                     break;
                 case WolfensteinPickupType.Crown:
                     CollectTreasure(5000);
+                    PlaySound(WolfensteinSoundEffect.BonusCrown);
                     break;
             }
             m_staticObjects.RemoveAt(index);
@@ -486,8 +520,25 @@ public sealed class GameSession
             Ammo--;
             m_playerMadeNoise = true;
         }
+        PlaySound(Weapon switch
+        {
+            PlayerWeapon.Knife => WolfensteinSoundEffect.AttackKnife,
+            PlayerWeapon.Pistol => WolfensteinSoundEffect.AttackPistol,
+            PlayerWeapon.MachineGun => WolfensteinSoundEffect.AttackMachineGun,
+            _ => WolfensteinSoundEffect.AttackGatling
+        });
         DamageTarget(Weapon == PlayerWeapon.Knife ? 25 : 100);
     }
+
+    private void PlaySound(WolfensteinSoundEffect effect, double? x = null, double? y = null) =>
+        m_soundEvents.Add(new WolfensteinSoundEvent(effect, x, y));
+
+    private static WolfensteinSoundEffect GetEnemyAttackSound(WolfensteinActorType type) => type switch
+    {
+        WolfensteinActorType.Ss => WolfensteinSoundEffect.SsFire,
+        WolfensteinActorType.Dog => WolfensteinSoundEffect.DogAttack,
+        _ => WolfensteinSoundEffect.GuardFire
+    };
 
     private void DamageTarget(int damage)
     {
@@ -596,9 +647,11 @@ public sealed class GameSession
             if (actor.Behavior == WolfensteinActorBehavior.Shooting)
             {
                 changed |= actor.UpdateShooting(elapsedSeconds, out var fired);
-                if (fired && HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y))
+                if (fired)
                 {
-                    TakeDamage(actor.Profile.AttackDamage);
+                    PlaySound(GetEnemyAttackSound(actor.Actor.Type), actor.X, actor.Y);
+                    if (HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y))
+                        TakeDamage(actor.Profile.AttackDamage);
                 }
                 continue;
             }

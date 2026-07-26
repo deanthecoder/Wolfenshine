@@ -114,9 +114,9 @@ public sealed class WolfensteinActorState
                m_shootAnimationTime >= Profile.AttackFrameTicks[m_shootFrame] / OriginalTicksPerSecond)
         {
             m_shootAnimationTime -= Profile.AttackFrameTicks[m_shootFrame] / OriginalTicksPerSecond;
-            m_shootFrame++;
             if (Profile.FiringFrames.Contains(m_shootFrame))
                 fired = true;
+            m_shootFrame++;
             if (m_shootFrame >= Profile.AttackSprites.Count)
             {
                 Behavior = WolfensteinActorBehavior.Chasing;
