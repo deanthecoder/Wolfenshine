@@ -115,6 +115,7 @@ public static class WolfensteinSoundLoader
         stereo = new short[releaseFrames * 2];
         chip.GenerateStream(stereo);
         ConvertToMono8(stereo, samples.AsSpan(destination));
+        ApplyGain(samples, 4.0);
         return new WolfensteinSound(samples, AdLibSampleRate);
     }
 
@@ -133,6 +134,15 @@ public static class WolfensteinSoundLoader
         {
             var mixed = (stereo[frame * 2] + stereo[(frame * 2) + 1]) / 2;
             mono[frame] = (byte)Math.Clamp(128 + (mixed >> 8), byte.MinValue, byte.MaxValue);
+        }
+    }
+
+    private static void ApplyGain(Span<byte> samples, double gain)
+    {
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var amplified = 128 + ((samples[index] - 128) * gain);
+            samples[index] = (byte)Math.Clamp(amplified, byte.MinValue, byte.MaxValue);
         }
     }
 
