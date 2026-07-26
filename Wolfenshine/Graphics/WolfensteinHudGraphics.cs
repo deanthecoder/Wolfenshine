@@ -27,7 +27,7 @@ public sealed class WolfensteinHudGraphics
     private readonly WolfensteinGraphic m_noKey;
     private readonly WolfensteinGraphic m_blankDigit;
     private readonly IReadOnlyList<WolfensteinGraphic> m_digits;
-    private readonly WolfensteinGraphic m_healthyFace;
+    private readonly IReadOnlyList<WolfensteinGraphic> m_faces;
 
     public WolfensteinHudGraphics(
         WolfensteinGraphic background,
@@ -35,35 +35,38 @@ public sealed class WolfensteinHudGraphics
         WolfensteinGraphic noKey,
         WolfensteinGraphic blankDigit,
         IReadOnlyList<WolfensteinGraphic> digits,
-        WolfensteinGraphic healthyFace)
+        IReadOnlyList<WolfensteinGraphic> faces)
     {
         ArgumentNullException.ThrowIfNull(background);
         ArgumentNullException.ThrowIfNull(weaponIcons);
         ArgumentNullException.ThrowIfNull(noKey);
         ArgumentNullException.ThrowIfNull(blankDigit);
         ArgumentNullException.ThrowIfNull(digits);
-        ArgumentNullException.ThrowIfNull(healthyFace);
+        ArgumentNullException.ThrowIfNull(faces);
         if (background.Width != Width || background.Height != Height)
             throw new ArgumentException("The HUD background must be 320 x 40.", nameof(background));
         if (weaponIcons.Count != 4)
             throw new ArgumentException("The HUD requires four weapon icons.", nameof(weaponIcons));
         if (digits.Count != 10)
             throw new ArgumentException("The HUD requires ten digit pictures.", nameof(digits));
+        if (faces.Count != 23)
+            throw new ArgumentException("The HUD requires 21 health faces, the dead face, and the chaingun grin.", nameof(faces));
         m_background = background;
         m_weaponIcons = weaponIcons;
         m_noKey = noKey;
         m_blankDigit = blankDigit;
         m_digits = digits;
-        m_healthyFace = healthyFace;
+        m_faces = faces;
     }
 
-    public WolfensteinGraphic Render(PlayerWeapon weapon, int ammo, int score, int health)
+    public WolfensteinGraphic Render(PlayerWeapon weapon, int ammo, int score, int health, int facePictureIndex = 0)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(ammo);
         ArgumentOutOfRangeException.ThrowIfNegative(score);
         ArgumentOutOfRangeException.ThrowIfNegative(health);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(facePictureIndex, m_faces.Count);
         var indices = CopyIndices(m_background);
-        DrawPicture(indices, m_healthyFace, 17 * 8, 4);
+        DrawPicture(indices, m_faces[facePictureIndex], 17 * 8, 4);
         DrawPicture(indices, m_weaponIcons[(int)weapon], 32 * 8, 8);
         DrawPicture(indices, m_noKey, 30 * 8, 4);
         DrawPicture(indices, m_noKey, 30 * 8, 20);

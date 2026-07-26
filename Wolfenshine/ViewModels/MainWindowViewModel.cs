@@ -35,6 +35,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int m_hudAmmo = -1;
     private int m_hudScore = -1;
     private int m_hudHealth = -1;
+    private int m_hudFace = -1;
     private int m_actorRevision = -1;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
 
@@ -173,9 +174,10 @@ public sealed class MainWindowViewModel : ViewModelBase
                 $"open {door.OpenAmount:0.000}, opening {door.IsOpening}, closing {door.IsClosing}.");
         }
 
-        foreach (var actor in Actors.OrderBy(actor => DistanceToCamera(actor.X, actor.Y)))
+        foreach (var actorState in m_gameSession.Actors.OrderBy(actor => DistanceToCamera(actor.X, actor.Y)))
         {
-            WorldSprite[] sprite = [actor.ToWorldSprite()];
+            var actor = actorState.Actor;
+            WorldSprite[] sprite = [actorState.ToWorldSprite()];
             var projected = new ProjectedWorldSprite[1];
             var projectedCount = WorldSpriteProjector.Project(sprite, Camera, 320, 160, 200, projected);
             var projection = projectedCount == 0
@@ -186,7 +188,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 .Where(item => Math.Abs(item.X - actor.X) <= 2.0 && Math.Abs(item.Y - actor.Y) <= 2.0)
                 .Select(item => $"{item.SpriteNumber}@({item.X:0.0},{item.Y:0.0})");
             Logger.Instance.Info(
-                $"Actor {actor.Type} at ({actor.X:0.0}, {actor.Y:0.0}), distance {DistanceToCamera(actor.X, actor.Y):0.000}, " +
+                $"Actor {actor.Type} at ({actorState.X:0.0}, {actorState.Y:0.0}), " +
+                $"distance {DistanceToCamera(actorState.X, actorState.Y):0.000}, behavior {actorState.Behavior}, " +
                 $"direction {actor.Direction}, base sprite {actor.BaseSpriteNumber}, patrol {actor.IsPatrolling}, " +
                 $"ambush {actor.IsAmbush}; {projection}; nearby decorations [{string.Join(", ", nearbyDecorations)}].");
         }
@@ -197,7 +200,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (m_hudGraphics == null || m_gameSession == null ||
             m_hudWeapon == m_gameSession.Weapon && m_hudAmmo == m_gameSession.Ammo &&
-            m_hudScore == m_gameSession.Score && m_hudHealth == m_gameSession.Health)
+            m_hudScore == m_gameSession.Score && m_hudHealth == m_gameSession.Health &&
+            m_hudFace == m_gameSession.FacePictureIndex)
         {
             return;
         }
@@ -205,9 +209,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         m_hudAmmo = m_gameSession.Ammo;
         m_hudScore = m_gameSession.Score;
         m_hudHealth = m_gameSession.Health;
+        m_hudFace = m_gameSession.FacePictureIndex;
         SetField(
             ref m_statusBar,
-            m_hudGraphics.Render(m_hudWeapon, m_hudAmmo, m_hudScore, m_hudHealth),
+            m_hudGraphics.Render(m_hudWeapon, m_hudAmmo, m_hudScore, m_hudHealth, m_hudFace),
             nameof(StatusBar));
     }
 

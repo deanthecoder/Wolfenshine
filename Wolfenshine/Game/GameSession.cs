@@ -38,12 +38,20 @@ public sealed class GameSession
     private const double MaximumMovementStep = 0.1;
     private const int CombatViewportWidth = 320;
     private const int CrosshairHalfWidth = 20;
+    private const double GuardChaseSpeed = 1.64;
+    private const double MinimumShootingDistance = 0.75;
     private bool m_useWasDown;
     private bool m_attackWasDown;
     private int m_attackStep;
     private double m_attackTimeRemaining;
     private PlayerWeapon m_chosenWeapon = PlayerWeapon.Pistol;
     private PlayerWeapon m_bestWeapon = PlayerWeapon.Pistol;
+    private bool m_playerMadeNoise;
+    private double m_faceTime;
+    private double m_nextFaceChange = 1.0;
+    private double m_chaingunGrinTime;
+    private int m_faceFrame;
+    private uint m_randomState = 0x5f3759df;
     private readonly IReadOnlyList<WolfensteinActorState> m_actors;
     private readonly List<WorldSprite> m_staticObjects;
 
@@ -79,7 +87,13 @@ public sealed class GameSession
     public bool IsAttacking { get; private set; }
     public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
     public IReadOnlyList<WorldSprite> ActorSprites => m_actors.Select(actor => actor.ToWorldSprite()).ToArray();
+    public IReadOnlyList<WolfensteinActorState> Actors => m_actors;
     public int ActorRevision { get; private set; }
+    public int FacePictureIndex => m_chaingunGrinTime > 0.0
+        ? 22
+        : Health == 0
+            ? 21
+            : Math.Min(6, (MaximumHealth - Health) / 16) * 3 + m_faceFrame;
 
 #if DEBUG
     public bool ReloadDebugState()
@@ -101,18 +115,12 @@ public sealed class GameSession
 
         var changed = Doors.Update(elapsedSeconds, CanDoorClose);
         changed |= PushWalls.Update(elapsedSeconds, CanPushWallEnterTile);
-        var actorsChanged = false;
-        foreach (var actor in m_actors)
-            actorsChanged |= actor.Update(elapsedSeconds);
-        if (actorsChanged)
-        {
-            ActorRevision++;
-            changed = true;
-        }
         if (input.Use && !m_useWasDown)
             changed |= OperateAhead();
         m_useWasDown = input.Use;
         changed |= UpdateWeapon(elapsedSeconds, input);
+        changed |= UpdateActors(elapsedSeconds);
+        changed |= UpdateFace(elapsedSeconds);
         changed |= CollectPickups(Camera.X, Camera.Y);
 
         var horizontal = (input.TurnRight ? 1.0 : 0.0) - (input.TurnLeft ? 1.0 : 0.0);
@@ -183,8 +191,8 @@ public sealed class GameSession
         // Wolf3D uses an axis-aligned one-tile exclusion box around every shootable actor.
         return m_actors.All(actor =>
             actor.IsDead ||
-            Math.Abs(x - actor.Actor.X) > MinimumActorDistance ||
-            Math.Abs(y - actor.Actor.Y) > MinimumActorDistance);
+            Math.Abs(x - actor.X) > MinimumActorDistance ||
+            Math.Abs(y - actor.Y) > MinimumActorDistance);
     }
 
     private bool IsSolid(int x, int y)
@@ -238,14 +246,14 @@ public sealed class GameSession
             return false;
         }
         return m_actors.All(actor => actor.IsDead ||
-            (int)Math.Floor(actor.Actor.X) != x || (int)Math.Floor(actor.Actor.Y) != y);
+            (int)Math.Floor(actor.X) != x || (int)Math.Floor(actor.Y) != y);
     }
 
     private bool CanDoorClose(WolfensteinDoor door)
     {
         if (OccupiesDoorway(Camera.X, Camera.Y, door))
             return false;
-        return m_actors.All(actor => actor.IsDead || !OccupiesDoorway(actor.Actor.X, actor.Actor.Y, door));
+        return m_actors.All(actor => actor.IsDead || !OccupiesDoorway(actor.X, actor.Y, door));
     }
 
     private static bool OccupiesDoorway(double x, double y, WolfensteinDoor door)
@@ -396,7 +404,10 @@ public sealed class GameSession
         if (Weapon != PlayerWeapon.Knife && Ammo == 0)
             return;
         if (Weapon != PlayerWeapon.Knife)
+        {
             Ammo--;
+            m_playerMadeNoise = true;
+        }
         DamageTarget(Weapon == PlayerWeapon.Knife ? 25 : 100);
     }
 
@@ -457,11 +468,240 @@ public sealed class GameSession
     private void GiveWeapon(PlayerWeapon weapon)
     {
         GiveAmmo(6);
+        if (weapon == PlayerWeapon.Chaingun)
+            m_chaingunGrinTime = 1.0;
         if (weapon <= m_bestWeapon)
             return;
         m_bestWeapon = weapon;
         m_chosenWeapon = weapon;
         Weapon = weapon;
         WeaponFrame = 0;
+    }
+
+    private bool UpdateFace(double elapsedSeconds)
+    {
+        if (m_chaingunGrinTime > 0.0)
+        {
+            m_chaingunGrinTime = Math.Max(0.0, m_chaingunGrinTime - elapsedSeconds);
+            return elapsedSeconds > 0.0;
+        }
+        if (Health == 0)
+            return false;
+        m_faceTime += elapsedSeconds;
+        if (m_faceTime < m_nextFaceChange)
+            return false;
+        m_faceTime = 0.0;
+        var random = NextRandomByte();
+        m_faceFrame = random >> 6;
+        if (m_faceFrame == 3)
+            m_faceFrame = 1;
+        m_nextFaceChange = (NextRandomByte() + 1.0) / OriginalTicksPerSecond;
+        return true;
+    }
+
+    private byte NextRandomByte()
+    {
+        m_randomState ^= m_randomState << 13;
+        m_randomState ^= m_randomState >> 17;
+        m_randomState ^= m_randomState << 5;
+        return (byte)m_randomState;
+    }
+
+    private bool UpdateActors(double elapsedSeconds)
+    {
+        var changed = false;
+        foreach (var actor in m_actors)
+        {
+            changed |= actor.Update(elapsedSeconds);
+            if (actor.IsDead || actor.Actor.Type != WolfensteinActorType.Guard)
+                continue;
+            if (actor.Behavior == WolfensteinActorBehavior.Shooting)
+            {
+                changed |= actor.UpdateShooting(elapsedSeconds, out var fired);
+                if (fired && HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y))
+                    TakeDamage(5);
+                continue;
+            }
+
+            if (actor.Behavior == WolfensteinActorBehavior.Dormant)
+            {
+                var canHear = m_playerMadeNoise && !actor.Actor.IsAmbush && HasOpenPath(actor.X, actor.Y);
+                if (!canHear && !CanSeePlayer(actor))
+                    continue;
+                changed |= actor.Alert();
+            }
+
+            actor.AttackCooldown = Math.Max(0.0, actor.AttackCooldown - elapsedSeconds);
+            var distance = Math.Sqrt(
+                Math.Pow(Camera.X - actor.X, 2.0) +
+                Math.Pow(Camera.Y - actor.Y, 2.0));
+            if (distance >= MinimumShootingDistance && actor.AttackCooldown == 0.0 &&
+                HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y))
+            {
+                actor.AttackCooldown = 1.0;
+                changed |= actor.BeginShooting();
+                continue;
+            }
+            changed |= MoveActorTowardPlayer(actor, elapsedSeconds);
+        }
+        if (changed)
+            ActorRevision++;
+        return changed;
+    }
+
+    private bool CanSeePlayer(WolfensteinActorState actor)
+    {
+        var deltaX = Camera.X - actor.X;
+        var deltaY = Camera.Y - actor.Y;
+        if (Math.Abs(deltaX) >= 1.5 || Math.Abs(deltaY) >= 1.5)
+        {
+            var facing = actor.Direction switch
+            {
+                0 => (X: 1.0, Y: 0.0),
+                1 => (X: 0.0, Y: -1.0),
+                2 => (X: -1.0, Y: 0.0),
+                _ => (X: 0.0, Y: 1.0)
+            };
+            if ((deltaX * facing.X) + (deltaY * facing.Y) <= 0.0)
+                return false;
+        }
+        return HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y);
+    }
+
+    private bool HasLineOfSight(double fromX, double fromY, double toX, double toY)
+    {
+        var deltaX = toX - fromX;
+        var deltaY = toY - fromY;
+        var steps = Math.Max(1, (int)Math.Ceiling(Math.Max(Math.Abs(deltaX), Math.Abs(deltaY)) * 10.0));
+        for (var step = 1; step < steps; step++)
+        {
+            var x = (int)Math.Floor(fromX + (deltaX * step / steps));
+            var y = (int)Math.Floor(fromY + (deltaY * step / steps));
+            if (IsSolid(x, y))
+                return false;
+        }
+        return true;
+    }
+
+    private bool HasOpenPath(double actorX, double actorY) =>
+        FindNextPathTile((int)actorX, (int)actorY, allowClosedDoors: false) != null;
+
+    private bool MoveActorTowardPlayer(WolfensteinActorState actor, double elapsedSeconds)
+    {
+        var next = actor.PathTarget;
+        if (next == null)
+        {
+            var currentX = (int)Math.Floor(actor.X);
+            var currentY = (int)Math.Floor(actor.Y);
+            next = FindNextPathTile(currentX, currentY, allowClosedDoors: true);
+            if (next == null)
+                return false;
+            actor.SetPathTarget(next.Value.X, next.Value.Y);
+        }
+        var door = Doors.Get(next.Value.X, next.Value.Y);
+        if (door != null && !door.IsFullyOpen)
+            return door.Open();
+        var targetX = next.Value.X + 0.5;
+        var targetY = next.Value.Y + 0.5;
+        var deltaX = targetX - actor.X;
+        var deltaY = targetY - actor.Y;
+        var distance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+        if (distance <= double.Epsilon)
+            return false;
+        var travel = Math.Min(distance, GuardChaseSpeed * elapsedSeconds);
+        var stepCount = Math.Max(1, (int)Math.Ceiling(travel / MaximumMovementStep));
+        var stepX = deltaX / distance * travel / stepCount;
+        var stepY = deltaY / distance * travel / stepCount;
+        var x = actor.X;
+        var y = actor.Y;
+        var moved = false;
+        for (var step = 0; step < stepCount; step++)
+        {
+            var nextX = x + stepX;
+            var nextY = y + stepY;
+            if (!CanActorOccupy(actor, nextX, nextY))
+                break;
+            x = nextX;
+            y = nextY;
+            moved = true;
+        }
+        if (!moved)
+            return false;
+        var direction = Math.Abs(deltaX) > Math.Abs(deltaY)
+            ? deltaX > 0.0 ? 0 : 2
+            : deltaY < 0.0 ? 1 : 3;
+        actor.MoveTo(x, y, direction, elapsedSeconds);
+        if (Math.Abs(x - targetX) < 0.0001 && Math.Abs(y - targetY) < 0.0001)
+            actor.ClearPathTarget();
+        return true;
+    }
+
+    private bool CanActorOccupy(WolfensteinActorState movingActor, double x, double y)
+    {
+        if (IsSolid((int)Math.Floor(x), (int)Math.Floor(y)) ||
+            Math.Abs(x - Camera.X) <= MinimumActorDistance &&
+            Math.Abs(y - Camera.Y) <= MinimumActorDistance)
+        {
+            return false;
+        }
+        return m_actors.All(actor => ReferenceEquals(actor, movingActor) || actor.IsDead ||
+            Math.Abs(x - actor.X) > MinimumActorDistance ||
+            Math.Abs(y - actor.Y) > MinimumActorDistance);
+    }
+
+    private (int X, int Y)? FindNextPathTile(int startX, int startY, bool allowClosedDoors)
+    {
+        var targetX = (int)Math.Floor(Camera.X);
+        var targetY = (int)Math.Floor(Camera.Y);
+        if (startX == targetX && startY == targetY)
+            return null;
+        var visited = new bool[Map.Width * Map.Height];
+        var previous = new (int X, int Y)?[visited.Length];
+        var queue = new Queue<(int X, int Y)>();
+        queue.Enqueue((startX, startY));
+        visited[(startY * Map.Width) + startX] = true;
+        (int X, int Y)[] directions = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var direction in directions)
+            {
+                var next = (X: current.X + direction.X, Y: current.Y + direction.Y);
+                if (next.X < 0 || next.X >= Map.Width || next.Y < 0 || next.Y >= Map.Height)
+                    continue;
+                var index = (next.Y * Map.Width) + next.X;
+                if (visited[index] || !CanActorPathThrough(next.X, next.Y, allowClosedDoors))
+                    continue;
+                visited[index] = true;
+                previous[index] = current;
+                if (next.X == targetX && next.Y == targetY)
+                {
+                    while (previous[(next.Y * Map.Width) + next.X] is { } parent &&
+                           (parent.X != startX || parent.Y != startY))
+                    {
+                        next = parent;
+                    }
+                    return next;
+                }
+                queue.Enqueue(next);
+            }
+        }
+        return null;
+    }
+
+    private bool CanActorPathThrough(int x, int y, bool allowClosedDoors)
+    {
+        var door = Doors.Get(x, y);
+        if (door != null)
+            return !door.IsLocked && (allowClosedDoors || door.IsFullyOpen);
+        return !Map.IsSolid(x, y) && !PushWalls.IsTileReserved(x, y) &&
+               !WolfensteinStaticObjects.BlocksMovement(Map.GetObject(x, y));
+    }
+
+    private void TakeDamage(int damage)
+    {
+        if (Health == 0)
+            return;
+        Health = Math.Max(0, Health - damage);
     }
 }

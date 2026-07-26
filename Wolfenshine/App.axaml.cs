@@ -55,7 +55,7 @@ public sealed class App : Application
                 Logger.Instance.Info(
                     $"Loaded {viewModel.StaticObjects.Count} static world objects for {viewModel.SelectedMap.Name}.");
                 Logger.Instance.Info(
-                    $"Placed {viewModel.Actors.Count} inert actors for {viewModel.SelectedMap.Name} on normal difficulty.");
+                    $"Placed {viewModel.Actors.Count} actors for {viewModel.SelectedMap.Name} on normal difficulty.");
             }
             catch (WolfensteinDataNotFoundException exception)
             {

@@ -24,6 +24,9 @@ public sealed class WolfensteinActorState
     private double m_animationTime;
     private int m_deathFrame;
     private bool m_isHurt;
+    private double m_walkAnimationTime;
+    private double m_shootAnimationTime;
+    private int m_shootFrame;
 
     public WolfensteinActorState(WolfensteinActor actor)
     {
@@ -38,21 +41,92 @@ public sealed class WolfensteinActorState
             _ => throw new ArgumentOutOfRangeException(nameof(actor))
         };
         CurrentSpriteNumber = actor.BaseSpriteNumber;
+        X = actor.X;
+        Y = actor.Y;
+        Direction = actor.Direction;
     }
 
     public WolfensteinActor Actor { get; }
     public int HitPoints { get; private set; }
     public int Score { get; }
     public int CurrentSpriteNumber { get; private set; }
+    public double X { get; private set; }
+    public double Y { get; private set; }
+    public int Direction { get; private set; }
+    public WolfensteinActorBehavior Behavior { get; private set; }
+    public double AttackCooldown { get; set; }
+    public (int X, int Y)? PathTarget { get; private set; }
     public bool IsDead => HitPoints == 0;
     public bool IsHurt => m_isHurt;
     public bool IsDeathAnimationComplete => IsDead && m_deathFrame == m_deathSprites.Length - 1;
 
     public WorldSprite ToWorldSprite() => new(
-        Actor.X,
-        Actor.Y,
+        X,
+        Y,
         CurrentSpriteNumber,
-        IsDead ? -1 : Actor.Direction);
+        IsDead || Behavior == WolfensteinActorBehavior.Shooting ? -1 : Direction);
+
+    public bool Alert()
+    {
+        if (IsDead || Behavior != WolfensteinActorBehavior.Dormant)
+            return false;
+        Behavior = WolfensteinActorBehavior.Chasing;
+        CurrentSpriteNumber = GetWalkingSprite(0);
+        return true;
+    }
+
+    public void MoveTo(double x, double y, int direction, double elapsedSeconds)
+    {
+        X = x;
+        Y = y;
+        Direction = direction;
+        m_walkAnimationTime += elapsedSeconds;
+        var frame = (int)(m_walkAnimationTime / (10.0 / OriginalTicksPerSecond)) % 4;
+        CurrentSpriteNumber = GetWalkingSprite(frame);
+    }
+
+    public void SetPathTarget(int x, int y) => PathTarget = (x, y);
+
+    public void ClearPathTarget() => PathTarget = null;
+
+    public bool BeginShooting()
+    {
+        if (IsDead || Behavior == WolfensteinActorBehavior.Shooting)
+            return false;
+        Behavior = WolfensteinActorBehavior.Shooting;
+        m_shootAnimationTime = 0.0;
+        m_shootFrame = 0;
+        CurrentSpriteNumber = GetShootingSprite(0);
+        return true;
+    }
+
+    public bool UpdateShooting(double elapsedSeconds, out bool fired)
+    {
+        fired = false;
+        if (Behavior != WolfensteinActorBehavior.Shooting)
+            return false;
+        m_shootAnimationTime += elapsedSeconds;
+        var changed = false;
+        while (m_shootAnimationTime >= 20.0 / OriginalTicksPerSecond &&
+               Behavior == WolfensteinActorBehavior.Shooting)
+        {
+            m_shootAnimationTime -= 20.0 / OriginalTicksPerSecond;
+            m_shootFrame++;
+            if (m_shootFrame == 1)
+                fired = true;
+            if (m_shootFrame >= 3)
+            {
+                Behavior = WolfensteinActorBehavior.Chasing;
+                CurrentSpriteNumber = GetWalkingSprite(0);
+            }
+            else
+            {
+                CurrentSpriteNumber = GetShootingSprite(m_shootFrame);
+            }
+            changed = true;
+        }
+        return changed;
+    }
 
     public bool Damage(int amount)
     {
@@ -75,6 +149,7 @@ public sealed class WolfensteinActorState
             return true;
         }
         m_isHurt = false;
+        Behavior = WolfensteinActorBehavior.Dead;
         m_deathFrame = 0;
         m_animationTime = 0.0;
         CurrentSpriteNumber = m_deathSprites[0];
@@ -105,4 +180,23 @@ public sealed class WolfensteinActorState
         }
         return changed;
     }
+
+    private int GetWalkingSprite(int frame) => Actor.Type switch
+    {
+        WolfensteinActorType.Guard => 58 + (frame * 8),
+        WolfensteinActorType.Officer => 246 + (frame * 8),
+        WolfensteinActorType.Ss => 146 + (frame * 8),
+        WolfensteinActorType.Dog => 99 + (frame * 8),
+        WolfensteinActorType.Mutant => 195 + (frame * 8),
+        _ => Actor.BaseSpriteNumber
+    };
+
+    private int GetShootingSprite(int frame) => Actor.Type switch
+    {
+        WolfensteinActorType.Guard => 96 + frame,
+        WolfensteinActorType.Officer => 285 + frame,
+        WolfensteinActorType.Ss => 184 + frame,
+        WolfensteinActorType.Mutant => 234 + Math.Min(frame, 3),
+        _ => Actor.BaseSpriteNumber
+    };
 }

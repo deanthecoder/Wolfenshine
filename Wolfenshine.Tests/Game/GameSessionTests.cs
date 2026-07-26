@@ -84,6 +84,8 @@ public sealed class GameSessionTests
             Assert.That(session.Weapon, Is.EqualTo(weapon));
             Assert.That(session.Ammo, Is.EqualTo(14));
             Assert.That(session.StaticObjects, Is.Empty);
+            Assert.That(session.FacePictureIndex, Is.EqualTo(
+                weapon == PlayerWeapon.Chaingun ? 22 : 0));
         });
     }
 
@@ -291,6 +293,93 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenGuardFacingPlayerCheckItBecomesAlertedBySight()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 1.5, WolfensteinActorType.Guard, 3, false, false, 50));
+
+        session.Update(0.0, default);
+
+        Assert.That(session.Actors[0].Behavior, Is.Not.EqualTo(WolfensteinActorBehavior.Dormant));
+    }
+
+    [Test]
+    public void GivenGunfireBehindGuardCheckSoundAlertsIt()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 4.5, WolfensteinActorType.Guard, 3, false, false, 50));
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        session.Update(12.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
+
+        Assert.That(session.Actors[0].Behavior, Is.Not.EqualTo(WolfensteinActorBehavior.Dormant));
+    }
+
+    [Test]
+    public void GivenGunfireBehindAmbushGuardCheckItStillRequiresSight()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 4.5, WolfensteinActorType.Guard, 3, false, true, 50));
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        session.Update(12.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
+
+        Assert.That(session.Actors[0].Behavior, Is.EqualTo(WolfensteinActorBehavior.Dormant));
+    }
+
+    [Test]
+    public void GivenAlertGuardFiresCheckPlayerTakesDamage()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 1.5, WolfensteinActorType.Guard, 3, false, false, 50));
+
+        session.Update(0.0, default);
+        session.Update(20.0 / 70.0, default);
+
+        Assert.That(session.Health, Is.EqualTo(95));
+    }
+
+    [Test]
+    public void GivenChasingGuardAtCloseRangeCheckItCannotOverlapPlayer()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 1.5, WolfensteinActorType.Guard, 3, false, false, 50));
+        var guard = session.Actors[0];
+        guard.Alert();
+        guard.AttackCooldown = 10.0;
+
+        session.Update(2.0, default);
+
+        Assert.That(Math.Abs(guard.Y - session.Camera.Y), Is.GreaterThanOrEqualTo(1.0));
+
+        session.Update(0.2, new PlayerInput(false, true, false, false));
+        Assert.That(session.Camera.Y, Is.GreaterThan(2.5));
+    }
+
+    [Test]
+    public void GivenAlertGuardBehindClosedDoorCheckItOpensDoorToChasePlayer()
+    {
+        const int width = 7;
+        const int height = 5;
+        var walls = Enumerable.Repeat((ushort)1, width * height).ToArray();
+        for (var x = 1; x <= 5; x++)
+            walls[(2 * width) + x] = 107;
+        walls[(2 * width) + 3] = 90;
+        var map = new WolfensteinMap(0, "Guard Door", width, height, walls, new ushort[width * height]);
+        var actor = new WolfensteinActor(5.5, 2.5, WolfensteinActorType.Guard, 2, false, false, 50);
+        var session = new GameSession(
+            map,
+            new RaycastCamera(1.5, 2.5, 1.0, 0.0, 0.0, 0.66),
+            new[] { actor });
+        session.Actors[0].Alert();
+
+        session.Update(1.0, default);
+        session.Update(0.1, default);
+
+        Assert.That(session.Doors.Items[0].IsOpening, Is.True);
+    }
+
+    [Test]
     public void GivenBlockingDecorationAheadCheckPlayerCannotWalkThroughItsTile()
     {
         var session = CreateSessionWithObject(31);
@@ -450,7 +539,7 @@ public sealed class GameSessionTests
 
     private static GameSession CreateSessionWithActor(WolfensteinActor actor)
     {
-        const int size = 5;
+        const int size = 7;
         var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
         for (var i = 0; i < size; i++)
         {

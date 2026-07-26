@@ -34,9 +34,9 @@ public sealed class WolfensteinHudGraphicsTests
             CreateGraphic(1, 1, 1),
             CreateGraphic(8, 16, 2),
             digits,
-            CreateGraphic(1, 1, 3));
+            Enumerable.Range(0, 23).Select(index => CreateGraphic(1, 1, (byte)(40 + index))).ToArray());
 
-        var rendered = hud.Render(PlayerWeapon.Chaingun, 42, 1234, 87);
+        var rendered = hud.Render(PlayerWeapon.Chaingun, 42, 1234, 87, 22);
 
         Assert.Multiple(() =>
         {
@@ -47,6 +47,7 @@ public sealed class WolfensteinHudGraphicsTests
             Assert.That(rendered.GetIndex(11 * 8, 16), Is.EqualTo(24));
             Assert.That(rendered.GetIndex(22 * 8, 16), Is.EqualTo(28));
             Assert.That(rendered.GetIndex(23 * 8, 16), Is.EqualTo(27));
+            Assert.That(rendered.GetIndex(17 * 8, 4), Is.EqualTo(62));
         });
     }
 

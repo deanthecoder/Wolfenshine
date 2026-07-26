@@ -30,7 +30,8 @@ public static class WolfensteinGraphicsLoader
     private const int NoKeyPictureOffset = 9;
     private const int BlankDigitPictureOffset = 12;
     private const int ZeroDigitPictureOffset = 13;
-    private const int HealthyFacePictureOffset = 23;
+    private const int FirstFacePictureOffset = 23;
+    private const int FacePictureCount = 23;
 
     public static WolfensteinHudGraphics LoadHudGraphics(WolfensteinResources resources)
     {
@@ -62,9 +63,11 @@ public static class WolfensteinGraphicsLoader
             var digits = Enumerable.Range(ZeroDigitPictureOffset, 10)
                 .Select(relativeChunk => ReadPicture(reader, offsets, dictionary, pictures, chunk + relativeChunk))
                 .ToArray();
-            var healthyFace = ReadPicture(reader, offsets, dictionary, pictures, chunk + HealthyFacePictureOffset);
+            var faces = Enumerable.Range(FirstFacePictureOffset, FacePictureCount)
+                .Select(relativeChunk => ReadPicture(reader, offsets, dictionary, pictures, chunk + relativeChunk))
+                .ToArray();
             Logger.Instance.Info($"Loaded {width} x {height} HUD graphics from VGAGRAPH chunk {chunk}.");
-            return new WolfensteinHudGraphics(statusBar, weaponIcons, noKey, blankDigit, digits, healthyFace);
+            return new WolfensteinHudGraphics(statusBar, weaponIcons, noKey, blankDigit, digits, faces);
         }
 
         throw new InvalidDataException("VGAGRAPH.WL6 does not contain a 320 x 40 status-bar picture.");
