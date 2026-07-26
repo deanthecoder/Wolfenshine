@@ -860,6 +860,21 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenDeadEnemyInDoorwayCheckAutomaticClosingWaitsUntilClear()
+    {
+        var actor = new WolfensteinActor(2.5, 2.5, WolfensteinActorType.Guard, 0, false, false, 50);
+        var session = CreateDoorSession([actor]);
+        session.Actors[0].Damage(session.Actors[0].HitPoints);
+        session.Update(0.01, new PlayerInput(false, false, false, false, true));
+        session.Update(1.0, default);
+
+        session.Update(5.0, default);
+
+        Assert.That(session.Doors.Items[0].IsClosing, Is.False);
+        Assert.That(session.Doors.Items[0].IsFullyOpen, Is.True);
+    }
+
+    [Test]
     public void GivenPushwallAheadCheckUseActivatesItAndCountsSecret()
     {
         var session = CreatePushWallSession();
@@ -966,7 +981,7 @@ public sealed class GameSessionTests
             new RaycastCamera(2.5, 2.5, directionX, directionY, planeX, planeY));
     }
 
-    private static GameSession CreateDoorSession()
+    private static GameSession CreateDoorSession(WolfensteinActor[] actors = null)
     {
         const int size = 5;
         var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
@@ -984,7 +999,10 @@ public sealed class GameSessionTests
         var objects = new ushort[size * size];
         objects[(3 * size) + 2] = 19;
         var map = new WolfensteinMap(0, "Door Map", size, size, walls, objects);
-        return new GameSession(map, RaycastCamera.FromPlayerStart(map));
+        return new GameSession(
+            map,
+            RaycastCamera.FromPlayerStart(map),
+            actors);
     }
 
     private static GameSession CreateSessionWithActor(

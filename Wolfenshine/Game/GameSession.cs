@@ -403,7 +403,7 @@ public sealed class GameSession
     {
         if (OccupiesDoorway(Camera.X, Camera.Y, door))
             return false;
-        return m_actors.All(actor => actor.IsDead || !OccupiesDoorway(actor.X, actor.Y, door));
+        return m_actors.All(actor => !OccupiesDoorway(actor.X, actor.Y, door));
     }
 
     private static bool OccupiesDoorway(double x, double y, WolfensteinDoor door)
