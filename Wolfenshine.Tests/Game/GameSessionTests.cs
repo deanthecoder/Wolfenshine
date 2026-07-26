@@ -252,9 +252,15 @@ public sealed class GameSessionTests
         var session = CreateSession();
 
         session.Update(1.0, new PlayerInput(true, false, false, false));
+        var sounds = session.DrainSoundEvents();
 
-        Assert.That(session.Camera.Y, Is.GreaterThanOrEqualTo(1.19));
-        Assert.That(session.Camera.Y, Is.LessThan(1.31));
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Camera.Y, Is.GreaterThanOrEqualTo(1.19));
+            Assert.That(session.Camera.Y, Is.LessThan(1.31));
+            Assert.That(sounds, Has.One.Matches<WolfensteinSoundEvent>(sound =>
+                sound.Effect == WolfensteinSoundEffect.HitWall));
+        });
     }
 
     [Test]
@@ -639,12 +645,16 @@ public sealed class GameSessionTests
     {
         var session = CreateSessionWithObjectAndDog(47);
         InflictFatalDogBites(session);
+        var sounds = session.DrainSoundEvents();
 
         Assert.Multiple(() =>
         {
             Assert.That(session.IsDying, Is.True);
             Assert.That(session.FacePictureIndex, Is.EqualTo(21));
             Assert.That(session.Lives, Is.EqualTo(3));
+            Assert.That(session.DamageFlash, Is.GreaterThan(0.0));
+            Assert.That(sounds, Has.One.Matches<WolfensteinSoundEvent>(sound =>
+                sound.Effect == WolfensteinSoundEffect.PlayerDeath));
         });
 
         session.Update(1.5, new PlayerInput(true, false, false, false));

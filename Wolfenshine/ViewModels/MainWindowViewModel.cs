@@ -44,6 +44,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private int m_restartRevision;
     private bool m_isGameOver;
     private double m_deathFade;
+    private double m_damageFlash;
     private double m_levelFade;
     private WolfensteinElevatorSwitch m_elevatorSwitch;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
@@ -120,6 +121,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool HasGameData => Resources != null;
     public bool IsGameOver => m_isGameOver;
     public double DeathFade => m_deathFade;
+    public double DamageFlash => m_damageFlash;
     public double LevelFade => m_levelFade;
     public int NativeViewportWidth => 320;
     public int NativeViewportHeight => 200;
@@ -144,6 +146,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer?.SetMusicFade(Math.Max(m_gameSession.DeathFade, m_gameSession.LevelFade));
         SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
         SetField(ref m_deathFade, m_gameSession.DeathFade, nameof(DeathFade));
+        SetField(ref m_damageFlash, m_gameSession.DamageFlash, nameof(DamageFlash));
         SetField(ref m_levelFade, m_gameSession.LevelFade, nameof(LevelFade));
         SetField(ref m_elevatorSwitch, m_gameSession.ElevatorSwitch, nameof(ElevatorSwitch));
         if (m_worldObjects.Count != StaticObjects.Count + Actors.Count ||

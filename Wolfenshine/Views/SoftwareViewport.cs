@@ -41,6 +41,7 @@ public sealed class SoftwareViewport : Control
     private RaycastCamera m_renderedCamera;
     private WolfensteinElevatorSwitch m_renderedElevatorSwitch;
     private double m_renderedDeathFade = -1.0;
+    private double m_renderedDamageFlash = -1.0;
     private double m_renderedLevelFade = -1.0;
 
     public static readonly StyledProperty<WolfensteinMap> MapProperty =
@@ -67,6 +68,8 @@ public sealed class SoftwareViewport : Control
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinGraphic>(nameof(StatusBar));
     public static readonly StyledProperty<double> DeathFadeProperty =
         AvaloniaProperty.Register<SoftwareViewport, double>(nameof(DeathFade));
+    public static readonly StyledProperty<double> DamageFlashProperty =
+        AvaloniaProperty.Register<SoftwareViewport, double>(nameof(DamageFlash));
     public static readonly StyledProperty<double> LevelFadeProperty =
         AvaloniaProperty.Register<SoftwareViewport, double>(nameof(LevelFade));
 
@@ -82,6 +85,7 @@ public sealed class SoftwareViewport : Control
         SpritesProperty,
         StaticObjectsProperty,
         StatusBarProperty,
+        DamageFlashProperty,
         DeathFadeProperty,
         LevelFadeProperty);
 
@@ -157,6 +161,12 @@ public sealed class SoftwareViewport : Control
         set => SetValue(DeathFadeProperty, value);
     }
 
+    public double DamageFlash
+    {
+        get => GetValue(DamageFlashProperty);
+        set => SetValue(DamageFlashProperty, value);
+    }
+
     public double LevelFade
     {
         get => GetValue(LevelFadeProperty);
@@ -170,7 +180,8 @@ public sealed class SoftwareViewport : Control
             return;
         if (!ReferenceEquals(m_renderedMap, Map) || !ReferenceEquals(m_renderedCamera, Camera) ||
             !ReferenceEquals(m_renderedElevatorSwitch, ElevatorSwitch) ||
-            m_renderedDeathFade != DeathFade || m_renderedLevelFade != LevelFade)
+            m_renderedDamageFlash != DamageFlash || m_renderedDeathFade != DeathFade ||
+            m_renderedLevelFade != LevelFade)
             RenderFrame();
         context.DrawImage(m_bitmap, Bounds);
     }
@@ -224,6 +235,8 @@ public sealed class SoftwareViewport : Control
             ApplyDeathFade(playViewPixels, DeathFade, Palette.GetColor(4));
         if (StatusBar != null && Palette != null)
             SoftwareRaycastRenderer.DrawGraphic(StatusBar, Palette, 0, PlayViewHeight, m_pixels, ViewportWidth, ViewportHeight);
+        if (DamageFlash > 0.0)
+            ApplyRedFlash(m_pixels, DamageFlash);
         if (LevelFade > 0.0)
             ApplyBlackFade(m_pixels, LevelFade);
 
@@ -248,6 +261,7 @@ public sealed class SoftwareViewport : Control
         m_renderedMap = Map;
         m_renderedCamera = Camera;
         m_renderedElevatorSwitch = ElevatorSwitch;
+        m_renderedDamageFlash = DamageFlash;
         m_renderedDeathFade = DeathFade;
         m_renderedLevelFade = LevelFade;
     }
@@ -276,6 +290,17 @@ public sealed class SoftwareViewport : Control
             pixels[offset] = (byte)(pixels[offset] * scale);
             pixels[offset + 1] = (byte)(pixels[offset + 1] * scale);
             pixels[offset + 2] = (byte)(pixels[offset + 2] * scale);
+        }
+    }
+
+    private static void ApplyRedFlash(Span<byte> pixels, double intensity)
+    {
+        var amount = Math.Clamp(intensity, 0.0, 1.0);
+        for (var offset = 0; offset < pixels.Length; offset += 4)
+        {
+            pixels[offset] = (byte)(pixels[offset] + ((byte.MaxValue - pixels[offset]) * amount));
+            pixels[offset + 1] = (byte)(pixels[offset + 1] * (1.0 - amount));
+            pixels[offset + 2] = (byte)(pixels[offset + 2] * (1.0 - amount));
         }
     }
 }

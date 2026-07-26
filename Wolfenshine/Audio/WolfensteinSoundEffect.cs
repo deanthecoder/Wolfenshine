@@ -18,7 +18,9 @@ namespace Wolfenshine.Audio;
 /// </remarks>
 public enum WolfensteinSoundEffect
 {
+    HitWall = 0,
     CannotUse = 6,
+    PlayerDeath = 9,
     DogDeath = 10,
     AttackGatling = 11,
     OpenDoor = 18,

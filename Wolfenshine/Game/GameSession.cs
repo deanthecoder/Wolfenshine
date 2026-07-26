@@ -46,6 +46,8 @@ public sealed class GameSession
     private const double DeathDuration = 100.0 / OriginalTicksPerSecond;
     private const ushort ElevatorSwitchTile = 21;
     private const double LevelFadeDuration = 0.5;
+    private const double WallHitSoundInterval = 0.2;
+    private const double DeathRotationRadiansPerSecond = 140.0 * Math.PI / 180.0;
     private bool m_useWasDown;
     private double m_useRepeatTime;
     private bool m_attackWasDown;
@@ -63,6 +65,10 @@ public sealed class GameSession
     private bool m_isCompletingLevel;
     private bool m_isFadingIn;
     private double m_deathTime;
+    private double m_damageCount;
+    private double m_wallHitSoundTime;
+    private double? m_killerX;
+    private double? m_killerY;
     private readonly RaycastCamera m_startCamera;
     private readonly IReadOnlyList<WolfensteinActor> m_actorDefinitions;
     private IReadOnlyList<WolfensteinActorState> m_actors;
@@ -126,6 +132,9 @@ public sealed class GameSession
     public bool IsReadyForNextLevel => m_isCompletingLevel && m_levelFade >= 1.0;
     public double LevelFade => m_levelFade;
     public double DeathFade => IsDying ? Math.Min(1.0, m_deathTime / DeathFadeDuration) : 0.0;
+    public double DamageFlash => m_damageCount > 0.0
+        ? Math.Min(6.0, Math.Floor(m_damageCount / 10.0) + 1.0) / 8.0
+        : 0.0;
     public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
     public IReadOnlyList<WorldSprite> ActorSprites => m_actors.Select(actor => actor.ToWorldSprite()).ToArray();
     public IReadOnlyList<WolfensteinActorState> Actors => m_actors;
@@ -163,21 +172,22 @@ public sealed class GameSession
     {
         if (!double.IsFinite(elapsedSeconds) || elapsedSeconds < 0.0)
             throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
+        var feedbackChanged = UpdateFeedback(elapsedSeconds);
         if (IsGameOver)
             return false;
         if (IsDying)
-            return UpdateDeath(elapsedSeconds, input);
+            return UpdateDeath(elapsedSeconds, input) || feedbackChanged;
         if (m_isCompletingLevel)
-            return UpdateLevelFade(elapsedSeconds);
+            return UpdateLevelFade(elapsedSeconds) || feedbackChanged;
         if (m_isFadingIn)
         {
             m_levelFade = Math.Max(0.0, m_levelFade - (elapsedSeconds / LevelFadeDuration));
             m_isFadingIn = m_levelFade > 0.0;
-            return elapsedSeconds > 0.0;
+            return elapsedSeconds > 0.0 || feedbackChanged;
         }
 
         var doorsClosingBeforeUpdate = Doors.Items.Where(door => door.IsClosing).ToHashSet();
-        var changed = Doors.Update(elapsedSeconds, CanDoorClose);
+        var changed = Doors.Update(elapsedSeconds, CanDoorClose) || feedbackChanged;
         foreach (var door in Doors.Items.Where(door => door.IsClosing && !doorsClosingBeforeUpdate.Contains(door)))
             PlaySound(WolfensteinSoundEffect.CloseDoor, door.X + 0.5, door.Y + 0.5);
         changed |= PushWalls.Update(elapsedSeconds, CanPushWallEnterTile);
@@ -239,16 +249,26 @@ public sealed class GameSession
             var stepCount = Math.Max(1, (int)Math.Ceiling(distance / MaximumMovementStep));
             var stepX = moveX / stepCount;
             var stepY = moveY / stepCount;
+            var hitObstacle = false;
             for (var step = 0; step < stepCount; step++)
             {
                 // Resolve each axis independently so the player slides naturally along nearby walls.
                 var nextX = x + stepX;
                 if (CanOccupy(nextX, y))
                     x = nextX;
+                else if (Math.Abs(stepX) > double.Epsilon)
+                    hitObstacle = true;
                 var nextY = y + stepY;
                 if (CanOccupy(x, nextY))
                     y = nextY;
+                else if (Math.Abs(stepY) > double.Epsilon)
+                    hitObstacle = true;
                 changed |= CollectPickups(x, y);
+            }
+            if (hitObstacle && m_wallHitSoundTime <= 0.0)
+            {
+                PlaySound(WolfensteinSoundEffect.HitWall);
+                m_wallHitSoundTime = WallHitSoundInterval;
             }
         }
 
@@ -691,7 +711,7 @@ public sealed class GameSession
                 {
                     PlaySound(GetEnemyAttackSound(actor.Actor.Type), actor.X, actor.Y);
                     if (HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y))
-                        TakeDamage(actor.Profile.AttackDamage);
+                        TakeDamage(actor.Profile.AttackDamage, actor.X, actor.Y);
                 }
                 continue;
             }
@@ -925,21 +945,34 @@ public sealed class GameSession
                !WolfensteinStaticObjects.BlocksMovement(Map.GetObject(x, y));
     }
 
-    private void TakeDamage(int damage)
+    private void TakeDamage(int damage, double attackerX, double attackerY)
     {
         if (Health == 0)
             return;
+        m_damageCount += damage;
         Health = Math.Max(0, Health - damage);
         if (Health > 0)
             return;
         IsDying = true;
+        m_killerX = attackerX;
+        m_killerY = attackerY;
+        PlaySound(WolfensteinSoundEffect.PlayerDeath);
         IsAttacking = false;
         WeaponFrame = 0;
         m_deathTime = 0.0;
     }
 
+    private bool UpdateFeedback(double elapsedSeconds)
+    {
+        var previousDamageCount = m_damageCount;
+        m_damageCount = Math.Max(0.0, m_damageCount - (elapsedSeconds * OriginalTicksPerSecond));
+        m_wallHitSoundTime = Math.Max(0.0, m_wallHitSoundTime - elapsedSeconds);
+        return m_damageCount != previousDamageCount;
+    }
+
     private bool UpdateDeath(double elapsedSeconds, PlayerInput input)
     {
+        RotateTowardKiller(elapsedSeconds);
         m_deathTime += elapsedSeconds;
         var skipDelay = m_deathTime >= DeathFadeDuration && HasInput(input);
         if (m_deathTime < DeathDuration && !skipDelay)
@@ -952,6 +985,24 @@ public sealed class GameSession
         }
         RestartLevel();
         return true;
+    }
+
+    private void RotateTowardKiller(double elapsedSeconds)
+    {
+        if (m_killerX == null || m_killerY == null)
+            return;
+        var targetAngle = Math.Atan2(m_killerY.Value - Camera.Y, m_killerX.Value - Camera.X);
+        var currentAngle = Math.Atan2(Camera.DirectionY, Camera.DirectionX);
+        var difference = Math.Atan2(Math.Sin(targetAngle - currentAngle), Math.Cos(targetAngle - currentAngle));
+        var rotation = Math.Clamp(
+            difference,
+            -DeathRotationRadiansPerSecond * elapsedSeconds,
+            DeathRotationRadiansPerSecond * elapsedSeconds);
+        if (Math.Abs(rotation) <= double.Epsilon)
+            return;
+        var (directionX, directionY) = Rotate(Camera.DirectionX, Camera.DirectionY, rotation);
+        var (planeX, planeY) = Rotate(Camera.PlaneX, Camera.PlaneY, rotation);
+        Camera = new RaycastCamera(Camera.X, Camera.Y, directionX, directionY, planeX, planeY);
     }
 
     private static bool HasInput(PlayerInput input) =>
@@ -1001,6 +1052,10 @@ public sealed class GameSession
         m_faceTime = 0.0;
         m_nextFaceChange = 1.0;
         m_chaingunGrinTime = 0.0;
+        m_damageCount = 0.0;
+        m_wallHitSoundTime = 0.0;
+        m_killerX = null;
+        m_killerY = null;
         m_faceFrame = 0;
         TreasureCount = 0;
         SecretCount = 0;
