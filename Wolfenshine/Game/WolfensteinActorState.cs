@@ -133,7 +133,7 @@ public sealed class WolfensteinActorState
 
     public bool Damage(int amount)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);
+        ArgumentOutOfRangeException.ThrowIfNegative(amount);
         if (IsDead)
             return false;
         HitPoints = Math.Max(0, HitPoints - amount);

@@ -613,7 +613,7 @@ public sealed class GameSession
             PlayerWeapon.MachineGun => WolfensteinSoundEffect.AttackMachineGun,
             _ => WolfensteinSoundEffect.AttackGatling
         });
-        DamageTarget(Weapon == PlayerWeapon.Knife ? 25 : 100);
+        DamageTarget(Weapon == PlayerWeapon.Knife);
     }
 
     private void PlaySound(WolfensteinSoundEffect effect, double? x = null, double? y = null) =>
@@ -626,7 +626,7 @@ public sealed class GameSession
         _ => WolfensteinSoundEffect.GuardFire
     };
 
-    private void DamageTarget(int damage)
+    private void DamageTarget(bool isKnife)
     {
         Span<WallColumn> columns = stackalloc WallColumn[CombatViewportWidth];
         Raycaster.Cast(Map, Doors, PushWalls, Camera, columns);
@@ -652,7 +652,12 @@ public sealed class GameSession
             target = actor;
             nearestDepth = projection.Depth;
         }
-        if (target == null || !target.Damage(damage))
+        if (target == null || isKnife && nearestDepth > 1.5)
+            return;
+        var damage = GetPlayerAttackDamage(target, isKnife);
+        if (target.Behavior == WolfensteinActorBehavior.Dormant)
+            damage *= 2;
+        if (!target.Damage(damage))
             return;
         if (target.IsDead)
         {
@@ -669,6 +674,22 @@ public sealed class GameSession
                 m_staticObjects.Add(new WorldSprite(target.X, target.Y, dropSprite));
         }
         ActorRevision++;
+    }
+
+    private int GetPlayerAttackDamage(WolfensteinActorState target, bool isKnife)
+    {
+        if (isKnife)
+            return NextRandomByte() >> 4;
+        var distanceX = Math.Abs((int)Math.Floor(target.X) - (int)Math.Floor(Camera.X));
+        var distanceY = Math.Abs((int)Math.Floor(target.Y) - (int)Math.Floor(Camera.Y));
+        var distance = Math.Max(distanceX, distanceY);
+        if (distance < 2)
+            return NextRandomByte() / 4;
+        if (distance < 4)
+            return NextRandomByte() / 6;
+        if (NextRandomByte() / 12 < distance)
+            return 0;
+        return NextRandomByte() / 6;
     }
 
     private void GiveAmmo(int amount)

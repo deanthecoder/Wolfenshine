@@ -309,6 +309,23 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenCloseUnawareSsCheckPistolDamageDoesNotAlwaysKillIt()
+    {
+        var session = CreateSessionWithActor(new WolfensteinActor(
+            2.5, 1.5, WolfensteinActorType.Ss, 0, false, false, 138));
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        session.Update(12.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Actors[0].IsDead, Is.False);
+            Assert.That(session.Actors[0].HitPoints, Is.GreaterThan(0));
+            Assert.That(session.Actors[0].HitPoints, Is.LessThan(100));
+        });
+    }
+
+    [Test]
     public void GivenGuardMovedFromSpawnCheckAmmoDropsAtDeathPosition()
     {
         var session = CreateSessionWithActor(new WolfensteinActor(
