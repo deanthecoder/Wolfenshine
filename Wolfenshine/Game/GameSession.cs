@@ -47,6 +47,7 @@ public sealed class GameSession
     private const ushort ElevatorSwitchTile = 21;
     private const double LevelFadeDuration = 0.5;
     private const double WallHitSoundInterval = 0.2;
+    private const double EnemyMuzzleFlashDuration = 6.0 / OriginalTicksPerSecond;
     private const double DeathRotationRadiansPerSecond = 140.0 * Math.PI / 180.0;
     private bool m_useWasDown;
     private double m_useRepeatTime;
@@ -75,6 +76,8 @@ public sealed class GameSession
     private IReadOnlyList<WolfensteinActorState> m_actors;
     private readonly List<WorldSprite> m_staticObjects;
     private readonly List<WolfensteinSoundEvent> m_soundEvents = [];
+    private readonly List<TimedWorldLight> m_enemyMuzzleFlashes = [];
+    private IReadOnlyList<WorldLight> m_enemyMuzzleFlashSnapshot = [];
 
     public GameSession(
         WolfensteinMap map,
@@ -148,6 +151,7 @@ public sealed class GameSession
     public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
     public IReadOnlyList<WorldSprite> ActorSprites => m_actors.Select(actor => actor.ToWorldSprite()).ToArray();
     public IReadOnlyList<WolfensteinActorState> Actors => m_actors;
+    public IReadOnlyList<WorldLight> EnemyMuzzleFlashes => m_enemyMuzzleFlashSnapshot;
     public int ActorRevision { get; private set; }
     public int RestartRevision { get; private set; }
     public int FacePictureIndex => m_chaingunGrinTime > 0.0
@@ -771,6 +775,7 @@ public sealed class GameSession
                 if (fired)
                 {
                     PlaySound(GetEnemyAttackSound(actor.Actor.Type), actor.X, actor.Y);
+                    AddEnemyMuzzleFlash(actor.X, actor.Y);
                     if (HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y) &&
                         TryGetEnemyAttackDamage(actor, playerIsRunning, out var damage))
                     {
@@ -1078,7 +1083,46 @@ public sealed class GameSession
         var previousDamageCount = m_damageCount;
         m_damageCount = Math.Max(0.0, m_damageCount - (elapsedSeconds * OriginalTicksPerSecond));
         m_wallHitSoundTime = Math.Max(0.0, m_wallHitSoundTime - elapsedSeconds);
-        return m_damageCount != previousDamageCount;
+        return UpdateEnemyMuzzleFlashes(elapsedSeconds) || m_damageCount != previousDamageCount;
+    }
+
+    private bool UpdateEnemyMuzzleFlashes(double elapsedSeconds)
+    {
+        if (elapsedSeconds <= 0.0 || m_enemyMuzzleFlashes.Count == 0)
+            return false;
+        for (var index = m_enemyMuzzleFlashes.Count - 1; index >= 0; index--)
+        {
+            var flash = m_enemyMuzzleFlashes[index];
+            flash.RemainingSeconds -= elapsedSeconds;
+            if (flash.RemainingSeconds <= 0.0)
+                m_enemyMuzzleFlashes.RemoveAt(index);
+        }
+        RebuildEnemyMuzzleFlashSnapshot();
+        return true;
+    }
+
+    private void AddEnemyMuzzleFlash(double x, double y)
+    {
+        var flash = m_enemyMuzzleFlashes.FirstOrDefault(item => item.X == x && item.Y == y);
+        if (flash == null)
+            m_enemyMuzzleFlashes.Add(new TimedWorldLight(x, y, EnemyMuzzleFlashDuration));
+        else
+            flash.RemainingSeconds = EnemyMuzzleFlashDuration;
+        RebuildEnemyMuzzleFlashSnapshot();
+    }
+
+    private void RebuildEnemyMuzzleFlashSnapshot()
+    {
+        m_enemyMuzzleFlashSnapshot = m_enemyMuzzleFlashes
+            .Select(flash =>
+            {
+                var intensity = (float)Math.Clamp(
+                    flash.RemainingSeconds / EnemyMuzzleFlashDuration,
+                    0.0,
+                    1.0);
+                return new WorldLight(flash.X, flash.Y, intensity, intensity, 2.5f, 2.5f);
+            })
+            .ToArray();
     }
 
     private bool UpdateDeath(double elapsedSeconds, PlayerInput input)
@@ -1166,6 +1210,8 @@ public sealed class GameSession
         m_chaingunGrinTime = 0.0;
         m_damageCount = 0.0;
         m_wallHitSoundTime = 0.0;
+        m_enemyMuzzleFlashes.Clear();
+        m_enemyMuzzleFlashSnapshot = [];
         m_killerX = null;
         m_killerY = null;
         m_faceFrame = 0;
@@ -1179,4 +1225,11 @@ public sealed class GameSession
 
     private IReadOnlyList<WolfensteinActorState> CreateActorStates() =>
         m_actorDefinitions.Select(actor => new WolfensteinActorState(actor, Difficulty)).ToArray();
+
+    private sealed class TimedWorldLight(double x, double y, double remainingSeconds)
+    {
+        public double X { get; } = x;
+        public double Y { get; } = y;
+        public double RemainingSeconds { get; set; } = remainingSeconds;
+    }
 }

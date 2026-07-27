@@ -60,6 +60,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private double m_statsCountTime;
     private WolfensteinElevatorSwitch m_elevatorSwitch;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
+    private IReadOnlyList<WorldLight> m_enemyMuzzleFlashes = [];
     private bool m_isSelectingDifficulty;
     private bool m_difficultyInputReleased = true;
     private int m_selectedDifficultyIndex = 2;
@@ -147,6 +148,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<WorldSprite> StaticObjects { get; private set; }
     public IReadOnlyList<WolfensteinActor> Actors { get; private set; }
     public IReadOnlyList<WorldSprite> WorldObjects => m_worldObjects;
+    public IReadOnlyList<WorldLight> EnemyMuzzleFlashes => m_enemyMuzzleFlashes;
     public string StatusText { get; private set; }
     public string DataErrorMessage { get; }
     public bool HasGameData => Resources != null;
@@ -224,6 +226,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_muzzleFlash, m_gameSession.MuzzleFlash, nameof(MuzzleFlash));
         SetField(ref m_levelFade, m_gameSession.LevelFade, nameof(LevelFade));
         SetField(ref m_elevatorSwitch, m_gameSession.ElevatorSwitch, nameof(ElevatorSwitch));
+        SetField(
+            ref m_enemyMuzzleFlashes,
+            m_gameSession.EnemyMuzzleFlashes,
+            nameof(EnemyMuzzleFlashes));
         var staticObjectsChanged = m_worldObjects.Count != StaticObjects.Count + Actors.Count;
         if (staticObjectsChanged ||
             m_actorRevision != m_gameSession.ActorRevision)
@@ -507,6 +513,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer?.PlayMusic(map.Slot);
         m_audioPlayer?.SetMusicFade(startFaded ? 1.0 : 0.0);
         m_worldObjects = CreateWorldObjects();
+        m_enemyMuzzleFlashes = [];
         m_weaponSprite = Sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? m_weaponSprite;
         StatusText = $"{map.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
                      "1–4 select weapons · Space opens doors";

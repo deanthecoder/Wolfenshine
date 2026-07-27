@@ -422,6 +422,8 @@ public sealed class GameSessionTests
         Assert.Multiple(() =>
         {
             Assert.That(session.Health, Is.LessThan(100));
+            Assert.That(session.EnemyMuzzleFlashes, Has.Some.Matches<WorldLight>(light =>
+                light.X == 2.5 && light.Y == 1.5 && light.UpwardBrightness > 0.0f));
             Assert.That(sounds, Has.Some.Matches<WolfensteinSoundEvent>(sound =>
                 sound.Effect == WolfensteinSoundEffect.GuardFire && sound.X == 2.5 && sound.Y == 1.5));
         });
@@ -481,10 +483,18 @@ public sealed class GameSessionTests
             2.5, 1.5, WolfensteinActorType.Ss, 3, false, false, 138));
         session.Update(0.0, default);
 
+        var muzzleFlashSeen = false;
         foreach (var ticks in new[] { 20, 20, 10, 10, 10, 10, 10, 10 })
+        {
             session.Update(ticks / 70.0, default);
+            muzzleFlashSeen |= session.EnemyMuzzleFlashes.Count > 0;
+        }
 
-        Assert.That(session.Health, Is.LessThan(100));
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Health, Is.LessThan(100));
+            Assert.That(muzzleFlashSeen, Is.True);
+        });
     }
 
     [Test]

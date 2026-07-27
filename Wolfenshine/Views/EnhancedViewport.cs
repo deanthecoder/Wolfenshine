@@ -62,8 +62,16 @@ public sealed class EnhancedViewport : SoftwareViewport
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(ViewBob));
     public static readonly StyledProperty<double> MuzzleFlashProperty =
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(MuzzleFlash));
+    public static readonly StyledProperty<IReadOnlyList<WorldSprite>> LightObjectsProperty =
+        AvaloniaProperty.Register<EnhancedViewport, IReadOnlyList<WorldSprite>>(nameof(LightObjects));
+    public static readonly StyledProperty<IReadOnlyList<WorldLight>> DynamicLightsProperty =
+        AvaloniaProperty.Register<EnhancedViewport, IReadOnlyList<WorldLight>>(nameof(DynamicLights));
 
-    static EnhancedViewport() => AffectsRender<EnhancedViewport>(ViewBobProperty, MuzzleFlashProperty);
+    static EnhancedViewport() => AffectsRender<EnhancedViewport>(
+        ViewBobProperty,
+        MuzzleFlashProperty,
+        LightObjectsProperty,
+        DynamicLightsProperty);
 
     public EnhancedViewport()
     {
@@ -84,6 +92,18 @@ public sealed class EnhancedViewport : SoftwareViewport
     {
         get => GetValue(MuzzleFlashProperty);
         set => SetValue(MuzzleFlashProperty, value);
+    }
+
+    public IReadOnlyList<WorldSprite> LightObjects
+    {
+        get => GetValue(LightObjectsProperty);
+        set => SetValue(LightObjectsProperty, value);
+    }
+
+    public IReadOnlyList<WorldLight> DynamicLights
+    {
+        get => GetValue(DynamicLightsProperty);
+        set => SetValue(DynamicLightsProperty, value);
     }
 
     public override void Render(DrawingContext context)
@@ -179,57 +199,79 @@ public sealed class EnhancedViewport : SoftwareViewport
         Array.Clear(m_sceneLights);
         Array.Clear(m_sceneLightRadii);
         Array.Fill(m_sceneLightDistances, double.PositiveInfinity);
-        if (StaticObjects == null)
+        if (LightObjects != null)
+        {
+            foreach (var sprite in LightObjects)
+            {
+                var (upward, downward) = WolfensteinStaticObjects.GetLightBrightness(sprite.SpriteNumber);
+                var (upwardRadius, downwardRadius) = WolfensteinStaticObjects.GetLightRadii(sprite.SpriteNumber);
+                if (upward <= 0.0f && downward <= 0.0f)
+                    continue;
+                InsertLight(sprite.X, sprite.Y, upward, downward, upwardRadius, downwardRadius);
+            }
+        }
+        if (DynamicLights == null)
+            return;
+        foreach (var light in DynamicLights)
+        {
+            InsertLight(
+                light.X,
+                light.Y,
+                light.UpwardBrightness,
+                light.DownwardBrightness,
+                light.UpwardRadius,
+                light.DownwardRadius);
+        }
+    }
+
+    private void InsertLight(
+        double x,
+        double y,
+        float upward,
+        float downward,
+        float upwardRadius,
+        float downwardRadius)
+    {
+        var deltaX = x - Camera.X;
+        var deltaY = y - Camera.Y;
+        var distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
+        var insertAt = -1;
+        for (var index = 0; index < LightCount; index++)
+        {
+            if (distanceSquared >= m_sceneLightDistances[index])
+                continue;
+            insertAt = index;
+            break;
+        }
+        if (insertAt < 0)
             return;
 
-        foreach (var sprite in StaticObjects)
+        for (var index = LightCount - 1; index > insertAt; index--)
         {
-            var (upward, downward) = WolfensteinStaticObjects.GetLightBrightness(sprite.SpriteNumber);
-            var (upwardRadius, downwardRadius) = WolfensteinStaticObjects.GetLightRadii(sprite.SpriteNumber);
-            if (upward <= 0.0f && downward <= 0.0f)
-                continue;
-
-            var deltaX = sprite.X - Camera.X;
-            var deltaY = sprite.Y - Camera.Y;
-            var distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
-            var insertAt = -1;
-            for (var index = 0; index < LightCount; index++)
-            {
-                if (distanceSquared >= m_sceneLightDistances[index])
-                    continue;
-                insertAt = index;
-                break;
-            }
-            if (insertAt < 0)
-                continue;
-
-            for (var index = LightCount - 1; index > insertAt; index--)
-            {
-                m_sceneLightDistances[index] = m_sceneLightDistances[index - 1];
-                Array.Copy(
-                    m_sceneLights,
-                    (index - 1) * LightChannelCount,
-                    m_sceneLights,
-                    index * LightChannelCount,
-                    LightChannelCount);
-                Array.Copy(
-                    m_sceneLightRadii,
-                    (index - 1) * LightRadiusChannelCount,
-                    m_sceneLightRadii,
-                    index * LightRadiusChannelCount,
-                    LightRadiusChannelCount);
-            }
-
-            m_sceneLightDistances[insertAt] = distanceSquared;
-            var target = insertAt * LightChannelCount;
-            m_sceneLights[target] = (float)sprite.X;
-            m_sceneLights[target + 1] = (float)sprite.Y;
-            m_sceneLights[target + 2] = upward;
-            m_sceneLights[target + 3] = downward;
-            var radiusTarget = insertAt * LightRadiusChannelCount;
-            m_sceneLightRadii[radiusTarget] = upwardRadius;
-            m_sceneLightRadii[radiusTarget + 1] = downwardRadius;
+            m_sceneLightDistances[index] = m_sceneLightDistances[index - 1];
+            Array.Copy(
+                m_sceneLights,
+                (index - 1) * LightChannelCount,
+                m_sceneLights,
+                index * LightChannelCount,
+                LightChannelCount);
+            Array.Copy(
+                m_sceneLightRadii,
+                (index - 1) * LightRadiusChannelCount,
+                m_sceneLightRadii,
+                index * LightRadiusChannelCount,
+                LightRadiusChannelCount);
         }
+
+        m_sceneLightDistances[insertAt] = distanceSquared;
+        var target = insertAt * LightChannelCount;
+        m_sceneLights[target] = (float)x;
+        m_sceneLights[target + 1] = (float)y;
+        m_sceneLights[target + 2] = upward;
+        m_sceneLights[target + 3] = downward;
+        var radiusTarget = insertAt * LightRadiusChannelCount;
+        m_sceneLightRadii[radiusTarget] = upwardRadius;
+        m_sceneLightRadii[radiusTarget + 1] = downwardRadius;
     }
 
     private void BuildSoftwareOverlays()

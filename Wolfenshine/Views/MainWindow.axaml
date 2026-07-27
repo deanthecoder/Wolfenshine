@@ -52,6 +52,8 @@
                                     WeaponSprite="{Binding WeaponSprite}"
                                     Sprites="{Binding Sprites}"
                                     StaticObjects="{Binding WorldObjects}"
+                                    LightObjects="{Binding StaticObjects}"
+                                    DynamicLights="{Binding EnemyMuzzleFlashes}"
                                     StatusBar="{Binding StatusBar}"
                                     DamageFlash="{Binding DamageFlash}"
                                     MuzzleFlash="{Binding MuzzleFlash}"
