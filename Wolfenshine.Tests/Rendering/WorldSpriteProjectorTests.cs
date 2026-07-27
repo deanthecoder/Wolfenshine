@@ -62,6 +62,18 @@ public sealed class WorldSpriteProjectorTests
     }
 
     [Test]
+    public void GivenLitSpriteCheckBrightnessIsPreservedDuringProjection()
+    {
+        var camera = new RaycastCamera(2.5, 3.5, 0.0, -1.0, 0.66, 0.0);
+        WorldSprite[] sprites = [new(2.5, 2.5, 1, Brightness: 0.45f)];
+        var projected = new ProjectedWorldSprite[1];
+
+        WorldSpriteProjector.Project(sprites, camera, 320, 200, projected);
+
+        Assert.That(projected[0].Brightness, Is.EqualTo(0.45f));
+    }
+
+    [Test]
     public void GivenDirectionalActorCheckRotationFacingCameraIsSelected()
     {
         WorldSprite[] sprites = [new(2.5, 2.5, 50, 0)];

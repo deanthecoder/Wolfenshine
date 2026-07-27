@@ -25,5 +25,5 @@ public readonly record struct WolfensteinActor(
     bool IsAmbush,
     int BaseSpriteNumber)
 {
-    public WorldSprite ToWorldSprite() => new(X, Y, BaseSpriteNumber, Direction);
+    public WorldSprite ToWorldSprite() => new(X, Y, BaseSpriteNumber, Direction, IsActor: true);
 }

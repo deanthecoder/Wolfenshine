@@ -72,7 +72,8 @@ public static class WorldSpriteProjector
                 ResolveSpriteNumber(sprite, camera),
                 depth,
                 centerX,
-                renderedSize);
+                renderedSize,
+                sprite.Brightness);
         }
 
         projectedSprites[..visibleCount].Sort(static (left, right) => right.Depth.CompareTo(left.Depth));

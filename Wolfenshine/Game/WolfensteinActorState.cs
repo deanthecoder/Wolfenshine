@@ -67,7 +67,8 @@ public sealed class WolfensteinActorState
         X,
         Y,
         CurrentSpriteNumber,
-        IsDead || Behavior == WolfensteinActorBehavior.Shooting ? -1 : Direction);
+        IsDead || Behavior == WolfensteinActorBehavior.Shooting ? -1 : Direction,
+        IsActor: true);
 
     public bool Alert()
     {

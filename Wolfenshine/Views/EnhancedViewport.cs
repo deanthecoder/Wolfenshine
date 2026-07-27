@@ -43,6 +43,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly float[] m_cameraDirection = new float[2];
     private readonly float[] m_cameraPlane = new float[2];
     private readonly byte[] m_weaponPixels = new byte[ViewportWidth * ViewportHeight * 4];
+    private WorldSprite[] m_litWorldSprites = [];
     private readonly SKBitmap m_overlayBitmap = new(new SKImageInfo(
         ViewportWidth,
         ViewportHeight,
@@ -281,10 +282,20 @@ public sealed class EnhancedViewport : SoftwareViewport
         var playViewPixels = m_pixels.AsSpan(0, ViewportWidth * PlayViewHeight * 4);
         if (Sprites != null && StaticObjects != null)
         {
+            if (m_litWorldSprites.Length != StaticObjects.Count)
+                m_litWorldSprites = new WorldSprite[StaticObjects.Count];
+            for (var index = 0; index < StaticObjects.Count; index++)
+            {
+                var sprite = StaticObjects[index];
+                m_litWorldSprites[index] = sprite with
+                {
+                    Brightness = sprite.IsActor ? CalculateActorBrightness(sprite.X, sprite.Y) : 1.0f
+                };
+            }
             if (m_projectedSprites.Length != StaticObjects.Count)
                 m_projectedSprites = new ProjectedWorldSprite[StaticObjects.Count];
             var visibleSpriteCount = WorldSpriteProjector.Project(
-                StaticObjects,
+                m_litWorldSprites,
                 Camera,
                 ViewportWidth,
                 PlayViewHeight,
@@ -324,6 +335,68 @@ public sealed class EnhancedViewport : SoftwareViewport
         }
         CopyPixelsToBitmap(m_pixels, m_overlayBitmap);
         CopyPixelsToBitmap(m_weaponPixels, m_weaponOverlayBitmap);
+    }
+
+    private float CalculateActorBrightness(double x, double y)
+    {
+        var illumination = 0.60f;
+        if (LightObjects != null)
+        {
+            foreach (var sprite in LightObjects)
+            {
+                var (_, downward) = WolfensteinStaticObjects.GetLightBrightness(sprite.SpriteNumber);
+                var (_, downwardRadius) = WolfensteinStaticObjects.GetLightRadii(sprite.SpriteNumber);
+                illumination += CalculateLightContribution(
+                    x,
+                    y,
+                    sprite.X,
+                    sprite.Y,
+                    downward,
+                    downwardRadius);
+            }
+        }
+        if (DynamicLights != null)
+        {
+            foreach (var light in DynamicLights)
+            {
+                illumination += CalculateLightContribution(
+                    x,
+                    y,
+                    light.X,
+                    light.Y,
+                    light.DownwardBrightness,
+                    light.DownwardRadius);
+            }
+        }
+        if (MuzzleFlash > 0.0)
+        {
+            illumination += CalculateLightContribution(
+                x,
+                y,
+                Camera.X + (Camera.DirectionX * 0.35),
+                Camera.Y + (Camera.DirectionY * 0.35),
+                (float)MuzzleFlash * 0.90f,
+                2.50f);
+        }
+        return Math.Clamp(illumination, 0.20f, 1.0f);
+    }
+
+    private static float CalculateLightContribution(
+        double x,
+        double y,
+        double lightX,
+        double lightY,
+        float brightness,
+        float radius)
+    {
+        if (brightness <= 0.0f || radius <= 0.0f)
+            return 0.0f;
+        var deltaX = x - lightX;
+        var deltaY = y - lightY;
+        var distance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+        var conePosition = Math.Clamp(distance / radius, 0.0, 1.0);
+        var cone = 1.0 - (conePosition * conePosition * (3.0 - (2.0 * conePosition)));
+        return brightness * (float)cone * 0.80f;
     }
 
     private static void CopyPixelsToBitmap(byte[] pixels, SKBitmap bitmap)

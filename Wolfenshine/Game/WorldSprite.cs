@@ -14,6 +14,12 @@ namespace Wolfenshine.Game;
 /// Places one VSWAP sprite at a world-space position.
 /// </summary>
 /// <remarks>
-/// Static decorations use tile centers now; actors can later supply continuously changing positions.
+/// Static decorations use tile centers, while actors supply continuously changing positions and lighting state.
 /// </remarks>
-public readonly record struct WorldSprite(double X, double Y, int SpriteNumber, int FacingDirection = -1);
+public readonly record struct WorldSprite(
+    double X,
+    double Y,
+    int SpriteNumber,
+    int FacingDirection = -1,
+    bool IsActor = false,
+    float Brightness = 1.0f);

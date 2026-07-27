@@ -188,7 +188,7 @@ public static class SoftwareRaycastRenderer
                 {
                     var sourceY = ((y - top) * WolfensteinSprite.Size) / projected.RenderedSize;
                     if (sprite.TryGetIndex(sourceX, sourceY, out var index))
-                        WritePixel(pixels, width, x, y, palette.GetColor(index));
+                        WritePixel(pixels, width, x, y, palette.GetColor(index).Scale(projected.Brightness));
                 }
             }
         }
