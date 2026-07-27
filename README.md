@@ -16,6 +16,10 @@ Press F2 at any time during play to switch between the faithful software rendere
 
 ![A 50/50 comparison of Wolfenshine's enhanced and authentic renderers](img/renderer-comparison.png)
 
+The enhanced renderer also applies dynamic light to enemies. The example below shows a guard moving into and out of a ceiling light, with gunfire briefly illuminating both the enemy and the surrounding room.
+
+![A guard moving through ceiling light and being illuminated by muzzle flashes](img/enemy-lighting.webp)
+
 ## What works today
 
 - All 60 maps from the six-episode edition load directly from the original data files.
