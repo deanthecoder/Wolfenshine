@@ -229,6 +229,8 @@ public sealed partial class MainWindow : Window
 
     private bool SetKeyState(Key key, bool isDown)
     {
+        var isMacOs = OperatingSystem.IsMacOS();
+        
         switch (key)
         {
             case Key.Up:
@@ -251,8 +253,10 @@ public sealed partial class MainWindow : Window
             case Key.RightShift:
                 m_run = isDown;
                 return true;
-            case Key.LWin:
-            case Key.RWin:
+            case Key.LeftCtrl when !isMacOs:
+            case Key.RightCtrl when !isMacOs:
+            case Key.LWin when isMacOs:
+            case Key.RWin when isMacOs:
                 m_attack = isDown;
                 return true;
             case Key.LeftAlt:
