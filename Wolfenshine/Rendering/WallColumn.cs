@@ -14,11 +14,13 @@ namespace Wolfenshine.Rendering;
 /// Describes the first wall hit by one screen-column ray.
 /// </summary>
 /// <remarks>
-/// Both software and future GPU renderers can consume the same compact raycast result.
+/// Both renderers consume the same compact raycast result; enhanced rendering also uses the concave-corner flags.
 /// </remarks>
 public readonly record struct WallColumn(
     double Distance,
     double TextureU,
     ushort Tile,
     WallSide Side,
-    bool IsDoorJamb = false);
+    bool IsDoorJamb = false,
+    bool HasConcaveTextureStart = false,
+    bool HasConcaveTextureEnd = false);

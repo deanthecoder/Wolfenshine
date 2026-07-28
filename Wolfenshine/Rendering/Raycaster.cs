@@ -141,10 +141,18 @@ public static class Raycaster
             ? camera.Y + (distance * rayDirectionY)
             : camera.X + (distance * rayDirectionX);
         var textureU = wallPosition - Math.Floor(wallPosition);
+        var isMapWall = mapX >= 0 && mapX < map.Width && mapY >= 0 && mapY < map.Height;
+        var hasConcaveWorldStart = isMapWall && (side == WallSide.Vertical
+            ? IsConcaveCornerWall(map, doors, pushWalls, mapX - stepX, mapY - 1)
+            : IsConcaveCornerWall(map, doors, pushWalls, mapX - 1, mapY - stepY));
+        var hasConcaveWorldEnd = isMapWall && (side == WallSide.Vertical
+            ? IsConcaveCornerWall(map, doors, pushWalls, mapX - stepX, mapY + 1)
+            : IsConcaveCornerWall(map, doors, pushWalls, mapX + 1, mapY - stepY));
         // Match the original renderer's face orientation. Subtracting from the largest value below one
         // mirrors discrete texels exactly: column zero becomes 63 rather than overflowing to column 64.
-        if (side == WallSide.Vertical && rayDirectionX < 0.0 ||
-            side == WallSide.Horizontal && rayDirectionY > 0.0)
+        var isTextureMirrored = side == WallSide.Vertical && rayDirectionX < 0.0 ||
+                                side == WallSide.Horizontal && rayDirectionY > 0.0;
+        if (isTextureMirrored)
         {
             textureU = double.BitDecrement(1.0) - textureU;
         }
@@ -153,8 +161,25 @@ public static class Raycaster
         var isDoorJamb = side == WallSide.Vertical
             ? doors.Get(mapX - stepX, mapY) != null
             : doors.Get(mapX, mapY - stepY) != null;
-        return new WallColumn(distance, textureU, tile, side, isDoorJamb);
+        return new WallColumn(
+            distance,
+            textureU,
+            tile,
+            side,
+            isDoorJamb,
+            isTextureMirrored ? hasConcaveWorldEnd : hasConcaveWorldStart,
+            isTextureMirrored ? hasConcaveWorldStart : hasConcaveWorldEnd);
     }
+
+    private static bool IsConcaveCornerWall(
+        WolfensteinMap map,
+        WolfensteinDoors doors,
+        WolfensteinPushWalls pushWalls,
+        int x,
+        int y) =>
+        map.IsSolid(x, y) &&
+        doors.Get(x, y) == null &&
+        pushWalls?.IsOriginalWallSuppressed(x, y) != true;
 
     private static bool TryHitPushWall(
         WolfensteinPushWalls pushWalls,

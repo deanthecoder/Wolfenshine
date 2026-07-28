@@ -191,7 +191,12 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_wallColumns[target] = (float)m_columns[column].Distance;
             m_wallColumns[target + 1] = (float)m_columns[column].TextureU;
             m_wallColumns[target + 2] = WallTextures.GetPageIndex(m_columns[column]);
-            m_wallColumns[target + 3] = m_columns[column].Side == WallSide.Horizontal ? 1.0f : 0.0f;
+            var flags = m_columns[column].Side == WallSide.Horizontal ? 1 : 0;
+            if (m_columns[column].HasConcaveTextureStart)
+                flags |= 2;
+            if (m_columns[column].HasConcaveTextureEnd)
+                flags |= 4;
+            m_wallColumns[target + 3] = flags;
         }
     }
 

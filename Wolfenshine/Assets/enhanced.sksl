@@ -27,7 +27,8 @@ uniform float4 deathColor;        // Original palette red used by the death tran
 //   X = perpendicular distance; also the future wall depth
 //   Y = horizontal texture coordinate, 0..1
 //   Z = resolved VSWAP texture-page index
-//   W = wall orientation: 0 vertical, 1 horizontal
+//   W = packed wall flags: bit 0 horizontal orientation, bit 1 concave
+//       corner at texture U=0, bit 2 concave corner at texture U=1
 uniform float4 wallColumns[320];
 
 // The thirty-two nearest light-emitting map objects:
@@ -73,17 +74,21 @@ float smoothRamp(float value)
     return value * value * (3.0 - (2.0 * value));
 }
 
-float wallAmbientOcclusion(float textureU, float textureV)
+float wallAmbientOcclusion(float textureU, float textureV, float packedFlags)
 {
     // Wolfenstein's one-tile-high walls have no geometric bevels or lightmap,
-    // so shade a few texels at each boundary to suggest contact shadow. The
-    // horizontal and vertical terms combine to make corners a little deeper.
-    float horizontalDistance = min(textureU, 1.0 - textureU);
+    // so shade their floor/ceiling boundaries and only those horizontal ends
+    // where map geometry identifies a genuine inward corner.
+    float textureStartCorner = floor(packedFlags / 2.0) - (floor(packedFlags / 4.0) * 2.0);
+    float textureEndCorner = floor(packedFlags / 4.0);
     float verticalDistance = min(textureV, 1.0 - textureV);
-    float horizontalEdge = smoothRamp(horizontalDistance / 0.11);
+    float textureStartEdge = (1.0 - smoothRamp(textureU / 0.11)) * textureStartCorner;
+    float textureEndEdge = (1.0 - smoothRamp((1.0 - textureU) / 0.11)) * textureEndCorner;
     float verticalEdge = smoothRamp(verticalDistance / 0.10);
-    float occlusion = ((1.0 - horizontalEdge) * 0.073) + ((1.0 - verticalEdge) * 0.093);
-    return 1.0 - min(occlusion, 0.15);
+    // Stronger shading at a true inward join makes the otherwise paper-thin grid geometry read as a solid corner.
+    float occlusion = ((textureStartEdge + textureEndEdge) * 0.60) +
+                      ((1.0 - verticalEdge) * 0.093);
+    return 1.0 - min(occlusion, 0.65);
 }
 
 float surfaceContactAmbientOcclusion(float pixelDistance, float projectedWallHeight)
@@ -209,7 +214,8 @@ float4 main(float2 fragment)
         // Distance is perpendicular to the camera plane, so this darkening does
         // not bow across the screen and can later be combined with real lights.
         float illumination = distanceIllumination(distance);
-        illumination *= mix(1.0, 0.92, column.w);
+        float orientation = column.w - (floor(column.w / 2.0) * 2.0);
+        illumination *= mix(1.0, 0.92, orientation);
         float2 wallPosition = playerPosition + (rayDirection * distance);
         // Vertical walls receive a restrained blend of the upward and downward
         // components. This lets local sources such as treasure softly illuminate
@@ -217,7 +223,7 @@ float4 main(float2 fragment)
         illumination += surfaceIllumination(wallPosition, 0.5) * 0.60;
         illumination += muzzleIllumination(wallPosition);
         color.rgb *= min(illumination, 1.0);
-        color.rgb *= wallAmbientOcclusion(column.y, textureV);
+        color.rgb *= wallAmbientOcclusion(column.y, textureV, column.w);
     }
 
     // World sprites follow view bob; the HUD remains fixed.

@@ -58,6 +58,42 @@ public sealed class RaycasterTests
             Assert.That(column.Side, Is.EqualTo(WallSide.Horizontal));
             Assert.That(column.Distance, Is.EqualTo(1.5).Within(0.0001));
             Assert.That(column.TextureU, Is.EqualTo(0.5).Within(0.0001));
+            Assert.That(column.HasConcaveTextureStart, Is.False);
+            Assert.That(column.HasConcaveTextureEnd, Is.False);
+        });
+    }
+
+    [Test]
+    public void GivenInwardWallJoinCheckConcaveTextureStartIsIdentified()
+    {
+        var map = CreateMap(19);
+        ((ushort[])map.Walls)[(1 * map.Width) + 1] = 1;
+        var camera = RaycastCamera.FromPlayerStart(map);
+        var columns = new WallColumn[1];
+
+        Raycaster.Cast(map, WolfensteinDoors.FromMap(map), camera, columns);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(columns[0].HasConcaveTextureStart, Is.True);
+            Assert.That(columns[0].HasConcaveTextureEnd, Is.False);
+        });
+    }
+
+    [Test]
+    public void GivenMirroredInwardWallJoinCheckConcaveFlagFollowsTextureOrientation()
+    {
+        var map = CreateMap(19);
+        ((ushort[])map.Walls)[(3 * map.Width) + 1] = 1;
+        var camera = new RaycastCamera(2.5, 2.5, 0.0, 1.0, 0.0, 0.0);
+        var columns = new WallColumn[1];
+
+        Raycaster.Cast(map, WolfensteinDoors.FromMap(map), camera, columns);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(columns[0].HasConcaveTextureStart, Is.False);
+            Assert.That(columns[0].HasConcaveTextureEnd, Is.True);
         });
     }
 
