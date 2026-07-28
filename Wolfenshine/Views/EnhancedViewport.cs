@@ -36,6 +36,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const int LightCount = 32;
     private const int LightChannelCount = 4;
     private const int LightRadiusChannelCount = 2;
+    private const int AmbientMapPixelsPerTile = 4;
     private readonly float[] m_wallColumns = new float[ViewportWidth * ColumnChannelCount];
     private readonly float[] m_sceneLights = new float[LightCount * LightChannelCount];
     private readonly float[] m_sceneLightRadii = new float[LightCount * LightRadiusChannelCount];
@@ -44,6 +45,9 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly float[] m_cameraDirection = new float[2];
     private readonly float[] m_cameraPlane = new float[2];
     private readonly byte[] m_weaponPixels = new byte[ViewportWidth * ViewportHeight * 4];
+    private byte[] m_areaAmbientPixels = [];
+    private double[] m_areaAmbientDoorOpenAmounts = [];
+    private bool m_areaAmbientBitmapDirty;
     private WorldSprite[] m_litWorldSprites = [];
     private readonly SKBitmap m_overlayBitmap = new(new SKImageInfo(
         ViewportWidth,
@@ -57,6 +61,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         SKAlphaType.Unpremul));
     private readonly SKRuntimeEffect m_effect;
     private SKBitmap m_wallAtlas;
+    private SKBitmap m_areaAmbientBitmap;
     private WolfensteinWallTextures m_atlasWallTextures;
     private WolfensteinPalette m_atlasPalette;
     private WolfensteinMap m_areaAmbientSourceMap;
@@ -117,10 +122,11 @@ public sealed class EnhancedViewport : SoftwareViewport
 
         EnsureWallAtlas();
         EnsureAreaAmbientMap();
-        var ambientScale = (float)m_areaAmbientMap.GetAmbientScale(Camera.X, Camera.Y, Doors);
+        UpdateAreaAmbientBitmap();
+        var playerAmbientScale = (float)m_areaAmbientMap.GetAmbientScale(Camera.X, Camera.Y, Doors);
         BuildColumnBuffer();
         BuildLightBuffer();
-        BuildSoftwareOverlays(ambientScale);
+        BuildSoftwareOverlays();
         m_playerPosition[0] = (float)Camera.X;
         m_playerPosition[1] = (float)Camera.Y;
         m_cameraDirection[0] = (float)Camera.DirectionX;
@@ -131,6 +137,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             new Rect(Bounds.Size),
             m_effect,
             m_wallAtlas,
+            m_areaAmbientBitmap,
             m_overlayBitmap,
             m_weaponOverlayBitmap,
             m_wallColumns,
@@ -140,7 +147,9 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_cameraDirection,
             m_cameraPlane,
             (float)MuzzleFlash,
-            ambientScale,
+            playerAmbientScale,
+            (float)AreaAmbientMap.MaximumAmbientScale,
+            AmbientMapPixelsPerTile,
             (float)ViewBob,
             (float)DamageFlash,
             (float)DeathFade,
@@ -156,6 +165,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_overlayBitmap.Dispose();
         m_weaponOverlayBitmap.Dispose();
         m_wallAtlas?.Dispose();
+        m_areaAmbientBitmap?.Dispose();
         m_effect.Dispose();
     }
 
@@ -194,6 +204,95 @@ public sealed class EnhancedViewport : SoftwareViewport
             return;
         m_areaAmbientSourceMap = Map;
         m_areaAmbientMap = AreaAmbientMap.FromMap(Map);
+        m_areaAmbientBitmap?.Dispose();
+        m_areaAmbientBitmap = new SKBitmap(new SKImageInfo(
+            Map.Width * AmbientMapPixelsPerTile,
+            Map.Height * AmbientMapPixelsPerTile,
+            SKColorType.Rgba8888,
+            SKAlphaType.Opaque));
+        m_areaAmbientPixels = new byte[
+            m_areaAmbientBitmap.Width *
+            m_areaAmbientBitmap.Height *
+            4];
+        m_areaAmbientDoorOpenAmounts = Enumerable
+            .Repeat(double.NaN, Doors.Items.Count)
+            .ToArray();
+        m_areaAmbientBitmapDirty = true;
+    }
+
+    private void UpdateAreaAmbientBitmap()
+    {
+        var doorStateChanged = m_areaAmbientBitmapDirty ||
+                               m_areaAmbientDoorOpenAmounts.Length != Doors.Items.Count;
+        if (doorStateChanged)
+            m_areaAmbientDoorOpenAmounts = new double[Doors.Items.Count];
+        for (var index = 0; index < Doors.Items.Count; index++)
+        {
+            var openAmount = Doors.Items[index].OpenAmount;
+            if (m_areaAmbientDoorOpenAmounts[index] == openAmount)
+                continue;
+            m_areaAmbientDoorOpenAmounts[index] = openAmount;
+            doorStateChanged = true;
+        }
+        if (!doorStateChanged)
+            return;
+
+        for (var pixelY = 0; pixelY < m_areaAmbientBitmap.Height; pixelY++)
+        {
+            var worldY = (pixelY + 0.5) / AmbientMapPixelsPerTile;
+            for (var pixelX = 0; pixelX < m_areaAmbientBitmap.Width; pixelX++)
+            {
+                var worldX = (pixelX + 0.5) / AmbientMapPixelsPerTile;
+                SetAreaAmbientPixel(
+                    pixelX,
+                    pixelY,
+                    m_areaAmbientMap.GetAmbientScale(worldX, worldY));
+            }
+        }
+        foreach (var door in Doors.Items.Where(item => item.OpenAmount > 0.0))
+        {
+            var vertical = door.Orientation == DoorOrientation.Vertical;
+            var radiusX = vertical ? AreaAmbientMap.DoorBlendRadius : AreaAmbientMap.DoorBlendHalfWidth;
+            var radiusY = vertical ? AreaAmbientMap.DoorBlendHalfWidth : AreaAmbientMap.DoorBlendRadius;
+            var centerX = door.X + 0.5;
+            var centerY = door.Y + 0.5;
+            var firstPixelX = Math.Max(0, (int)Math.Floor(
+                (centerX - radiusX) * AmbientMapPixelsPerTile));
+            var lastPixelX = Math.Min(m_areaAmbientBitmap.Width - 1, (int)Math.Ceiling(
+                (centerX + radiusX) * AmbientMapPixelsPerTile));
+            var firstPixelY = Math.Max(0, (int)Math.Floor(
+                (centerY - radiusY) * AmbientMapPixelsPerTile));
+            var lastPixelY = Math.Min(m_areaAmbientBitmap.Height - 1, (int)Math.Ceiling(
+                (centerY + radiusY) * AmbientMapPixelsPerTile));
+            for (var pixelY = firstPixelY; pixelY <= lastPixelY; pixelY++)
+            {
+                var worldY = (pixelY + 0.5) / AmbientMapPixelsPerTile;
+                for (var pixelX = firstPixelX; pixelX <= lastPixelX; pixelX++)
+                {
+                    var worldX = (pixelX + 0.5) / AmbientMapPixelsPerTile;
+                    SetAreaAmbientPixel(
+                        pixelX,
+                        pixelY,
+                        m_areaAmbientMap.GetAmbientScale(worldX, worldY, Doors));
+                }
+            }
+        }
+        CopyPixelsToBitmap(m_areaAmbientPixels, m_areaAmbientBitmap);
+        m_areaAmbientBitmapDirty = false;
+    }
+
+    private void SetAreaAmbientPixel(int pixelX, int pixelY, double ambientScale)
+    {
+        var ambient = (byte)Math.Round(
+            Math.Clamp(
+                ambientScale / AreaAmbientMap.MaximumAmbientScale,
+                0.0,
+                1.0) * byte.MaxValue);
+        var target = ((pixelY * m_areaAmbientBitmap.Width) + pixelX) * 4;
+        m_areaAmbientPixels[target] = ambient;
+        m_areaAmbientPixels[target + 1] = ambient;
+        m_areaAmbientPixels[target + 2] = ambient;
+        m_areaAmbientPixels[target + 3] = byte.MaxValue;
     }
 
     private void BuildColumnBuffer()
@@ -294,7 +393,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_sceneLightRadii[radiusTarget + 1] = downwardRadius;
     }
 
-    private void BuildSoftwareOverlays(float ambientScale)
+    private void BuildSoftwareOverlays()
     {
         Array.Clear(m_pixels);
         Array.Clear(m_weaponPixels);
@@ -308,7 +407,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 var sprite = StaticObjects[index];
                 m_litWorldSprites[index] = sprite with
                 {
-                    Brightness = CalculateSpriteBrightness(sprite, ambientScale)
+                    Brightness = CalculateSpriteBrightness(sprite)
                 };
             }
             if (m_projectedSprites.Length != StaticObjects.Count)
@@ -356,9 +455,14 @@ public sealed class EnhancedViewport : SoftwareViewport
         CopyPixelsToBitmap(m_weaponPixels, m_weaponOverlayBitmap);
     }
 
-    private float CalculateSpriteBrightness(WorldSprite worldSprite, float ambientScale)
+    private float CalculateSpriteBrightness(WorldSprite worldSprite)
     {
-        var illumination = (worldSprite.IsActor ? 0.60f : 1.0f) * Math.Clamp(ambientScale, 0.35f, 1.0f);
+        var ambientScale = (float)m_areaAmbientMap.GetAmbientScale(worldSprite.X, worldSprite.Y);
+        var illumination = (worldSprite.IsActor ? 0.60f : 1.0f) *
+                           Math.Clamp(
+                               ambientScale,
+                               (float)AreaAmbientMap.MinimumAmbientScale,
+                               (float)AreaAmbientMap.MaximumAmbientScale);
         if (LightObjects != null)
         {
             foreach (var sprite in LightObjects)
@@ -420,8 +524,8 @@ public sealed class EnhancedViewport : SoftwareViewport
 
     private static void CopyPixelsToBitmap(byte[] pixels, SKBitmap bitmap)
     {
-        var sourceRowBytes = ViewportWidth * 4;
-        for (var y = 0; y < ViewportHeight; y++)
+        var sourceRowBytes = bitmap.Width * 4;
+        for (var y = 0; y < bitmap.Height; y++)
         {
             Marshal.Copy(
                 pixels,
@@ -438,6 +542,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         Rect bounds,
         SKRuntimeEffect effect,
         SKBitmap wallTextures,
+        SKBitmap areaAmbientMap,
         SKBitmap spriteOverlay,
         SKBitmap weaponOverlay,
         float[] wallColumns,
@@ -447,7 +552,9 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] cameraDirection,
         float[] cameraPlane,
         float muzzleFlash,
-        float ambientScale,
+        float playerAmbientScale,
+        float areaAmbientMaximum,
+        float areaAmbientPixelsPerTile,
         float viewBob,
         float damageFlash,
         float deathFade,
@@ -473,6 +580,9 @@ public sealed class EnhancedViewport : SoftwareViewport
                 return;
             using var lease = leaseFeature.Lease();
             using var textureShader = wallTextures.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+            using var areaAmbientShader = areaAmbientMap.ToShader(
+                SKShaderTileMode.Clamp,
+                SKShaderTileMode.Clamp);
             using var overlayShader = spriteOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             using var weaponShader = weaponOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             var uniforms = new SKRuntimeEffectUniforms(effect)
@@ -485,7 +595,9 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["cameraDirection"] = cameraDirection,
                 ["cameraPlane"] = cameraPlane,
                 ["muzzleFlash"] = muzzleFlash,
-                ["ambientScale"] = ambientScale,
+                ["playerAmbientScale"] = playerAmbientScale,
+                ["areaAmbientMaximum"] = areaAmbientMaximum,
+                ["areaAmbientPixelsPerTile"] = areaAmbientPixelsPerTile,
                 ["viewBob"] = viewBob,
                 ["damageFlash"] = damageFlash,
                 ["deathFade"] = deathFade,
@@ -497,6 +609,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             var children = new SKRuntimeEffectChildren(effect)
             {
                 ["wallTextureAtlas"] = textureShader,
+                ["areaAmbientMap"] = areaAmbientShader,
                 ["softwareSpriteOverlay"] = overlayShader,
                 ["softwareWeaponOverlay"] = weaponShader
             };

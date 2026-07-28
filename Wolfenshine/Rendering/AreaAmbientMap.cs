@@ -14,93 +14,111 @@ using Wolfenshine.Maps;
 namespace Wolfenshine.Rendering;
 
 /// <summary>
-/// Estimates ambient light from fixture coverage within Wolfenstein map areas and blends it across doors.
+/// Derives architectural lighting zones from floor geometry and blends their ambience across doors.
 /// </summary>
 /// <remarks>
-/// Original area tiles provide room boundaries. Both fixture strength and illuminated floor coverage are considered,
-/// preventing either one strong lamp or several weak lamps in a large corridor from making it fully bright.
+/// Doors divide rooms even when the original map reuses one sound-area tile on both sides. Secret pushwalls do the
+/// opposite: their adjoining floor regions are merged so lighting cannot disclose the hidden opening.
 /// </remarks>
 public sealed class AreaAmbientMap
 {
+    public const double MinimumAmbientScale = 0.42;
+    public const double MaximumAmbientScale = 1.25;
+    public const double DoorBlendRadius = 1.50;
+    public const double DoorBlendHalfWidth = 0.85;
+    private const ushort AmbushTile = 106;
     private const ushort FirstAreaTile = 107;
-    private const double MinimumAmbientScale = 0.35;
+    private const ushort PushwallMarker = 98;
+    private const int SmallRoomTileCount = 16;
+    private const double SmallRoomInheritance = 0.75;
+    private const double ChandelierAmbientBoost = MaximumAmbientScale - 1.0;
+    private const double FullChandelierStrength = 3.0;
     private const double FullLightingCoverage = 0.38;
     private const double FullFixtureStrength = 2.4;
-    private const double DoorBlendRadius = 1.50;
-    private const double DoorBlendHalfWidth = 0.85;
     private readonly WolfensteinMap m_map;
-    private readonly IReadOnlyDictionary<ushort, double> m_areaAmbientScales;
+    private readonly int[] m_zoneByTile;
+    private readonly IReadOnlyList<double> m_zoneAmbientScales;
     private readonly IReadOnlyList<DoorTransition> m_doorTransitions;
 
     private AreaAmbientMap(
         WolfensteinMap map,
-        IReadOnlyDictionary<ushort, double> areaAmbientScales,
+        int[] zoneByTile,
+        IReadOnlyList<double> zoneAmbientScales,
         IReadOnlyList<DoorTransition> doorTransitions)
     {
         m_map = map;
-        m_areaAmbientScales = areaAmbientScales;
+        m_zoneByTile = zoneByTile;
+        m_zoneAmbientScales = zoneAmbientScales;
         m_doorTransitions = doorTransitions;
     }
 
     /// <summary>
-    /// Measures static light coverage for every numbered floor area in a map.
+    /// Finds rooms and corridors separated by ordinary doors, then measures their broad ambient-light coverage.
     /// </summary>
     public static AreaAmbientMap FromMap(WolfensteinMap map)
     {
         ArgumentNullException.ThrowIfNull(map);
-        var areaTileCounts = new Dictionary<ushort, int>();
-        for (var y = 0; y < map.Height; y++)
-        {
-            for (var x = 0; x < map.Width; x++)
-            {
-                var area = map.GetWall(x, y);
-                if (area >= FirstAreaTile)
-                    areaTileCounts[area] = areaTileCounts.GetValueOrDefault(area) + 1;
-            }
-        }
-
-        var areaLightCoverage = new Dictionary<ushort, double>();
-        var areaFixtureStrength = new Dictionary<ushort, double>();
+        var layout = BuildZoneLayout(map);
+        var doorTransitions = FindDoorTransitions(map, layout.ZoneByTile);
+        var zoneLightCoverage = new double[layout.TileCounts.Count];
+        var zoneFixtureStrength = new double[layout.TileCounts.Count];
+        var zoneChandelierStrength = new double[layout.TileCounts.Count];
+        var zoneFixtureCounts = new int[layout.TileCounts.Count];
         foreach (var worldSprite in WolfensteinStaticObjects.FromMap(map))
         {
-            if (WolfensteinStaticObjects.GetPickupType(worldSprite.SpriteNumber) != WolfensteinPickupType.None)
+            if (!ContributesToRoomAmbient(worldSprite.SpriteNumber))
                 continue;
             var (_, downwardBrightness) = WolfensteinStaticObjects.GetLightBrightness(worldSprite.SpriteNumber);
             var (_, downwardRadius) = WolfensteinStaticObjects.GetLightRadii(worldSprite.SpriteNumber);
             if (downwardBrightness <= 0.0f || downwardRadius <= 0.0f)
                 continue;
-            var area = FindArea(map, (int)worldSprite.X, (int)worldSprite.Y);
-            if (area < FirstAreaTile)
+            var zone = GetZone(layout.ZoneByTile, map, (int)worldSprite.X, (int)worldSprite.Y);
+            if (zone < 0)
                 continue;
-            var coverage = Math.PI * downwardRadius * downwardRadius * downwardBrightness;
-            areaLightCoverage[area] = areaLightCoverage.GetValueOrDefault(area) + coverage;
-            areaFixtureStrength[area] = areaFixtureStrength.GetValueOrDefault(area) + downwardBrightness;
+            zoneLightCoverage[zone] += Math.PI * downwardRadius * downwardRadius * downwardBrightness;
+            zoneFixtureStrength[zone] += downwardBrightness;
+            if (worldSprite.SpriteNumber == 6)
+                zoneChandelierStrength[zone] += downwardBrightness;
+            zoneFixtureCounts[zone]++;
         }
 
-        var areaAmbientScales = areaTileCounts.ToDictionary(
-            pair => pair.Key,
-            pair => CalculateAmbientScale(
-                areaLightCoverage.GetValueOrDefault(pair.Key),
-                areaFixtureStrength.GetValueOrDefault(pair.Key),
-                pair.Value));
-        return new AreaAmbientMap(map, areaAmbientScales, FindDoorTransitions(map));
+        var zoneAmbientScales = new double[layout.TileCounts.Count];
+        for (var zone = 0; zone < zoneAmbientScales.Length; zone++)
+        {
+            zoneAmbientScales[zone] = CalculateAmbientScale(
+                zoneLightCoverage[zone],
+                zoneFixtureStrength[zone],
+                zoneChandelierStrength[zone],
+                layout.TileCounts[zone]);
+        }
+        InheritSmallRoomAmbient(
+            zoneAmbientScales,
+            zoneFixtureCounts,
+            layout.TileCounts,
+            doorTransitions);
+        return new AreaAmbientMap(map, layout.ZoneByTile, zoneAmbientScales, doorTransitions);
     }
 
     /// <summary>
-    /// Returns the local ambient scale, including a smooth transition when passing through an open door.
+    /// Returns the static ambient scale at a world position without doorway transition effects.
+    /// </summary>
+    public double GetAmbientScale(double x, double y)
+    {
+        ValidatePosition(x, y);
+        return GetZoneAmbientScale(FindZone((int)Math.Floor(x), (int)Math.Floor(y)));
+    }
+
+    /// <summary>
+    /// Returns the local ambient scale, including a smooth transition while passing through an open door.
     /// </summary>
     public double GetAmbientScale(double x, double y, WolfensteinDoors doors)
     {
-        if (!double.IsFinite(x))
-            throw new ArgumentOutOfRangeException(nameof(x));
-        if (!double.IsFinite(y))
-            throw new ArgumentOutOfRangeException(nameof(y));
+        ValidatePosition(x, y);
         ArgumentNullException.ThrowIfNull(doors);
         if (!ReferenceEquals(m_map, doors.Map))
             throw new ArgumentException("The door collection belongs to a different map.", nameof(doors));
 
-        var currentArea = FindArea(m_map, (int)Math.Floor(x), (int)Math.Floor(y));
-        var ambientScale = GetAreaAmbientScale(currentArea);
+        var ambientScale = GetZoneAmbientScale(FindZone((int)Math.Floor(x), (int)Math.Floor(y)));
         var nearestDoorDistanceSquared = double.PositiveInfinity;
         foreach (var transition in m_doorTransitions)
         {
@@ -121,8 +139,8 @@ public sealed class AreaAmbientMap
                 1.0);
             var smoothBlend = blendPosition * blendPosition * (3.0 - (2.0 * blendPosition));
             var doorAmbient = Lerp(
-                GetAreaAmbientScale(transition.NegativeArea),
-                GetAreaAmbientScale(transition.PositiveArea),
+                GetZoneAmbientScale(transition.NegativeZone),
+                GetZoneAmbientScale(transition.PositiveZone),
                 smoothBlend);
             ambientScale = Lerp(ambientScale, doorAmbient, door.OpenAmount);
             nearestDoorDistanceSquared = distanceSquared;
@@ -130,20 +148,143 @@ public sealed class AreaAmbientMap
         return ambientScale;
     }
 
-    private static double CalculateAmbientScale(double lightCoverage, double fixtureStrength, int areaTileCount)
+    private static ZoneLayout BuildZoneLayout(WolfensteinMap map)
     {
-        var coverageRatio = lightCoverage / Math.Max(1, areaTileCount);
+        var rawZoneByTile = Enumerable.Repeat(-1, map.Width * map.Height).ToArray();
+        var rawTileCounts = new List<int>();
+        var pending = new Queue<(int X, int Y)>();
+        for (var y = 0; y < map.Height; y++)
+        {
+            for (var x = 0; x < map.Width; x++)
+            {
+                if (!IsWalkableArea(map.GetWall(x, y)) || GetZone(rawZoneByTile, map, x, y) >= 0)
+                    continue;
+                var rawZone = rawTileCounts.Count;
+                var tileCount = 0;
+                rawZoneByTile[(y * map.Width) + x] = rawZone;
+                pending.Enqueue((x, y));
+                while (pending.TryDequeue(out var tile))
+                {
+                    tileCount++;
+                    TryQueueFloor(map, rawZoneByTile, pending, rawZone, tile.X - 1, tile.Y);
+                    TryQueueFloor(map, rawZoneByTile, pending, rawZone, tile.X + 1, tile.Y);
+                    TryQueueFloor(map, rawZoneByTile, pending, rawZone, tile.X, tile.Y - 1);
+                    TryQueueFloor(map, rawZoneByTile, pending, rawZone, tile.X, tile.Y + 1);
+                }
+                rawTileCounts.Add(tileCount);
+            }
+        }
+
+        var mergedZones = new DisjointSet(rawTileCounts.Count);
+        for (var y = 0; y < map.Height; y++)
+        {
+            for (var x = 0; x < map.Width; x++)
+            {
+                if (map.GetObject(x, y) != PushwallMarker)
+                    continue;
+                var adjoiningZones = new[]
+                {
+                    GetZone(rawZoneByTile, map, x - 1, y),
+                    GetZone(rawZoneByTile, map, x + 1, y),
+                    GetZone(rawZoneByTile, map, x, y - 1),
+                    GetZone(rawZoneByTile, map, x, y + 1)
+                }.Where(zone => zone >= 0).Distinct().ToArray();
+                for (var index = 1; index < adjoiningZones.Length; index++)
+                    mergedZones.Union(adjoiningZones[0], adjoiningZones[index]);
+            }
+        }
+
+        var zoneByTile = Enumerable.Repeat(-1, rawZoneByTile.Length).ToArray();
+        var mergedZoneIds = new Dictionary<int, int>();
+        var tileCounts = new List<int>();
+        for (var index = 0; index < rawZoneByTile.Length; index++)
+        {
+            if (rawZoneByTile[index] < 0)
+                continue;
+            var root = mergedZones.Find(rawZoneByTile[index]);
+            if (!mergedZoneIds.TryGetValue(root, out var zone))
+            {
+                zone = mergedZoneIds.Count;
+                mergedZoneIds[root] = zone;
+                tileCounts.Add(0);
+            }
+            zoneByTile[index] = zone;
+            tileCounts[zone]++;
+        }
+        return new ZoneLayout(zoneByTile, tileCounts);
+    }
+
+    private static void TryQueueFloor(
+        WolfensteinMap map,
+        int[] zoneByTile,
+        Queue<(int X, int Y)> pending,
+        int zone,
+        int x,
+        int y)
+    {
+        if (x < 0 || x >= map.Width || y < 0 || y >= map.Height ||
+            !IsWalkableArea(map.GetWall(x, y)) ||
+            GetZone(zoneByTile, map, x, y) >= 0)
+        {
+            return;
+        }
+        zoneByTile[(y * map.Width) + x] = zone;
+        pending.Enqueue((x, y));
+    }
+
+    private static bool IsWalkableArea(ushort tile) => tile == AmbushTile || tile >= FirstAreaTile;
+
+    private static bool ContributesToRoomAmbient(int spriteNumber)
+    {
+        // Green ceiling lights remain local light pools; counting them globally makes blue-stone corridors fully bright.
+        return spriteNumber is 5 or 6;
+    }
+
+    private static double CalculateAmbientScale(
+        double lightCoverage,
+        double fixtureStrength,
+        double chandelierStrength,
+        int tileCount)
+    {
+        var coverageRatio = lightCoverage / Math.Max(1, tileCount);
         var coverageLevel = Math.Clamp(coverageRatio / FullLightingCoverage, 0.0, 1.0);
         var fixtureLevel = Math.Clamp(fixtureStrength / FullFixtureStrength, 0.0, 1.0);
         var lightLevel = Math.Min(coverageLevel, fixtureLevel);
         var smoothLightLevel = lightLevel * lightLevel * (3.0 - (2.0 * lightLevel));
-        return Lerp(MinimumAmbientScale, 1.0, smoothLightLevel);
+        var chandelierLevel = Math.Clamp(chandelierStrength / FullChandelierStrength, 0.0, 1.0);
+        var chandelierBoost = ChandelierAmbientBoost * chandelierLevel * coverageLevel;
+        return Lerp(MinimumAmbientScale, 1.0, smoothLightLevel) + chandelierBoost;
     }
 
-    private double GetAreaAmbientScale(ushort area) =>
-        m_areaAmbientScales.GetValueOrDefault(area, 1.0);
+    private static void InheritSmallRoomAmbient(
+        double[] ambientScales,
+        IReadOnlyList<int> fixtureCounts,
+        IReadOnlyList<int> tileCounts,
+        IReadOnlyList<DoorTransition> transitions)
+    {
+        var originalScales = ambientScales.ToArray();
+        for (var zone = 0; zone < ambientScales.Length; zone++)
+        {
+            if (tileCounts[zone] > SmallRoomTileCount || fixtureCounts[zone] > 0)
+                continue;
+            var adjoiningScale = transitions
+                .Where(transition => transition.NegativeZone == zone || transition.PositiveZone == zone)
+                .Select(transition => transition.NegativeZone == zone
+                    ? originalScales[transition.PositiveZone]
+                    : originalScales[transition.NegativeZone])
+                .DefaultIfEmpty(originalScales[zone])
+                .Max();
+            if (adjoiningScale > ambientScales[zone])
+            {
+                ambientScales[zone] = Lerp(
+                    ambientScales[zone],
+                    adjoiningScale,
+                    SmallRoomInheritance);
+            }
+        }
+    }
 
-    private static IReadOnlyList<DoorTransition> FindDoorTransitions(WolfensteinMap map)
+    private static IReadOnlyList<DoorTransition> FindDoorTransitions(WolfensteinMap map, int[] zoneByTile)
     {
         var transitions = new List<DoorTransition>();
         for (var y = 0; y < map.Height; y++)
@@ -154,40 +295,84 @@ public sealed class AreaAmbientMap
                 if (tile is < 90 or > 101)
                     continue;
                 var isVertical = (tile & 1) == 0;
-                var negativeArea = isVertical ? FindArea(map, x - 1, y) : FindArea(map, x, y - 1);
-                var positiveArea = isVertical ? FindArea(map, x + 1, y) : FindArea(map, x, y + 1);
-                if (negativeArea >= FirstAreaTile && positiveArea >= FirstAreaTile)
-                    transitions.Add(new DoorTransition(x, y, isVertical, negativeArea, positiveArea));
+                var negativeZone = isVertical
+                    ? GetZone(zoneByTile, map, x - 1, y)
+                    : GetZone(zoneByTile, map, x, y - 1);
+                var positiveZone = isVertical
+                    ? GetZone(zoneByTile, map, x + 1, y)
+                    : GetZone(zoneByTile, map, x, y + 1);
+                if (negativeZone >= 0 && positiveZone >= 0 && negativeZone != positiveZone)
+                    transitions.Add(new DoorTransition(x, y, isVertical, negativeZone, positiveZone));
             }
         }
         return transitions;
     }
 
-    private static ushort FindArea(WolfensteinMap map, int x, int y)
+    private int FindZone(int x, int y)
     {
-        if (x < 0 || x >= map.Width || y < 0 || y >= map.Height)
-            return 0;
-        var area = map.GetWall(x, y);
-        if (area >= FirstAreaTile)
-            return area;
-        if (x > 0 && map.GetWall(x - 1, y) >= FirstAreaTile)
-            return map.GetWall(x - 1, y);
-        if (x + 1 < map.Width && map.GetWall(x + 1, y) >= FirstAreaTile)
-            return map.GetWall(x + 1, y);
-        if (y > 0 && map.GetWall(x, y - 1) >= FirstAreaTile)
-            return map.GetWall(x, y - 1);
-        return y + 1 < map.Height && map.GetWall(x, y + 1) >= FirstAreaTile
-            ? map.GetWall(x, y + 1)
-            : (ushort)0;
+        var zone = GetZone(m_zoneByTile, m_map, x, y);
+        if (zone >= 0)
+            return zone;
+        zone = GetZone(m_zoneByTile, m_map, x - 1, y);
+        if (zone >= 0)
+            return zone;
+        zone = GetZone(m_zoneByTile, m_map, x + 1, y);
+        if (zone >= 0)
+            return zone;
+        zone = GetZone(m_zoneByTile, m_map, x, y - 1);
+        return zone >= 0 ? zone : GetZone(m_zoneByTile, m_map, x, y + 1);
+    }
+
+    private double GetZoneAmbientScale(int zone) =>
+        zone >= 0 && zone < m_zoneAmbientScales.Count ? m_zoneAmbientScales[zone] : 1.0;
+
+    private static int GetZone(int[] zoneByTile, WolfensteinMap map, int x, int y) =>
+        x < 0 || x >= map.Width || y < 0 || y >= map.Height
+            ? -1
+            : zoneByTile[(y * map.Width) + x];
+
+    private static void ValidatePosition(double x, double y)
+    {
+        if (!double.IsFinite(x))
+            throw new ArgumentOutOfRangeException(nameof(x));
+        if (!double.IsFinite(y))
+            throw new ArgumentOutOfRangeException(nameof(y));
     }
 
     private static double Lerp(double first, double second, double amount) =>
         first + ((second - first) * amount);
 
+    private sealed record ZoneLayout(int[] ZoneByTile, IReadOnlyList<int> TileCounts);
+
     private readonly record struct DoorTransition(
         int X,
         int Y,
         bool IsVertical,
-        ushort NegativeArea,
-        ushort PositiveArea);
+        int NegativeZone,
+        int PositiveZone);
+
+    private sealed class DisjointSet
+    {
+        private readonly int[] m_parents;
+
+        public DisjointSet(int count) => m_parents = Enumerable.Range(0, count).ToArray();
+
+        public int Find(int item)
+        {
+            while (m_parents[item] != item)
+            {
+                m_parents[item] = m_parents[m_parents[item]];
+                item = m_parents[item];
+            }
+            return item;
+        }
+
+        public void Union(int first, int second)
+        {
+            var firstRoot = Find(first);
+            var secondRoot = Find(second);
+            if (firstRoot != secondRoot)
+                m_parents[secondRoot] = firstRoot;
+        }
+    }
 }
