@@ -11,6 +11,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using DTC.Core;
 using Wolfenshine.Audio;
 using Wolfenshine.Maps;
@@ -37,6 +38,8 @@ public sealed class App : Application
             Logger.Instance.SysInfo();
             Logger.Instance.Info("Starting Wolfenshine.");
             MainWindowViewModel viewModel;
+            WolfensteinResources audioResources = null;
+            IReadOnlyList<WolfensteinMusicTrack> musicTracks = null;
             var settings = new WolfenshineSettings();
             try
             {
@@ -48,16 +51,14 @@ public sealed class App : Application
                 var hudGraphics = WolfensteinGraphicsLoader.LoadHudGraphics(resources);
                 var intermissionGraphics = WolfensteinGraphicsLoader.LoadIntermissionGraphics(resources);
                 var difficultyGraphics = WolfensteinGraphicsLoader.LoadDifficultyGraphics(resources);
-                WolfensteinAudioPlayer audioPlayer = null;
                 try
                 {
-                    audioPlayer = new WolfensteinAudioPlayer(
-                        WolfensteinSoundLoader.Load(resources),
-                        WolfensteinMusicLoader.Load(resources));
+                    musicTracks = WolfensteinMusicLoader.Load(resources);
+                    audioResources = resources;
                 }
                 catch (Exception exception)
                 {
-                    Logger.Instance.Warn($"Sound initialization failed; continuing without audio: {exception.Message}");
+                    Logger.Instance.Warn($"Music loading failed; continuing without audio: {exception.Message}");
                 }
                 viewModel = new MainWindowViewModel(
                     resources,
@@ -67,7 +68,7 @@ public sealed class App : Application
                     sprites.PistolReady,
                     sprites,
                     hudGraphics,
-                    audioPlayer,
+                    null,
                     settings,
                     intermissionGraphics,
                     difficultyGraphics);
@@ -83,8 +84,27 @@ public sealed class App : Application
             {
                 DataContext = viewModel
             };
+            if (audioResources != null)
+                _ = InitializeAudioAsync(viewModel, audioResources, musicTracks);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async Task InitializeAudioAsync(
+        MainWindowViewModel viewModel,
+        WolfensteinResources resources,
+        IReadOnlyList<WolfensteinMusicTrack> musicTracks)
+    {
+        try
+        {
+            var sounds = await WolfensteinSoundLoader.LoadAsync(resources).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+                viewModel.AttachAudioPlayer(new WolfensteinAudioPlayer(sounds, musicTracks)));
+        }
+        catch (Exception exception)
+        {
+            Logger.Instance.Warn($"Sound initialization failed; continuing without audio: {exception.Message}");
+        }
     }
 }

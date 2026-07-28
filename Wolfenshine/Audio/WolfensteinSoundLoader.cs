@@ -58,6 +58,17 @@ public static class WolfensteinSoundLoader
             [WolfensteinSoundEffect.DogAttack] = 29
         };
 
+    /// <summary>
+    /// Decodes gameplay sounds on a worker thread so OPL rendering does not delay the UI.
+    /// </summary>
+    public static Task<IReadOnlyDictionary<WolfensteinSoundEffect, WolfensteinSound>> LoadAsync(
+        WolfensteinResources resources,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
+        return Task.Run(() => Load(resources), cancellationToken);
+    }
+
     public static IReadOnlyDictionary<WolfensteinSoundEffect, WolfensteinSound> Load(WolfensteinResources resources)
     {
         ArgumentNullException.ThrowIfNull(resources);

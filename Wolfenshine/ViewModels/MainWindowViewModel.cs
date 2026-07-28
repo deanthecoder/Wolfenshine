@@ -28,7 +28,7 @@ namespace Wolfenshine.ViewModels;
 public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private GameSession m_gameSession;
-    private readonly WolfensteinAudioPlayer m_audioPlayer;
+    private WolfensteinAudioPlayer m_audioPlayer;
     private readonly WolfenshineSettings m_settings;
     private readonly WolfensteinHudGraphics m_hudGraphics;
     private double m_bjAnimationTime;
@@ -68,6 +68,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private GameDifficulty m_difficulty = GameDifficulty.Normal;
     private bool m_isPaused;
     private bool m_isEnhancedRendering;
+    private bool m_isDisposed;
 
     public MainWindowViewModel()
         : this(new WolfensteinDataNotFoundException(
@@ -264,6 +265,25 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(StatusText));
     }
 
+    /// <summary>
+    /// Attaches audio after background sound decoding has completed.
+    /// </summary>
+    public void AttachAudioPlayer(WolfensteinAudioPlayer audioPlayer)
+    {
+        ArgumentNullException.ThrowIfNull(audioPlayer);
+        if (m_isDisposed)
+        {
+            audioPlayer.Dispose();
+            return;
+        }
+        m_audioPlayer?.Dispose();
+        m_audioPlayer = audioPlayer;
+        if (m_isSelectingDifficulty)
+            m_audioPlayer.PlayMusicTrack(14);
+        else if (SelectedMap != null)
+            m_audioPlayer.PlayMusic(SelectedMap.Slot);
+    }
+
     public void ToggleRenderer()
     {
         if (m_gameSession == null || m_isSelectingDifficulty || m_isShowingLevelStats)
@@ -353,6 +373,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        if (m_isDisposed)
+            return;
+        m_isDisposed = true;
         m_audioPlayer?.Dispose();
         m_settings?.Dispose();
     }
