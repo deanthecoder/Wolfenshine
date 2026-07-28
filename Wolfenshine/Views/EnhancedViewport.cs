@@ -36,7 +36,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const int LightCount = 32;
     private const int LightChannelCount = 4;
     private const int LightRadiusChannelCount = 2;
-    private const int AmbientMapPixelsPerTile = 4;
+    private const int AmbientMapPixelsPerTile = 16;
     private readonly float[] m_wallColumns = new float[ViewportWidth * ColumnChannelCount];
     private readonly float[] m_sceneLights = new float[LightCount * LightChannelCount];
     private readonly float[] m_sceneLightRadii = new float[LightCount * LightRadiusChannelCount];
@@ -46,7 +46,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly float[] m_cameraPlane = new float[2];
     private readonly byte[] m_weaponPixels = new byte[ViewportWidth * ViewportHeight * 4];
     private byte[] m_areaAmbientPixels = [];
-    private double[] m_areaAmbientDoorOpenAmounts = [];
+    private byte[] m_areaAmbientBasePixels = [];
     private bool m_areaAmbientBitmapDirty;
     private WorldSprite[] m_litWorldSprites = [];
     private readonly SKBitmap m_overlayBitmap = new(new SKImageInfo(
@@ -214,42 +214,42 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_areaAmbientBitmap.Width *
             m_areaAmbientBitmap.Height *
             4];
-        m_areaAmbientDoorOpenAmounts = Enumerable
-            .Repeat(double.NaN, Doors.Items.Count)
-            .ToArray();
+        m_areaAmbientBasePixels = new byte[m_areaAmbientPixels.Length];
+        BuildAreaAmbientBasePixels();
         m_areaAmbientBitmapDirty = true;
+    }
+
+    private void BuildAreaAmbientBasePixels()
+    {
+        for (var tileY = 0; tileY < Map.Height; tileY++)
+        {
+            for (var tileX = 0; tileX < Map.Width; tileX++)
+            {
+                var ambientScale = m_areaAmbientMap.GetAmbientScale(tileX + 0.5, tileY + 0.5);
+                var firstPixelX = tileX * AmbientMapPixelsPerTile;
+                var firstPixelY = tileY * AmbientMapPixelsPerTile;
+                for (var localY = 0; localY < AmbientMapPixelsPerTile; localY++)
+                {
+                    for (var localX = 0; localX < AmbientMapPixelsPerTile; localX++)
+                    {
+                        SetAreaAmbientPixel(
+                            m_areaAmbientBasePixels,
+                            firstPixelX + localX,
+                            firstPixelY + localY,
+                            ambientScale);
+                    }
+                }
+            }
+        }
     }
 
     private void UpdateAreaAmbientBitmap()
     {
-        var doorStateChanged = m_areaAmbientBitmapDirty ||
-                               m_areaAmbientDoorOpenAmounts.Length != Doors.Items.Count;
-        if (doorStateChanged)
-            m_areaAmbientDoorOpenAmounts = new double[Doors.Items.Count];
-        for (var index = 0; index < Doors.Items.Count; index++)
-        {
-            var openAmount = Doors.Items[index].OpenAmount;
-            if (m_areaAmbientDoorOpenAmounts[index] == openAmount)
-                continue;
-            m_areaAmbientDoorOpenAmounts[index] = openAmount;
-            doorStateChanged = true;
-        }
-        if (!doorStateChanged)
+        if (!m_areaAmbientBitmapDirty)
             return;
 
-        for (var pixelY = 0; pixelY < m_areaAmbientBitmap.Height; pixelY++)
-        {
-            var worldY = (pixelY + 0.5) / AmbientMapPixelsPerTile;
-            for (var pixelX = 0; pixelX < m_areaAmbientBitmap.Width; pixelX++)
-            {
-                var worldX = (pixelX + 0.5) / AmbientMapPixelsPerTile;
-                SetAreaAmbientPixel(
-                    pixelX,
-                    pixelY,
-                    m_areaAmbientMap.GetAmbientScale(worldX, worldY));
-            }
-        }
-        foreach (var door in Doors.Items.Where(item => item.OpenAmount > 0.0))
+        Array.Copy(m_areaAmbientBasePixels, m_areaAmbientPixels, m_areaAmbientPixels.Length);
+        foreach (var door in Doors.Items)
         {
             var vertical = door.Orientation == DoorOrientation.Vertical;
             var radiusX = vertical ? AreaAmbientMap.DoorBlendRadius : AreaAmbientMap.DoorBlendHalfWidth;
@@ -271,6 +271,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 {
                     var worldX = (pixelX + 0.5) / AmbientMapPixelsPerTile;
                     SetAreaAmbientPixel(
+                        m_areaAmbientPixels,
                         pixelX,
                         pixelY,
                         m_areaAmbientMap.GetAmbientScale(worldX, worldY, Doors));
@@ -281,7 +282,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_areaAmbientBitmapDirty = false;
     }
 
-    private void SetAreaAmbientPixel(int pixelX, int pixelY, double ambientScale)
+    private void SetAreaAmbientPixel(byte[] pixels, int pixelX, int pixelY, double ambientScale)
     {
         var ambient = (byte)Math.Round(
             Math.Clamp(
@@ -289,10 +290,10 @@ public sealed class EnhancedViewport : SoftwareViewport
                 0.0,
                 1.0) * byte.MaxValue);
         var target = ((pixelY * m_areaAmbientBitmap.Width) + pixelX) * 4;
-        m_areaAmbientPixels[target] = ambient;
-        m_areaAmbientPixels[target + 1] = ambient;
-        m_areaAmbientPixels[target + 2] = ambient;
-        m_areaAmbientPixels[target + 3] = byte.MaxValue;
+        pixels[target] = ambient;
+        pixels[target + 1] = ambient;
+        pixels[target + 2] = ambient;
+        pixels[target + 3] = byte.MaxValue;
     }
 
     private void BuildColumnBuffer()
@@ -309,6 +310,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 flags |= 2;
             if (m_columns[column].HasConcaveTextureEnd)
                 flags |= 4;
+            if (m_columns[column].Tile is >= 90 and <= 101)
+                flags |= 8;
             m_wallColumns[target + 3] = flags;
         }
     }

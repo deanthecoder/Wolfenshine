@@ -28,7 +28,8 @@ uniform float4 deathColor;        // Original palette red used by the death tran
 //   Y = horizontal texture coordinate, 0..1
 //   Z = resolved VSWAP texture-page index
 //   W = packed wall flags: bit 0 horizontal orientation, bit 1 concave
-//       corner at texture U=0, bit 2 concave corner at texture U=1
+//       corner at texture U=0, bit 2 concave corner at texture U=1,
+//       bit 3 door panel
 uniform float4 wallColumns[320];
 
 // The thirty-two nearest light-emitting map objects:
@@ -95,7 +96,7 @@ float wallAmbientOcclusion(float textureU, float textureV, float packedFlags)
     // so shade their floor/ceiling boundaries and only those horizontal ends
     // where map geometry identifies a genuine inward corner.
     float textureStartCorner = floor(packedFlags / 2.0) - (floor(packedFlags / 4.0) * 2.0);
-    float textureEndCorner = floor(packedFlags / 4.0);
+    float textureEndCorner = floor(packedFlags / 4.0) - (floor(packedFlags / 8.0) * 2.0);
     float verticalDistance = min(textureV, 1.0 - textureV);
     float textureStartEdge = (1.0 - smoothRamp(textureU / 0.11)) * textureStartCorner;
     float textureEndEdge = (1.0 - smoothRamp((1.0 - textureU) / 0.11)) * textureEndCorner;
@@ -231,8 +232,20 @@ float4 main(float2 fragment)
         // Bias toward the visible side of the wall so its ambience comes from
         // the room being viewed rather than the solid wall tile itself.
         float2 wallPosition = playerPosition + (rayDirection * distance);
-        float illumination = ambientIllumination(distance, wallPosition - (rayDirection * 0.01));
         float orientation = column.w - (floor(column.w / 2.0) * 2.0);
+        float isDoor = floor(column.w / 8.0) - (floor(column.w / 16.0) * 2.0);
+        float2 ambientPosition = wallPosition - (rayDirection * 0.01);
+        if (isDoor > 0.5)
+        {
+            // A door occupies the centre of its map tile rather than its edge.
+            // Sample just across its centre plane on the viewer-facing side so
+            // a closed panel cannot borrow ambience from the room behind it.
+            if (orientation < 0.5)
+                ambientPosition.x = wallPosition.x - (sign(rayDirection.x) * 0.51);
+            else
+                ambientPosition.y = wallPosition.y - (sign(rayDirection.y) * 0.51);
+        }
+        float illumination = ambientIllumination(distance, ambientPosition);
         illumination *= mix(1.0, 0.92, orientation);
         // Vertical walls receive a restrained blend of the upward and downward
         // components. This lets local sources such as treasure softly illuminate

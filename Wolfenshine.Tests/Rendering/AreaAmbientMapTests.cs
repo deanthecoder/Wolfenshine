@@ -109,39 +109,39 @@ public sealed class AreaAmbientMapTests
     }
 
     [Test]
-    public void GivenPartlyOpenDoorCheckBlendExtendsIntoBothRooms()
+    public void GivenDoorStateChangesCheckDoorwayBlendRemainsTheSame()
     {
         var map = CreateTwoAreaDoorMap();
         var doors = WolfensteinDoors.FromMap(map);
-        doors.Items[0].Open();
-        doors.Update(0.5);
         var ambientMap = AreaAmbientMap.FromMap(map);
 
-        var farDarkSide = ambientMap.GetAmbientScale(2.0, 2.5, doors);
-        var nearDarkSide = ambientMap.GetAmbientScale(3.5, 2.5, doors);
-        var threshold = ambientMap.GetAmbientScale(4.5, 2.5, doors);
-        var nearLightSide = ambientMap.GetAmbientScale(5.5, 2.5, doors);
+        var closedAmbient = ambientMap.GetAmbientScale(4.0, 2.5, doors);
+        doors.Items[0].Open();
+        doors.Update(0.5);
+        var partlyOpenAmbient = ambientMap.GetAmbientScale(4.0, 2.5, doors);
+        doors.Update(0.5);
+        var fullyOpenAmbient = ambientMap.GetAmbientScale(4.0, 2.5, doors);
 
         Assert.Multiple(() =>
         {
-            Assert.That(farDarkSide, Is.EqualTo(AreaAmbientMap.MinimumAmbientScale).Within(0.0001));
-            Assert.That(nearDarkSide, Is.GreaterThan(farDarkSide));
-            Assert.That(threshold, Is.GreaterThan(nearDarkSide));
-            Assert.That(nearLightSide, Is.GreaterThan(threshold));
-            Assert.That(nearLightSide, Is.LessThan(1.0));
+            Assert.That(closedAmbient, Is.GreaterThan(AreaAmbientMap.MinimumAmbientScale));
+            Assert.That(partlyOpenAmbient, Is.EqualTo(closedAmbient).Within(0.0001));
+            Assert.That(fullyOpenAmbient, Is.EqualTo(closedAmbient).Within(0.0001));
         });
     }
 
     [Test]
-    public void GivenClosedDoorCheckAmbientDoesNotLeakBetweenAreas()
+    public void GivenClosedDoorCheckAmbientBlendsAcrossThreshold()
     {
         var map = CreateTwoAreaDoorMap();
         var doors = WolfensteinDoors.FromMap(map);
         var ambientMap = AreaAmbientMap.FromMap(map);
 
-        var darkSide = ambientMap.GetAmbientScale(3.75, 2.5, doors);
+        var darkSide = ambientMap.GetAmbientScale(2.0, 2.5, doors);
+        var threshold = ambientMap.GetAmbientScale(4.5, 2.5, doors);
+        var lightSide = ambientMap.GetAmbientScale(7.0, 2.5, doors);
 
-        Assert.That(darkSide, Is.EqualTo(AreaAmbientMap.MinimumAmbientScale).Within(0.0001));
+        Assert.That(threshold, Is.EqualTo((darkSide + lightSide) * 0.5).Within(0.0001));
     }
 
     [Test]

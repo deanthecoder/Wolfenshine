@@ -569,7 +569,11 @@ public sealed class GameSessionTests
         Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(135));
 
         session.Update(20.0 / 70.0, default);
-        Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(137));
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Actors[0].CurrentSpriteNumber, Is.EqualTo(137));
+            Assert.That(session.EnemyMuzzleFlashes, Is.Empty);
+        });
 
         session.Update(40.0 / 70.0, default);
         Assert.Multiple(() =>

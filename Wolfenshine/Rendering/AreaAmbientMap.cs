@@ -24,8 +24,8 @@ public sealed class AreaAmbientMap
 {
     public const double MinimumAmbientScale = 0.42;
     public const double MaximumAmbientScale = 1.25;
-    public const double DoorBlendRadius = 1.50;
-    public const double DoorBlendHalfWidth = 0.85;
+    public const double DoorBlendRadius = 0.75;
+    public const double DoorBlendHalfWidth = 0.55;
     private const ushort AmbushTile = 106;
     private const ushort FirstAreaTile = 107;
     private const ushort PushwallMarker = 98;
@@ -109,7 +109,7 @@ public sealed class AreaAmbientMap
     }
 
     /// <summary>
-    /// Returns the local ambient scale, including a smooth transition while passing through an open door.
+    /// Returns the local ambient scale, including a smooth architectural transition across doorways.
     /// </summary>
     public double GetAmbientScale(double x, double y, WolfensteinDoors doors)
     {
@@ -123,7 +123,7 @@ public sealed class AreaAmbientMap
         foreach (var transition in m_doorTransitions)
         {
             var door = doors.Get(transition.X, transition.Y);
-            if (door == null || door.OpenAmount <= 0.0)
+            if (door == null)
                 continue;
             var normalOffset = transition.IsVertical ? x - (transition.X + 0.5) : y - (transition.Y + 0.5);
             var tangentOffset = transition.IsVertical ? y - (transition.Y + 0.5) : x - (transition.X + 0.5);
@@ -142,7 +142,7 @@ public sealed class AreaAmbientMap
                 GetZoneAmbientScale(transition.NegativeZone),
                 GetZoneAmbientScale(transition.PositiveZone),
                 smoothBlend);
-            ambientScale = Lerp(ambientScale, doorAmbient, door.OpenAmount);
+            ambientScale = doorAmbient;
             nearestDoorDistanceSquared = distanceSquared;
         }
         return ambientScale;

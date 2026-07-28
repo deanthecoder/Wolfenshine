@@ -928,7 +928,8 @@ public sealed class GameSession
                 if (fired)
                 {
                     PlaySound(GetEnemyAttackSound(actor.Actor.Type), actor.X, actor.Y);
-                    AddEnemyMuzzleFlash(actor.X, actor.Y);
+                    if (actor.Actor.Type != WolfensteinActorType.Dog)
+                        AddEnemyMuzzleFlash(actor.X, actor.Y);
                     if (HasLineOfSight(actor.X, actor.Y, Camera.X, Camera.Y) &&
                         TryGetEnemyAttackDamage(actor, playerIsRunning, out var damage))
                     {
