@@ -50,6 +50,8 @@ uniform float weaponFlash; // 1 while the current weapon artwork visibly contain
 uniform float playerAmbientScale; // Player ambience, smoothly blended while crossing open doors.
 uniform float areaAmbientMaximum; // Decodes the normalized per-tile ambient map.
 uniform float areaAmbientPixelsPerTile; // Sub-tile resolution used for smooth doorway blending.
+uniform float4 fogColor; // Atmospheric RGB color; alpha is unused.
+uniform float4 fogParameters; // Start distance, end distance, maximum blend, unused.
 
 // A 64-pixel-wide atlas containing every decoded VSWAP wall page. Each page is
 // 64 x 64 and pages are stacked vertically. CPU palette lookup currently makes
@@ -91,6 +93,13 @@ float smoothRamp(float value)
 {
     value = clamp(value, 0.0, 1.0);
     return value * value * (3.0 - (2.0 * value));
+}
+
+float distanceFogAmount(float distance)
+{
+    float fogPosition = (distance - fogParameters.x) /
+                        max(fogParameters.y - fogParameters.x, 0.0001);
+    return smoothRamp(fogPosition) * fogParameters.z;
 }
 
 float wallAmbientOcclusion(float textureU, float textureV, float packedFlags)
@@ -191,6 +200,7 @@ float4 main(float2 fragment)
     float distance = max(column.x, 0.0001);
     float projectedHeight = nativeHeight / distance;
     float wallTop = (nativePlayHeight - projectedHeight) * 0.5;
+    float sceneDistance = distance;
 
     float4 color;
     if (!isPlayView)
@@ -203,6 +213,7 @@ float4 main(float2 fragment)
         // Intersect the view ray with the unit-height ceiling plane. The camera
         // is halfway between floor and ceiling, giving a 100-pixel projection height.
         float ceilingDistance = 100.0 / max(80.0 - scenePosition.y, 0.5);
+        sceneDistance = ceilingDistance;
         float2 ceilingPosition = playerPosition + (rayDirection * ceilingDistance);
         float3 illumination = float3(ambientIllumination(ceilingDistance, ceilingPosition));
         illumination += surfaceIllumination(ceilingPosition, 1.0);
@@ -214,6 +225,7 @@ float4 main(float2 fragment)
     {
         color = floorColor;
         float floorDistance = 100.0 / max(scenePosition.y - 80.0, 0.5);
+        sceneDistance = floorDistance;
         float2 floorPosition = playerPosition + (rayDirection * floorDistance);
         float3 illumination = float3(ambientIllumination(floorDistance, floorPosition));
         illumination += surfaceIllumination(floorPosition, 0.0);
@@ -260,6 +272,9 @@ float4 main(float2 fragment)
         color.rgb *= min(illumination, 1.0);
         color.rgb *= wallAmbientOcclusion(column.y, textureV, column.w);
     }
+
+    if (isPlayView)
+        color.rgb = mix(color.rgb, fogColor.rgb, distanceFogAmount(sceneDistance));
 
     // World sprites follow view bob; the HUD remains fixed.
     float4 overlay = sample(softwareSpriteOverlay, isPlayView ? scenePosition : nativePosition);

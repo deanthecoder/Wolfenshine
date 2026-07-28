@@ -156,7 +156,8 @@ public static class SoftwareRaycastRenderer
         IReadOnlyList<WallColumn> wallColumns,
         Span<byte> pixels,
         int width,
-        int height)
+        int height,
+        RgbaColor? fogColor = null)
     {
         ArgumentNullException.ThrowIfNull(sprites);
         ArgumentNullException.ThrowIfNull(palette);
@@ -187,8 +188,12 @@ public static class SoftwareRaycastRenderer
                 for (var y = firstY; y < lastY; y++)
                 {
                     var sourceY = ((y - top) * WolfensteinSprite.Size) / projected.RenderedSize;
-                    if (sprite.TryGetIndex(sourceX, sourceY, out var index))
-                        WritePixel(pixels, width, x, y, palette.GetColor(index).Scale(projected.Brightness));
+                    if (!sprite.TryGetIndex(sourceX, sourceY, out var index))
+                        continue;
+                    var color = palette.GetColor(index).Scale(projected.Brightness);
+                    if (fogColor is { } fog && projected.FogAmount > 0.0f)
+                        color = color.Blend(fog, projected.FogAmount);
+                    WritePixel(pixels, width, x, y, color);
                 }
             }
         }

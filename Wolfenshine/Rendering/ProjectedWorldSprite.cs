@@ -21,4 +21,5 @@ public readonly record struct ProjectedWorldSprite(
     double Depth,
     int CenterX,
     int RenderedSize,
-    float Brightness = 1.0f);
+    float Brightness = 1.0f,
+    float FogAmount = 0.0f);

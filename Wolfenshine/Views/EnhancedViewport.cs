@@ -38,6 +38,10 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const int LightRadiusChannelCount = 2;
     private const int LightColorChannelCount = 4;
     private const int AmbientMapPixelsPerTile = 16;
+    private const float FogStartDistance = 5.0f;
+    private const float FogEndDistance = 18.0f;
+    private const float MaximumFogAmount = 0.30f;
+    private static readonly RgbaColor FogColor = new(18, 24, 34);
     private readonly float[] m_wallColumns = new float[ViewportWidth * ColumnChannelCount];
     private readonly float[] m_sceneLights = new float[LightCount * LightChannelCount];
     private readonly float[] m_sceneLightRadii = new float[LightCount * LightRadiusChannelCount];
@@ -165,6 +169,8 @@ public sealed class EnhancedViewport : SoftwareViewport
             playerAmbientScale,
             (float)AreaAmbientMap.MaximumAmbientScale,
             AmbientMapPixelsPerTile,
+            ToFloats(FogColor),
+            [FogStartDistance, FogEndDistance, MaximumFogAmount, 0.0f],
             (float)ViewBob,
             (float)DamageFlash,
             (float)DeathFade,
@@ -475,6 +481,14 @@ public sealed class EnhancedViewport : SoftwareViewport
                 PlayViewHeight,
                 ViewportHeight,
                 m_projectedSprites);
+            for (var index = 0; index < visibleSpriteCount; index++)
+            {
+                var projected = m_projectedSprites[index];
+                m_projectedSprites[index] = projected with
+                {
+                    FogAmount = CalculateFogAmount(projected.Depth)
+                };
+            }
             SoftwareRaycastRenderer.DrawWorldSprites(
                 m_projectedSprites.AsSpan(0, visibleSpriteCount),
                 Sprites,
@@ -482,7 +496,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 m_columns,
                 playViewPixels,
                 ViewportWidth,
-                PlayViewHeight);
+                PlayViewHeight,
+                FogColor);
         }
         if (WeaponSprite != null)
         {
@@ -578,6 +593,16 @@ public sealed class EnhancedViewport : SoftwareViewport
         return brightness * (float)cone * 0.80f;
     }
 
+    private static float CalculateFogAmount(double distance)
+    {
+        var position = Math.Clamp(
+            (distance - FogStartDistance) / (FogEndDistance - FogStartDistance),
+            0.0,
+            1.0);
+        var smoothPosition = position * position * (3.0 - (2.0 * position));
+        return (float)(smoothPosition * MaximumFogAmount);
+    }
+
     private static void CopyPixelsToBitmap(byte[] pixels, SKBitmap bitmap)
     {
         var sourceRowBytes = bitmap.Width * 4;
@@ -614,6 +639,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         float playerAmbientScale,
         float areaAmbientMaximum,
         float areaAmbientPixelsPerTile,
+        float[] fogColor,
+        float[] fogParameters,
         float viewBob,
         float damageFlash,
         float deathFade,
@@ -660,6 +687,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["playerAmbientScale"] = playerAmbientScale,
                 ["areaAmbientMaximum"] = areaAmbientMaximum,
                 ["areaAmbientPixelsPerTile"] = areaAmbientPixelsPerTile,
+                ["fogColor"] = fogColor,
+                ["fogParameters"] = fogParameters,
                 ["viewBob"] = viewBob,
                 ["damageFlash"] = damageFlash,
                 ["deathFade"] = deathFade,

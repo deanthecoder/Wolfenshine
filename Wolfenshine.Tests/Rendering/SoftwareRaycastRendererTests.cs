@@ -159,6 +159,33 @@ public sealed class SoftwareRaycastRendererTests
     }
 
     [Test]
+    public void GivenFoggedWorldSpriteCheckColorBlendsTowardFog()
+    {
+        var sprite = new WolfensteinSprite(
+            Enumerable.Repeat((byte)7, WolfensteinSprite.PixelCount).ToArray(),
+            Enumerable.Repeat(true, WolfensteinSprite.PixelCount).ToArray());
+        var sprites = new WolfensteinSpriteSet(Enumerable.Repeat(sprite, 20).ToArray());
+        var paletteData = new byte[WolfensteinPalette.VgaDataLength];
+        paletteData[7 * 3] = 63;
+        var palette = WolfensteinPalette.FromVgaDac(paletteData);
+        WallColumn[] walls = [new(3.0, 0.0, 1, WallSide.Horizontal)];
+        var pixels = new byte[4];
+        ProjectedWorldSprite[] projected = [new(0, 2.0, 0, 1, FogAmount: 0.5f)];
+
+        SoftwareRaycastRenderer.DrawWorldSprites(
+            projected,
+            sprites,
+            palette,
+            walls,
+            pixels,
+            1,
+            1,
+            new RgbaColor(0, 0, 255));
+
+        Assert.That(GetPixel(pixels, 0), Is.EqualTo(new byte[] { 128, 0, 128, 255 }));
+    }
+
+    [Test]
     public void GivenIndexedGraphicCheckItIsCompositedAtRequestedPosition()
     {
         var graphic = new WolfensteinGraphic(2, 1, new byte[] { 7, 8 });

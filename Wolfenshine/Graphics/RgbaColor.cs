@@ -27,4 +27,14 @@ public readonly record struct RgbaColor(
         (byte)(Green * amount),
         (byte)(Blue * amount),
         Alpha);
+
+    public RgbaColor Blend(RgbaColor other, double amount)
+    {
+        amount = Math.Clamp(amount, 0.0, 1.0);
+        return new RgbaColor(
+            (byte)Math.Round(Red + ((other.Red - Red) * amount)),
+            (byte)Math.Round(Green + ((other.Green - Green) * amount)),
+            (byte)Math.Round(Blue + ((other.Blue - Blue) * amount)),
+            Alpha);
+    }
 }
