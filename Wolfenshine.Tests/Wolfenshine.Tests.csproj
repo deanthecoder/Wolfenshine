@@ -21,4 +21,10 @@
   <ItemGroup>
     <ProjectReference Include="../Wolfenshine/Wolfenshine.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../Wolfenshine/Assets/enhanced.sksl"
+          Link="Assets/enhanced.sksl"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

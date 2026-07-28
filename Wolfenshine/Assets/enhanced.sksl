@@ -67,6 +67,25 @@ float distanceIllumination(float distance)
     return max(0.20, 1.0 / (1.0 + distance * 0.22));
 }
 
+float smoothRamp(float value)
+{
+    value = clamp(value, 0.0, 1.0);
+    return value * value * (3.0 - (2.0 * value));
+}
+
+float wallAmbientOcclusion(float textureU, float textureV)
+{
+    // Wolfenstein's one-tile-high walls have no geometric bevels or lightmap,
+    // so shade a few texels at each boundary to suggest contact shadow. The
+    // horizontal and vertical terms combine to make corners a little deeper.
+    float horizontalDistance = min(textureU, 1.0 - textureU);
+    float verticalDistance = min(textureV, 1.0 - textureV);
+    float horizontalEdge = smoothRamp(horizontalDistance / 0.075);
+    float verticalEdge = smoothRamp(verticalDistance / 0.060);
+    float occlusion = ((1.0 - horizontalEdge) * 0.12) + ((1.0 - verticalEdge) * 0.15);
+    return 1.0 - min(occlusion, 0.27);
+}
+
 float weaponIllumination()
 {
     // The weapon starts darker than its original palette values. Downward
@@ -184,6 +203,7 @@ float4 main(float2 fragment)
         illumination += surfaceIllumination(wallPosition, 0.5) * 0.60;
         illumination += muzzleIllumination(wallPosition);
         color.rgb *= min(illumination, 1.0);
+        color.rgb *= wallAmbientOcclusion(column.y, textureV);
     }
 
     // World sprites follow view bob; the HUD remains fixed.

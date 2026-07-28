@@ -29,7 +29,7 @@ The enhanced renderer also applies dynamic light to enemies. The example below s
 - Original digitized and AdLib effects are played spatially through OpenAL; original IMF music is rendered through OPL emulation.
 - Difficulty affects enemy placement, health, behavior, and incoming damage in the same places it did originally.
 - An authentic-looking difficulty screen, HUD, pause plaque, and intermission screen complete the experience.
-- F2 switches live between the authentic software image and an experimental shader-enhanced view with distance-darkened walls and movement bob.
+- F2 switches live between the authentic software image and an experimental shader-enhanced view with movement bob, dynamic lighting, distance shading, and subtle ambient occlusion around wall edges.
 
 Wolfenshine is still under development. Bosses, episode endings, save games, and some less common gameplay details remain to be implemented.
 
@@ -108,7 +108,7 @@ Once the original game data, rendering, and core behavior are working, possible 
 - Persistent enemy blood splats.
 - Improved dynamic and colored lighting.
 - Flickering lights in dungeon-like areas.
-- Ambient occlusion for added depth around walls and objects.
+- Expanded ambient occlusion for added depth around sprites and other objects.
 - Dynamic shadows.
 - Spatial 3D sound.
 - Optional hint HUD components, such as a floor-projected route to the nearest exit.
