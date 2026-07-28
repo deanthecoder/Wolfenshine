@@ -33,8 +33,7 @@ public sealed class GameSessionTests
 
         Assert.That(changed, Is.True);
         Assert.That(session.Camera.X, Is.EqualTo(2.5).Within(0.0001));
-        Assert.That(session.Camera.Y, Is.InRange(1.93924, 2.5));
-        Assert.That(session.PlayerSpeed, Is.GreaterThan(0.0));
+        Assert.That(session.Camera.Y, Is.EqualTo(1.93924).Within(0.0001));
     }
 
     [Test]
@@ -246,7 +245,7 @@ public sealed class GameSessionTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(session.Camera.X, Is.InRange(2.5, 3.06076));
+            Assert.That(session.Camera.X, Is.EqualTo(3.06076).Within(0.0001));
             Assert.That(session.Camera.Y, Is.EqualTo(2.5).Within(0.0001));
             Assert.That(session.Camera.DirectionX, Is.EqualTo(0.0).Within(0.0001));
             Assert.That(session.Camera.DirectionY, Is.EqualTo(-1.0).Within(0.0001));
@@ -257,11 +256,11 @@ public sealed class GameSessionTests
     public void GivenMovementReleasedCheckMomentumCarriesPlayerAndFrictionSlowsThem()
     {
         var session = CreateSession();
-        session.Update(0.1, new PlayerInput(true, false, false, false));
+        session.Update(0.1, new PlayerInput(true, false, false, false), useMomentumMovement: true);
         var positionBeforeRelease = session.Camera.Y;
         var speedBeforeRelease = session.PlayerSpeed;
 
-        session.Update(0.05, default);
+        session.Update(0.05, default, useMomentumMovement: true);
 
         Assert.Multiple(() =>
         {
@@ -275,12 +274,40 @@ public sealed class GameSessionTests
     public void GivenTurnReleasedCheckAngularMomentumContinuesBriefly()
     {
         var session = CreateSession();
-        session.Update(0.1, new PlayerInput(false, false, false, true));
+        session.Update(0.1, new PlayerInput(false, false, false, true), useMomentumMovement: true);
         var directionBeforeRelease = session.Camera.DirectionX;
 
-        session.Update(0.03, default);
+        session.Update(0.03, default, useMomentumMovement: true);
 
         Assert.That(session.Camera.DirectionX, Is.GreaterThan(directionBeforeRelease));
+    }
+
+    [Test]
+    public void GivenClassicMovementReleasedCheckPlayerStopsImmediately()
+    {
+        var session = CreateSession();
+        session.Update(0.1, new PlayerInput(true, false, false, false), useMomentumMovement: false);
+        var positionBeforeRelease = session.Camera.Y;
+
+        session.Update(0.05, default, useMomentumMovement: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Camera.Y, Is.EqualTo(positionBeforeRelease).Within(0.0001));
+            Assert.That(session.PlayerSpeed, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void GivenClassicTurnReleasedCheckPlayerStopsTurningImmediately()
+    {
+        var session = CreateSession();
+        session.Update(0.1, new PlayerInput(false, false, false, true), useMomentumMovement: false);
+        var directionBeforeRelease = session.Camera.DirectionX;
+
+        session.Update(0.03, default, useMomentumMovement: false);
+
+        Assert.That(session.Camera.DirectionX, Is.EqualTo(directionBeforeRelease).Within(0.0001));
     }
 
     [Test]

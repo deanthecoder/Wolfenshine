@@ -201,7 +201,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             }
             return;
         }
-        if (m_gameSession?.Update(elapsedSeconds, input) != true)
+        if (m_gameSession?.Update(elapsedSeconds, input, m_isEnhancedRendering) != true)
             return;
         foreach (var soundEvent in m_gameSession.DrainSoundEvents())
             m_audioPlayer?.Play(soundEvent, m_gameSession.Camera);
