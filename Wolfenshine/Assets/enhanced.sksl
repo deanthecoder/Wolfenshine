@@ -80,10 +80,20 @@ float wallAmbientOcclusion(float textureU, float textureV)
     // horizontal and vertical terms combine to make corners a little deeper.
     float horizontalDistance = min(textureU, 1.0 - textureU);
     float verticalDistance = min(textureV, 1.0 - textureV);
-    float horizontalEdge = smoothRamp(horizontalDistance / 0.075);
-    float verticalEdge = smoothRamp(verticalDistance / 0.060);
-    float occlusion = ((1.0 - horizontalEdge) * 0.12) + ((1.0 - verticalEdge) * 0.15);
-    return 1.0 - min(occlusion, 0.27);
+    float horizontalEdge = smoothRamp(horizontalDistance / 0.11);
+    float verticalEdge = smoothRamp(verticalDistance / 0.10);
+    float occlusion = ((1.0 - horizontalEdge) * 0.22) + ((1.0 - verticalEdge) * 0.28);
+    return 1.0 - min(occlusion, 0.45);
+}
+
+float surfaceContactAmbientOcclusion(float pixelDistance, float projectedWallHeight)
+{
+    // Extend the wall contact shadow onto the adjoining flat surface. Scale its
+    // screen-space width with the projected wall so it remains visible nearby
+    // without swallowing distant floor and ceiling pixels.
+    float radius = clamp(projectedWallHeight * 0.08, 2.0, 8.0);
+    float edge = smoothRamp(pixelDistance / radius);
+    return mix(0.58, 1.0, edge);
 }
 
 float weaponIllumination()
@@ -172,6 +182,7 @@ float4 main(float2 fragment)
         illumination += surfaceIllumination(ceilingPosition, 1.0);
         illumination += muzzleIllumination(ceilingPosition);
         color.rgb *= min(illumination, 1.0);
+        color.rgb *= surfaceContactAmbientOcclusion(wallTop - scenePosition.y, projectedHeight);
     }
     else if (scenePosition.y >= wallTop + projectedHeight)
     {
@@ -182,6 +193,9 @@ float4 main(float2 fragment)
         illumination += surfaceIllumination(floorPosition, 0.0);
         illumination += muzzleIllumination(floorPosition);
         color.rgb *= min(illumination, 1.0);
+        color.rgb *= surfaceContactAmbientOcclusion(
+            scenePosition.y - (wallTop + projectedHeight),
+            projectedHeight);
     }
     else
     {
