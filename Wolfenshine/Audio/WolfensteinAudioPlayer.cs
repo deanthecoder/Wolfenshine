@@ -8,6 +8,7 @@
 //
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
+using Avalonia.Threading;
 using DTC.Core;
 using NukedOPL3Sharp;
 using OpenTK.Audio.OpenAL;
@@ -42,9 +43,14 @@ public sealed class WolfensteinAudioPlayer : IDisposable
     private readonly IReadOnlyDictionary<WolfensteinSoundEffect, int> m_buffers;
     private readonly IReadOnlyList<WolfensteinMusicTrack> m_musicTracks;
     private readonly Dictionary<int, int> m_musicBuffers = [];
+    private readonly Dictionary<int, Task<short[]>> m_musicRenderTasks = [];
     private readonly int[] m_sources;
     private readonly int m_musicSource;
     private int m_nextSource;
+    private int m_requestedMusicTrack = -1;
+    private int m_musicRequestId;
+    private double m_musicFade;
+    private bool m_isPaused;
     private bool m_isDisposed;
 
     public WolfensteinAudioPlayer(
@@ -112,31 +118,39 @@ public sealed class WolfensteinAudioPlayer : IDisposable
     }
 
     /// <summary>
-    /// Starts a looping music sequence by its original music number.
+    /// Requests a looping music sequence by its original music number, rendering it in the background if needed.
     /// </summary>
     public void PlayMusicTrack(int trackNumber)
     {
-        if (m_isDisposed)
+        if (m_isDisposed || trackNumber < 0 || trackNumber >= m_musicTracks.Count)
             return;
-        if (trackNumber >= m_musicTracks.Count)
-            return;
+        m_requestedMusicTrack = trackNumber;
+        var requestId = ++m_musicRequestId;
         AL.SourceStop(m_musicSource);
-        if (!m_musicBuffers.TryGetValue(trackNumber, out var buffer))
+        if (m_musicBuffers.TryGetValue(trackNumber, out var buffer))
         {
-            buffer = CreateMusicBuffer(m_musicTracks[trackNumber]);
-            m_musicBuffers.Add(trackNumber, buffer);
+            StartMusic(trackNumber, buffer);
+            return;
         }
-        AL.Source(m_musicSource, ALSourcei.Buffer, buffer);
-        AL.Source(m_musicSource, ALSourcef.Gain, MusicGain);
-        AL.SourcePlay(m_musicSource);
-        Logger.Instance.Info($"Playing music track {trackNumber}.");
+
+        if (!m_musicRenderTasks.TryGetValue(trackNumber, out var renderTask))
+        {
+            Logger.Instance.Info($"Rendering music track {trackNumber} in the background.");
+            renderTask = Task.Run(() => RenderMusic(m_musicTracks[trackNumber]));
+            m_musicRenderTasks.Add(trackNumber, renderTask);
+        }
+        _ = FinishMusicRenderingAsync(trackNumber, requestId, renderTask);
     }
 
     /// <summary>
     /// Fades the music from full volume at zero to silence at one.
     /// </summary>
-    public void SetMusicFade(double fade) =>
-        AL.Source(m_musicSource, ALSourcef.Gain, MusicGain * (float)(1.0 - Math.Clamp(fade, 0.0, 1.0)));
+    public void SetMusicFade(double fade)
+    {
+        m_musicFade = Math.Clamp(fade, 0.0, 1.0);
+        if (!m_isDisposed)
+            AL.Source(m_musicSource, ALSourcef.Gain, MusicGain * (float)(1.0 - m_musicFade));
+    }
 
     /// <summary>
     /// Pauses or resumes the current music without restarting its sequence.
@@ -145,9 +159,10 @@ public sealed class WolfensteinAudioPlayer : IDisposable
     {
         if (m_isDisposed)
             return;
+        m_isPaused = isPaused;
         if (isPaused)
             AL.SourcePause(m_musicSource);
-        else
+        else if (m_requestedMusicTrack >= 0 && m_musicBuffers.ContainsKey(m_requestedMusicTrack))
             AL.SourcePlay(m_musicSource);
     }
 
@@ -175,7 +190,40 @@ public sealed class WolfensteinAudioPlayer : IDisposable
         return buffer;
     }
 
-    private static int CreateMusicBuffer(WolfensteinMusicTrack track)
+    private async Task FinishMusicRenderingAsync(int trackNumber, int requestId, Task<short[]> renderTask)
+    {
+        try
+        {
+            var samples = await renderTask.ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (m_isDisposed || m_musicRequestId != requestId)
+                    return;
+                if (!m_musicBuffers.TryGetValue(trackNumber, out var buffer))
+                {
+                    buffer = CreateMusicBuffer(samples);
+                    m_musicBuffers.Add(trackNumber, buffer);
+                    m_musicRenderTasks.Remove(trackNumber);
+                }
+                StartMusic(trackNumber, buffer);
+            });
+        }
+        catch (Exception exception)
+        {
+            Logger.Instance.Warn($"Music track {trackNumber} could not be rendered: {exception.Message}");
+        }
+    }
+
+    private void StartMusic(int trackNumber, int buffer)
+    {
+        AL.Source(m_musicSource, ALSourcei.Buffer, buffer);
+        AL.Source(m_musicSource, ALSourcef.Gain, MusicGain * (float)(1.0 - m_musicFade));
+        if (!m_isPaused)
+            AL.SourcePlay(m_musicSource);
+        Logger.Instance.Info($"Playing music track {trackNumber}.");
+    }
+
+    private static short[] RenderMusic(WolfensteinMusicTrack track)
     {
         var framesPerTick = MusicSampleRate / MusicTicksPerSecond;
         var frameCount = checked(track.Commands.Sum(command => command.Delay) * framesPerTick);
@@ -196,6 +244,11 @@ public sealed class WolfensteinAudioPlayer : IDisposable
             destination += sampleCount;
         }
         ApplyMusicGain(samples);
+        return samples;
+    }
+
+    private static int CreateMusicBuffer(short[] samples)
+    {
         var buffer = AL.GenBuffer();
         AL.BufferData(buffer, ALFormat.Stereo16, samples, MusicSampleRate);
         return buffer;
