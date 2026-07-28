@@ -82,8 +82,8 @@ float wallAmbientOcclusion(float textureU, float textureV)
     float verticalDistance = min(textureV, 1.0 - textureV);
     float horizontalEdge = smoothRamp(horizontalDistance / 0.11);
     float verticalEdge = smoothRamp(verticalDistance / 0.10);
-    float occlusion = ((1.0 - horizontalEdge) * 0.22) + ((1.0 - verticalEdge) * 0.28);
-    return 1.0 - min(occlusion, 0.45);
+    float occlusion = ((1.0 - horizontalEdge) * 0.073) + ((1.0 - verticalEdge) * 0.093);
+    return 1.0 - min(occlusion, 0.15);
 }
 
 float surfaceContactAmbientOcclusion(float pixelDistance, float projectedWallHeight)
@@ -93,7 +93,7 @@ float surfaceContactAmbientOcclusion(float pixelDistance, float projectedWallHei
     // without swallowing distant floor and ceiling pixels.
     float radius = clamp(projectedWallHeight * 0.08, 2.0, 8.0);
     float edge = smoothRamp(pixelDistance / radius);
-    return mix(0.58, 1.0, edge);
+    return mix(0.86, 1.0, edge);
 }
 
 float weaponIllumination()
