@@ -38,6 +38,11 @@ public sealed class GameSession
     private const double PlayerRadius = 0.2;
     private const double OriginalPlayerRadius = 0x5800 / FixedUnitsPerTile;
     private const double MaximumMovementStep = 0.1;
+    private const double MaximumMotionTimeStep = 1.0 / OriginalTicksPerSecond;
+    private const double MovementAccelerationTime = 0.14;
+    private const double MovementFrictionTime = 0.22;
+    private const double TurnAccelerationTime = 0.10;
+    private const double TurnFrictionTime = 0.14;
     private const int CombatViewportWidth = 320;
     private const int CrosshairHalfWidth = 20;
     private const double MinimumShootingDistance = 0.75;
@@ -68,6 +73,9 @@ public sealed class GameSession
     private double m_deathTime;
     private double m_damageCount;
     private double m_wallHitSoundTime;
+    private double m_velocityX;
+    private double m_velocityY;
+    private double m_angularVelocity;
     private double? m_killerX;
     private double? m_killerY;
     private int m_keyMask;
@@ -143,6 +151,7 @@ public sealed class GameSession
     public bool IsCompletingLevel => m_isCompletingLevel;
     public bool IsReadyForNextLevel => m_isCompletingLevel && m_levelFade >= 1.0;
     public double MuzzleFlash => Weapon != PlayerWeapon.Knife && WeaponFrame == 3 ? 1.0 : 0.0;
+    public double PlayerSpeed => Math.Sqrt((m_velocityX * m_velocityX) + (m_velocityY * m_velocityY));
     public double LevelFade => m_levelFade;
     public double DeathFade => IsDying ? Math.Min(1.0, m_deathTime / DeathFadeDuration) : 0.0;
     public double DamageFlash => m_damageCount > 0.0
@@ -231,7 +240,10 @@ public sealed class GameSession
         var turn = input.Strafe ? 0.0 : horizontal;
         var strafe = input.Strafe ? horizontal : 0.0;
         var movement = (input.MoveForward ? 1.0 : 0.0) - (input.MoveBackward ? 1.0 : 0.0);
-        if ((elapsedSeconds == 0.0 || turn == 0.0 && movement == 0.0 && strafe == 0.0) && !changed)
+        var hasMomentum = Math.Abs(m_velocityX) > double.Epsilon ||
+                          Math.Abs(m_velocityY) > double.Epsilon ||
+                          Math.Abs(m_angularVelocity) > double.Epsilon;
+        if ((elapsedSeconds == 0.0 || turn == 0.0 && movement == 0.0 && strafe == 0.0 && !hasMomentum) && !changed)
             return false;
 
         var x = Camera.X;
@@ -241,26 +253,70 @@ public sealed class GameSession
         var planeX = Camera.PlaneX;
         var planeY = Camera.PlaneY;
 
-        if (turn != 0.0)
+        var remainingSeconds = elapsedSeconds;
+        while (remainingSeconds > 0.0)
         {
+            var motionSeconds = Math.Min(remainingSeconds, MaximumMotionTimeStep);
+            remainingSeconds -= motionSeconds;
             var inputScale = input.Run ? RunInput : WalkInput;
-            var degreesPerSecond = inputScale * OriginalTicksPerSecond / AngleScale;
-            var angle = turn * degreesPerSecond * Math.PI / 180.0 * elapsedSeconds;
-            (directionX, directionY) = Rotate(directionX, directionY, angle);
-            (planeX, planeY) = Rotate(planeX, planeY, angle);
-        }
+            var targetAngularVelocity = turn * inputScale * OriginalTicksPerSecond /
+                                        AngleScale * Math.PI / 180.0;
+            var previousAngularVelocity = m_angularVelocity;
+            if (targetAngularVelocity == 0.0)
+            {
+                m_angularVelocity *= Math.Pow(0.01, motionSeconds / TurnFrictionTime);
+                if (Math.Abs(m_angularVelocity) < 0.0001)
+                    m_angularVelocity = 0.0;
+            }
+            else
+            {
+                m_angularVelocity = MoveTowards(
+                    m_angularVelocity,
+                    targetAngularVelocity,
+                    Math.Abs(targetAngularVelocity) / TurnAccelerationTime * motionSeconds);
+            }
+            var angle = (previousAngularVelocity + m_angularVelocity) * 0.5 * motionSeconds;
+            if (Math.Abs(angle) > double.Epsilon)
+            {
+                (directionX, directionY) = Rotate(directionX, directionY, angle);
+                (planeX, planeY) = Rotate(planeX, planeY, angle);
+                changed = true;
+            }
 
-        if (movement != 0.0 || strafe != 0.0)
-        {
-            var inputScale = input.Run ? RunInput : WalkInput;
             var movementScale = movement > 0.0 ? ForwardMovementScale : BackwardMovementScale;
-            var forwardDistance = movement * inputScale * movementScale * OriginalTicksPerSecond /
-                                  FixedUnitsPerTile * elapsedSeconds;
-            var strafeDistance = strafe * inputScale * ForwardMovementScale * OriginalTicksPerSecond /
-                                 FixedUnitsPerTile * elapsedSeconds;
-            var moveX = (directionX * forwardDistance) - (directionY * strafeDistance);
-            var moveY = (directionY * forwardDistance) + (directionX * strafeDistance);
+            var forwardSpeed = movement * inputScale * movementScale * OriginalTicksPerSecond / FixedUnitsPerTile;
+            var strafeSpeed = strafe * inputScale * ForwardMovementScale * OriginalTicksPerSecond / FixedUnitsPerTile;
+            var targetVelocityX = (directionX * forwardSpeed) - (directionY * strafeSpeed);
+            var targetVelocityY = (directionY * forwardSpeed) + (directionX * strafeSpeed);
+            var previousVelocityX = m_velocityX;
+            var previousVelocityY = m_velocityY;
+            var targetSpeed = Math.Sqrt(
+                (targetVelocityX * targetVelocityX) + (targetVelocityY * targetVelocityY));
+            if (targetSpeed == 0.0)
+            {
+                var friction = Math.Pow(0.01, motionSeconds / MovementFrictionTime);
+                m_velocityX *= friction;
+                m_velocityY *= friction;
+                if (PlayerSpeed < 0.0001)
+                {
+                    m_velocityX = 0.0;
+                    m_velocityY = 0.0;
+                }
+            }
+            else
+            {
+                MoveTowards(
+                    ref m_velocityX,
+                    ref m_velocityY,
+                    targetVelocityX,
+                    targetVelocityY,
+                    targetSpeed / MovementAccelerationTime * motionSeconds);
+            }
+            var moveX = (previousVelocityX + m_velocityX) * 0.5 * motionSeconds;
+            var moveY = (previousVelocityY + m_velocityY) * 0.5 * motionSeconds;
             var distance = Math.Sqrt((moveX * moveX) + (moveY * moveY));
+            if (distance <= double.Epsilon)
+                continue;
             var stepCount = Math.Max(1, (int)Math.Ceiling(distance / MaximumMovementStep));
             var stepX = moveX / stepCount;
             var stepY = moveY / stepCount;
@@ -272,14 +328,21 @@ public sealed class GameSession
                 if (CanOccupy(nextX, y))
                     x = nextX;
                 else if (Math.Abs(stepX) > double.Epsilon)
+                {
+                    m_velocityX = 0.0;
                     hitObstacle = true;
+                }
                 var nextY = y + stepY;
                 if (CanOccupy(x, nextY))
                     y = nextY;
                 else if (Math.Abs(stepY) > double.Epsilon)
+                {
+                    m_velocityY = 0.0;
                     hitObstacle = true;
+                }
                 changed |= CollectPickups(x, y);
             }
+            changed = true;
             if (hitObstacle && m_wallHitSoundTime <= 0.0)
             {
                 PlaySound(WolfensteinSoundEffect.HitWall);
@@ -290,6 +353,35 @@ public sealed class GameSession
         // A fresh snapshot also publishes door-only animation changes to the viewport binding.
         Camera = new RaycastCamera(x, y, directionX, directionY, planeX, planeY);
         return true;
+    }
+
+    private static double MoveTowards(double current, double target, double maximumDelta)
+    {
+        var delta = target - current;
+        return Math.Abs(delta) <= maximumDelta
+            ? target
+            : current + (Math.Sign(delta) * maximumDelta);
+    }
+
+    private static void MoveTowards(
+        ref double currentX,
+        ref double currentY,
+        double targetX,
+        double targetY,
+        double maximumDelta)
+    {
+        var deltaX = targetX - currentX;
+        var deltaY = targetY - currentY;
+        var distance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+        if (distance <= maximumDelta || distance <= double.Epsilon)
+        {
+            currentX = targetX;
+            currentY = targetY;
+            return;
+        }
+        var scale = maximumDelta / distance;
+        currentX += deltaX * scale;
+        currentY += deltaY * scale;
     }
 
     private bool CanOccupy(double x, double y)
@@ -1210,6 +1302,9 @@ public sealed class GameSession
         m_chaingunGrinTime = 0.0;
         m_damageCount = 0.0;
         m_wallHitSoundTime = 0.0;
+        m_velocityX = 0.0;
+        m_velocityY = 0.0;
+        m_angularVelocity = 0.0;
         m_enemyMuzzleFlashes.Clear();
         m_enemyMuzzleFlashSnapshot = [];
         m_killerX = null;

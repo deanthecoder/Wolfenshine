@@ -52,6 +52,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private double m_damageFlash;
     private double m_muzzleFlash;
     private double m_levelFade;
+    private double m_playerSpeed;
     private bool m_isShowingLevelStats;
     private bool m_statsInputReleased;
     private WolfensteinLevelStats m_levelStats;
@@ -157,6 +158,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public double DamageFlash => m_damageFlash;
     public double MuzzleFlash => m_muzzleFlash;
     public double LevelFade => m_levelFade;
+    public double PlayerSpeed => m_playerSpeed;
     public bool IsShowingLevelStats => m_isShowingLevelStats;
     public bool IsSelectingDifficulty => m_isSelectingDifficulty;
     public bool IsPaused => m_isPaused;
@@ -225,6 +227,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_damageFlash, m_gameSession.DamageFlash, nameof(DamageFlash));
         SetField(ref m_muzzleFlash, m_gameSession.MuzzleFlash, nameof(MuzzleFlash));
         SetField(ref m_levelFade, m_gameSession.LevelFade, nameof(LevelFade));
+        SetField(ref m_playerSpeed, m_gameSession.PlayerSpeed, nameof(PlayerSpeed));
         SetField(ref m_elevatorSwitch, m_gameSession.ElevatorSwitch, nameof(ElevatorSwitch));
         SetField(
             ref m_enemyMuzzleFlashes,
@@ -338,6 +341,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_deathFade, 0.0, nameof(DeathFade));
         SetField(ref m_damageFlash, 0.0, nameof(DamageFlash));
         SetField(ref m_levelFade, 0.0, nameof(LevelFade));
+        SetField(ref m_playerSpeed, 0.0, nameof(PlayerSpeed));
         SetField(ref m_isGameOver, false, nameof(IsGameOver));
         SetField(ref m_isSelectingDifficulty, true, nameof(IsSelectingDifficulty));
         m_difficultyInputReleased = false;
@@ -514,6 +518,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer?.SetMusicFade(startFaded ? 1.0 : 0.0);
         m_worldObjects = CreateWorldObjects();
         m_enemyMuzzleFlashes = [];
+        m_playerSpeed = 0.0;
         m_weaponSprite = Sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? m_weaponSprite;
         StatusText = $"{map.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
                      "1–4 select weapons · Space opens doors";

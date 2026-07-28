@@ -193,7 +193,6 @@ public sealed partial class MainWindow : Window
         m_gameClock.Restart();
         if (DataContext is not MainWindowViewModel viewModel)
             return;
-        UpdateViewBob(elapsedSeconds, viewModel);
         viewModel.UpdateGame(
             elapsedSeconds,
             new PlayerInput(
@@ -206,6 +205,7 @@ public sealed partial class MainWindow : Window
                 m_attack,
                 m_weaponSelection,
                 m_strafe));
+        UpdateViewBob(elapsedSeconds, viewModel);
         m_weaponSelection = null;
         if (viewModel.IsGameOver)
             Close();
@@ -213,11 +213,12 @@ public sealed partial class MainWindow : Window
 
     private void UpdateViewBob(double elapsedSeconds, MainWindowViewModel viewModel)
     {
-        var isMoving = m_moveForward || m_moveBackward || m_strafe && (m_turnLeft || m_turnRight);
+        var speedRatio = Math.Clamp(viewModel.PlayerSpeed / 11.25, 0.0, 1.0);
+        var isMoving = speedRatio > 0.01;
         if (viewModel.IsEnhancedRendering && !viewModel.IsPaused && isMoving)
         {
-            m_viewBobPhase += elapsedSeconds * (m_run ? 13.0 : 9.0);
-            m_viewBobOffset = Math.Sin(m_viewBobPhase) * (m_run ? 2.25 : 1.4);
+            m_viewBobPhase += elapsedSeconds * (7.0 + (speedRatio * 7.0));
+            m_viewBobOffset = Math.Sin(m_viewBobPhase) * (0.5 + (speedRatio * 3.0));
             EnhancedViewport.ViewBob = m_viewBobOffset;
             return;
         }

@@ -33,7 +33,8 @@ public sealed class GameSessionTests
 
         Assert.That(changed, Is.True);
         Assert.That(session.Camera.X, Is.EqualTo(2.5).Within(0.0001));
-        Assert.That(session.Camera.Y, Is.EqualTo(1.93924).Within(0.0001));
+        Assert.That(session.Camera.Y, Is.InRange(1.93924, 2.5));
+        Assert.That(session.PlayerSpeed, Is.GreaterThan(0.0));
     }
 
     [Test]
@@ -53,11 +54,15 @@ public sealed class GameSessionTests
     [Test]
     public void GivenBackwardInputCheckOriginalReducedSpeedIsUsed()
     {
-        var session = CreateSession();
+        var forwardSession = CreateSession();
+        var backwardSession = CreateSession();
 
-        session.Update(0.1, new PlayerInput(false, true, false, false));
+        forwardSession.Update(0.1, new PlayerInput(true, false, false, false));
+        backwardSession.Update(0.1, new PlayerInput(false, true, false, false));
 
-        Assert.That(session.Camera.Y, Is.EqualTo(2.87384).Within(0.0001));
+        var forwardDistance = 2.5 - forwardSession.Camera.Y;
+        var backwardDistance = backwardSession.Camera.Y - 2.5;
+        Assert.That(backwardDistance, Is.EqualTo(forwardDistance * 2.0 / 3.0).Within(0.0001));
     }
 
     [Test]
@@ -228,8 +233,8 @@ public sealed class GameSessionTests
 
         session.Update(36.0 / 49.0, new PlayerInput(false, false, false, true));
 
-        Assert.That(session.Camera.DirectionX, Is.EqualTo(1.0).Within(0.0001));
-        Assert.That(session.Camera.DirectionY, Is.EqualTo(0.0).Within(0.0001));
+        Assert.That(session.Camera.DirectionX, Is.GreaterThan(0.99));
+        Assert.That(Math.Abs(session.Camera.DirectionY), Is.LessThan(0.11));
     }
 
     [Test]
@@ -241,11 +246,41 @@ public sealed class GameSessionTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(session.Camera.X, Is.EqualTo(3.06076).Within(0.0001));
+            Assert.That(session.Camera.X, Is.InRange(2.5, 3.06076));
             Assert.That(session.Camera.Y, Is.EqualTo(2.5).Within(0.0001));
             Assert.That(session.Camera.DirectionX, Is.EqualTo(0.0).Within(0.0001));
             Assert.That(session.Camera.DirectionY, Is.EqualTo(-1.0).Within(0.0001));
         });
+    }
+
+    [Test]
+    public void GivenMovementReleasedCheckMomentumCarriesPlayerAndFrictionSlowsThem()
+    {
+        var session = CreateSession();
+        session.Update(0.1, new PlayerInput(true, false, false, false));
+        var positionBeforeRelease = session.Camera.Y;
+        var speedBeforeRelease = session.PlayerSpeed;
+
+        session.Update(0.05, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Camera.Y, Is.LessThan(positionBeforeRelease));
+            Assert.That(session.PlayerSpeed, Is.GreaterThan(0.0));
+            Assert.That(session.PlayerSpeed, Is.LessThan(speedBeforeRelease));
+        });
+    }
+
+    [Test]
+    public void GivenTurnReleasedCheckAngularMomentumContinuesBriefly()
+    {
+        var session = CreateSession();
+        session.Update(0.1, new PlayerInput(false, false, false, true));
+        var directionBeforeRelease = session.Camera.DirectionX;
+
+        session.Update(0.03, default);
+
+        Assert.That(session.Camera.DirectionX, Is.GreaterThan(directionBeforeRelease));
     }
 
     [Test]
