@@ -43,6 +43,7 @@ uniform float2 playerPosition;
 uniform float2 cameraDirection;
 uniform float2 cameraPlane;
 uniform float muzzleFlash; // Brief 0..1 player weapon flash.
+uniform float dungeonDarkness; // Smooth 0..1 proximity to a blue-stone jail area.
 
 // A 64-pixel-wide atlas containing every decoded VSWAP wall page. Each page is
 // 64 x 64 and pages are stacked vertically. CPU palette lookup currently makes
@@ -66,6 +67,11 @@ float randomHash(float2 position)
 float distanceIllumination(float distance)
 {
     return max(0.20, 1.0 / (1.0 + distance * 0.22));
+}
+
+float ambientIllumination(float distance)
+{
+    return distanceIllumination(distance) * mix(1.0, 0.55, dungeonDarkness);
 }
 
 float smoothRamp(float value)
@@ -105,7 +111,7 @@ float weaponIllumination()
 {
     // The weapon starts darker than its original palette values. Downward
     // brightness raises it toward full brightness beneath ceiling light cones.
-    float illumination = 0.60;
+    float illumination = 0.60 * mix(1.0, 0.55, dungeonDarkness);
     for (int index = 0; index < 32; index++)
     {
         float4 light = sceneLights[index];
@@ -183,7 +189,7 @@ float4 main(float2 fragment)
         // is halfway between floor and ceiling, giving a 100-pixel projection height.
         float ceilingDistance = 100.0 / max(80.0 - scenePosition.y, 0.5);
         float2 ceilingPosition = playerPosition + (rayDirection * ceilingDistance);
-        float illumination = distanceIllumination(ceilingDistance);
+        float illumination = ambientIllumination(ceilingDistance);
         illumination += surfaceIllumination(ceilingPosition, 1.0);
         illumination += muzzleIllumination(ceilingPosition);
         color.rgb *= min(illumination, 1.0);
@@ -194,7 +200,7 @@ float4 main(float2 fragment)
         color = floorColor;
         float floorDistance = 100.0 / max(scenePosition.y - 80.0, 0.5);
         float2 floorPosition = playerPosition + (rayDirection * floorDistance);
-        float illumination = distanceIllumination(floorDistance);
+        float illumination = ambientIllumination(floorDistance);
         illumination += surfaceIllumination(floorPosition, 0.0);
         illumination += muzzleIllumination(floorPosition);
         color.rgb *= min(illumination, 1.0);
@@ -213,7 +219,7 @@ float4 main(float2 fragment)
 
         // Distance is perpendicular to the camera plane, so this darkening does
         // not bow across the screen and can later be combined with real lights.
-        float illumination = distanceIllumination(distance);
+        float illumination = ambientIllumination(distance);
         float orientation = column.w - (floor(column.w / 2.0) * 2.0);
         illumination *= mix(1.0, 0.92, orientation);
         float2 wallPosition = playerPosition + (rayDirection * distance);

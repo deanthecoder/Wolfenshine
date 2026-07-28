@@ -17,6 +17,7 @@ using Avalonia.Skia;
 using SkiaSharp;
 using Wolfenshine.Game;
 using Wolfenshine.Graphics;
+using Wolfenshine.Maps;
 using Wolfenshine.Rendering;
 
 namespace Wolfenshine.Views;
@@ -58,6 +59,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     private SKBitmap m_wallAtlas;
     private WolfensteinWallTextures m_atlasWallTextures;
     private WolfensteinPalette m_atlasPalette;
+    private WolfensteinMap m_dungeonAmbientSourceMap;
+    private DungeonAmbientMap m_dungeonAmbientMap;
 
     public static readonly StyledProperty<double> ViewBobProperty =
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(ViewBob));
@@ -113,9 +116,11 @@ public sealed class EnhancedViewport : SoftwareViewport
             return;
 
         EnsureWallAtlas();
+        EnsureDungeonAmbientMap();
+        var dungeonDarkness = (float)m_dungeonAmbientMap.GetDarkness(Camera.X, Camera.Y);
         BuildColumnBuffer();
         BuildLightBuffer();
-        BuildSoftwareOverlays();
+        BuildSoftwareOverlays(dungeonDarkness);
         m_playerPosition[0] = (float)Camera.X;
         m_playerPosition[1] = (float)Camera.Y;
         m_cameraDirection[0] = (float)Camera.DirectionX;
@@ -135,6 +140,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_cameraDirection,
             m_cameraPlane,
             (float)MuzzleFlash,
+            dungeonDarkness,
             (float)ViewBob,
             (float)DamageFlash,
             (float)DeathFade,
@@ -180,6 +186,14 @@ public sealed class EnhancedViewport : SoftwareViewport
         }
         m_atlasWallTextures = WallTextures;
         m_atlasPalette = Palette;
+    }
+
+    private void EnsureDungeonAmbientMap()
+    {
+        if (ReferenceEquals(m_dungeonAmbientSourceMap, Map))
+            return;
+        m_dungeonAmbientSourceMap = Map;
+        m_dungeonAmbientMap = DungeonAmbientMap.FromMap(Map);
     }
 
     private void BuildColumnBuffer()
@@ -280,7 +294,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_sceneLightRadii[radiusTarget + 1] = downwardRadius;
     }
 
-    private void BuildSoftwareOverlays()
+    private void BuildSoftwareOverlays(float dungeonDarkness)
     {
         Array.Clear(m_pixels);
         Array.Clear(m_weaponPixels);
@@ -294,7 +308,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 var sprite = StaticObjects[index];
                 m_litWorldSprites[index] = sprite with
                 {
-                    Brightness = sprite.IsActor ? CalculateActorBrightness(sprite.X, sprite.Y) : 1.0f
+                    Brightness = CalculateSpriteBrightness(sprite, dungeonDarkness)
                 };
             }
             if (m_projectedSprites.Length != StaticObjects.Count)
@@ -342,9 +356,10 @@ public sealed class EnhancedViewport : SoftwareViewport
         CopyPixelsToBitmap(m_weaponPixels, m_weaponOverlayBitmap);
     }
 
-    private float CalculateActorBrightness(double x, double y)
+    private float CalculateSpriteBrightness(WorldSprite worldSprite, float dungeonDarkness)
     {
-        var illumination = 0.60f;
+        var ambientScale = 1.0f - (Math.Clamp(dungeonDarkness, 0.0f, 1.0f) * 0.45f);
+        var illumination = (worldSprite.IsActor ? 0.60f : 1.0f) * ambientScale;
         if (LightObjects != null)
         {
             foreach (var sprite in LightObjects)
@@ -352,8 +367,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 var (_, downward) = WolfensteinStaticObjects.GetLightBrightness(sprite.SpriteNumber);
                 var (_, downwardRadius) = WolfensteinStaticObjects.GetLightRadii(sprite.SpriteNumber);
                 illumination += CalculateLightContribution(
-                    x,
-                    y,
+                    worldSprite.X,
+                    worldSprite.Y,
                     sprite.X,
                     sprite.Y,
                     downward,
@@ -365,8 +380,8 @@ public sealed class EnhancedViewport : SoftwareViewport
             foreach (var light in DynamicLights)
             {
                 illumination += CalculateLightContribution(
-                    x,
-                    y,
+                    worldSprite.X,
+                    worldSprite.Y,
                     light.X,
                     light.Y,
                     light.DownwardBrightness,
@@ -376,8 +391,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         if (MuzzleFlash > 0.0)
         {
             illumination += CalculateLightContribution(
-                x,
-                y,
+                worldSprite.X,
+                worldSprite.Y,
                 Camera.X + (Camera.DirectionX * 0.35),
                 Camera.Y + (Camera.DirectionY * 0.35),
                 (float)MuzzleFlash * 0.90f,
@@ -433,6 +448,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] cameraDirection,
         float[] cameraPlane,
         float muzzleFlash,
+        float dungeonDarkness,
         float viewBob,
         float damageFlash,
         float deathFade,
@@ -470,6 +486,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["cameraDirection"] = cameraDirection,
                 ["cameraPlane"] = cameraPlane,
                 ["muzzleFlash"] = muzzleFlash,
+                ["dungeonDarkness"] = dungeonDarkness,
                 ["viewBob"] = viewBob,
                 ["damageFlash"] = damageFlash,
                 ["deathFade"] = deathFade,
