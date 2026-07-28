@@ -497,7 +497,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 playViewPixels,
                 ViewportWidth,
                 PlayViewHeight,
-                FogColor);
+                FogColor,
+                drawGroundShadows: true);
         }
         if (WeaponSprite != null)
         {

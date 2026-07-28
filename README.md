@@ -6,7 +6,7 @@ A modern C# port of the original Wolfenstein 3D experience.
 
 Wolfenshine rebuilds the complete game around a clean, cross-platform .NET codebase while loading the artwork, maps, music, and sounds from your own copy of Wolfenstein 3D. It currently includes the original-style difficulty menu, all six episodes, textured software rendering, enemies, weapons, pickups, doors, secret walls, elevators, sound, music, death and respawning, and end-of-level statistics.
 
-The first goal is to reproduce how the 1992 game looks and plays. That gives us a trustworthy foundation for a later enhanced renderer with lighting, fog, shaders, and other modern effects—without losing the original version along the way.
+The first goal is to reproduce how the 1992 game looks and plays. That gives us a trustworthy foundation for an optional enhanced renderer with colored lighting, atmospheric fog, shadows, and other shader effects—without losing the original version along the way.
 
 ![Wolfenshine gameplay](img/gameplay.png)
 
@@ -29,7 +29,7 @@ The enhanced renderer also applies dynamic light to enemies. The example below s
 - Original digitized and AdLib effects are played spatially through OpenAL; original IMF music is rendered through OPL emulation.
 - Difficulty affects enemy placement, health, behavior, and incoming damage in the same places it did originally.
 - An authentic-looking difficulty screen, HUD, pause plaque, and intermission screen complete the experience.
-- F2 switches live between authentic movement/software rendering and an experimental enhanced mode with momentum-based movement, view bob, dynamic lighting, distance shading, geometry-aware ambient occlusion, and room ambience derived from local light coverage.
+- F2 switches live between authentic movement/software rendering and an experimental enhanced mode with momentum-based movement, view bob, colored directional lighting, muzzle-flash illumination, distance shading and fog, geometry-aware ambient occlusion, room ambience derived from local light coverage, and soft ground shadows beneath enemies.
 
 Wolfenshine is still under development. Bosses, episode endings, save games, and some less common gameplay details remain to be implemented.
 
@@ -101,16 +101,13 @@ Wolfenstein 3D has many excellent source ports already, but rebuilding it in mod
 
 Once the original game data, rendering, and core behavior are working, possible enhanced-mode experiments include:
 
-- View bob and smoother camera motion.
 - Damage feedback using edge-focused display blur and blood on the screen.
 - Subtle peripheral motion blur while moving, strengthened while running.
 - An optional LCD-screen shader for a stylized modern display treatment.
 - Persistent enemy blood splats.
-- Improved dynamic and colored lighting.
 - Flickering lights in dungeon-like areas.
 - Expanded ambient occlusion for added depth around sprites and other objects.
 - Dynamic shadows.
-- Spatial 3D sound.
 - Optional hint HUD components, such as a floor-projected route to the nearest exit.
 - A toggle that redirects the route hint toward the nearest unvisited treasure room.
 

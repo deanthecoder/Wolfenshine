@@ -186,6 +186,41 @@ public sealed class SoftwareRaycastRendererTests
     }
 
     [Test]
+    public void GivenActorSpriteAndEnhancedShadowsCheckSoftShadowIsDrawnAtItsFeet()
+    {
+        var sprite = new WolfensteinSprite(
+            new byte[WolfensteinSprite.PixelCount],
+            new bool[WolfensteinSprite.PixelCount]);
+        var sprites = new WolfensteinSpriteSet(Enumerable.Repeat(sprite, 20).ToArray());
+        var palette = WolfensteinPalette.FromVgaDac(new byte[WolfensteinPalette.VgaDataLength]);
+        var walls = Enumerable
+            .Repeat(new WallColumn(3.0, 0.0, 1, WallSide.Horizontal), 5)
+            .ToArray();
+        var pixels = new byte[5 * 4 * 4];
+        ProjectedWorldSprite[] projected =
+        [
+            new(0, 2.0, 2, 4, CastsGroundShadow: true)
+        ];
+
+        SoftwareRaycastRenderer.DrawWorldSprites(
+            projected,
+            sprites,
+            palette,
+            walls,
+            pixels,
+            5,
+            4,
+            drawGroundShadows: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(GetPixel(pixels, 17)[3], Is.GreaterThan(0));
+            Assert.That(GetPixel(pixels, 17)[3], Is.LessThan(255));
+            Assert.That(GetPixel(pixels, 0)[3], Is.Zero);
+        });
+    }
+
+    [Test]
     public void GivenIndexedGraphicCheckItIsCompositedAtRequestedPosition()
     {
         var graphic = new WolfensteinGraphic(2, 1, new byte[] { 7, 8 });

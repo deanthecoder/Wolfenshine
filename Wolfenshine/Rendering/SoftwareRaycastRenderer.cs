@@ -157,7 +157,8 @@ public static class SoftwareRaycastRenderer
         Span<byte> pixels,
         int width,
         int height,
-        RgbaColor? fogColor = null)
+        RgbaColor? fogColor = null,
+        bool drawGroundShadows = false)
     {
         ArgumentNullException.ThrowIfNull(sprites);
         ArgumentNullException.ThrowIfNull(palette);
@@ -173,6 +174,8 @@ public static class SoftwareRaycastRenderer
         // Sprites arrive farthest first. Nearer opaque pixels naturally overwrite farther sprites.
         foreach (var projected in projectedSprites)
         {
+            if (drawGroundShadows && projected.CastsGroundShadow)
+                DrawGroundShadow(projected, wallColumns, pixels, width, height);
             var sprite = sprites.Get(projected.SpriteNumber);
             var left = projected.CenterX - (projected.RenderedSize / 2);
             var top = (height - projected.RenderedSize) / 2;
@@ -195,6 +198,42 @@ public static class SoftwareRaycastRenderer
                         color = color.Blend(fog, projected.FogAmount);
                     WritePixel(pixels, width, x, y, color);
                 }
+            }
+        }
+    }
+
+    private static void DrawGroundShadow(
+        ProjectedWorldSprite projected,
+        IReadOnlyList<WallColumn> wallColumns,
+        Span<byte> pixels,
+        int width,
+        int height)
+    {
+        var radiusX = Math.Max(1.0, projected.RenderedSize * 0.22);
+        var radiusY = Math.Max(1.0, projected.RenderedSize * 0.055);
+        var centerY = Math.Min(
+            height - 1.0,
+            ((height + projected.RenderedSize) * 0.5) - Math.Max(1.0, projected.RenderedSize * 0.035));
+        var firstX = Math.Max(0, (int)Math.Floor(projected.CenterX - radiusX));
+        var lastX = Math.Min(width - 1, (int)Math.Ceiling(projected.CenterX + radiusX));
+        var firstY = Math.Max(0, (int)Math.Floor(centerY - radiusY));
+        var lastY = Math.Min(height - 1, (int)Math.Ceiling(centerY + radiusY));
+        for (var x = firstX; x <= lastX; x++)
+        {
+            if (projected.Depth >= wallColumns[x].Distance)
+                continue;
+            var normalizedX = (x + 0.5 - projected.CenterX) / radiusX;
+            for (var y = firstY; y <= lastY; y++)
+            {
+                var normalizedY = (y + 0.5 - centerY) / radiusY;
+                var distanceSquared = (normalizedX * normalizedX) + (normalizedY * normalizedY);
+                if (distanceSquared >= 1.0)
+                    continue;
+                var edge = Math.Clamp((Math.Sqrt(distanceSquared) - 0.15) / 0.85, 0.0, 1.0);
+                var smoothEdge = edge * edge * (3.0 - (2.0 * edge));
+                var opacity = (byte)Math.Round(
+                    72.0 * (1.0 - smoothEdge) * (1.0 - projected.FogAmount));
+                BlendPixel(pixels, width, x, y, new RgbaColor(0, 0, 0, opacity));
             }
         }
     }
@@ -241,5 +280,22 @@ public static class SoftwareRaycastRenderer
         pixels[offset + 1] = color.Green;
         pixels[offset + 2] = color.Blue;
         pixels[offset + 3] = color.Alpha;
+    }
+
+    private static void BlendPixel(Span<byte> pixels, int width, int x, int y, RgbaColor color)
+    {
+        var offset = ((y * width) + x) * 4;
+        var sourceAlpha = color.Alpha / 255.0;
+        var destinationAlpha = pixels[offset + 3] / 255.0;
+        var outputAlpha = sourceAlpha + (destinationAlpha * (1.0 - sourceAlpha));
+        if (outputAlpha <= 0.0)
+            return;
+        pixels[offset] = (byte)Math.Round(
+            ((color.Red * sourceAlpha) + (pixels[offset] * destinationAlpha * (1.0 - sourceAlpha))) / outputAlpha);
+        pixels[offset + 1] = (byte)Math.Round(
+            ((color.Green * sourceAlpha) + (pixels[offset + 1] * destinationAlpha * (1.0 - sourceAlpha))) / outputAlpha);
+        pixels[offset + 2] = (byte)Math.Round(
+            ((color.Blue * sourceAlpha) + (pixels[offset + 2] * destinationAlpha * (1.0 - sourceAlpha))) / outputAlpha);
+        pixels[offset + 3] = (byte)Math.Round(outputAlpha * 255.0);
     }
 }

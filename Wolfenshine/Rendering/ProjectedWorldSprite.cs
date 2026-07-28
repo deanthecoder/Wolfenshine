@@ -22,4 +22,5 @@ public readonly record struct ProjectedWorldSprite(
     int CenterX,
     int RenderedSize,
     float Brightness = 1.0f,
-    float FogAmount = 0.0f);
+    float FogAmount = 0.0f,
+    bool CastsGroundShadow = false);

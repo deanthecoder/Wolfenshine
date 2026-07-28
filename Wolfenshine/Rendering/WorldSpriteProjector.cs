@@ -73,7 +73,8 @@ public static class WorldSpriteProjector
                 depth,
                 centerX,
                 renderedSize,
-                sprite.Brightness);
+                sprite.Brightness,
+                CastsGroundShadow: sprite.IsActor);
         }
 
         projectedSprites[..visibleCount].Sort(static (left, right) => right.Depth.CompareTo(left.Depth));
