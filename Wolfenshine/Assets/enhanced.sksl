@@ -44,6 +44,7 @@ uniform float2 playerPosition;
 uniform float2 cameraDirection;
 uniform float2 cameraPlane;
 uniform float muzzleFlash; // Brief 0..1 player weapon flash.
+uniform float weaponFlash; // 1 while the current weapon artwork visibly contains a muzzle flash.
 uniform float playerAmbientScale; // Player ambience, smoothly blended while crossing open doors.
 uniform float areaAmbientMaximum; // Decodes the normalized per-tile ambient map.
 uniform float areaAmbientPixelsPerTile; // Sub-tile resolution used for smooth doorway blending.
@@ -121,6 +122,8 @@ float weaponIllumination()
 {
     // The weapon starts darker than its original palette values. Downward
     // brightness raises it toward full brightness beneath ceiling light cones.
+    // A firing frame containing a visible muzzle flash is emissive rather than
+    // allowing room ambience to dull the flame.
     float illumination = 0.60 * playerAmbientScale;
     for (int index = 0; index < 32; index++)
     {
@@ -130,8 +133,7 @@ float weaponIllumination()
         float cone = 1.0 - (conePosition * conePosition * (3.0 - 2.0 * conePosition));
         illumination += light.w * cone * 0.80;
     }
-    illumination += muzzleFlash * 0.40;
-    return clamp(illumination, 0.20, 1.0);
+    return mix(clamp(illumination, 0.20, 1.0), 1.0, clamp(weaponFlash, 0.0, 1.0));
 }
 
 float muzzleIllumination(float2 worldPosition)

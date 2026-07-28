@@ -150,6 +150,9 @@ public sealed class GameSession
     public bool IsGameOver { get; private set; }
     public bool IsCompletingLevel => m_isCompletingLevel;
     public bool IsReadyForNextLevel => m_isCompletingLevel && m_levelFade >= 1.0;
+    public bool IsWeaponFlashFrame => Weapon != PlayerWeapon.Knife &&
+                                      (WeaponFrame == 2 ||
+                                       (Weapon == PlayerWeapon.Chaingun && WeaponFrame == 3));
     public double MuzzleFlash => Weapon != PlayerWeapon.Knife && WeaponFrame == 3 ? 1.0 : 0.0;
     public double PlayerSpeed => Math.Sqrt((m_velocityX * m_velocityX) + (m_velocityY * m_velocityY));
     public double LevelFade => m_levelFade;

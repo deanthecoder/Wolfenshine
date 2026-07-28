@@ -128,7 +128,7 @@ Debug builds provide a few development conveniences that are omitted from Releas
 
 | Key | Action |
 |---|---|
-| `I` | Log the camera, weapon, doors, actors, sprite resolution, projection values, and nearby decorations. |
+| `I` | Log the player's position and facing angle, weapon, doors, actors, sprite resolution, projection values, and nearby decorations. |
 | `R` | Restore health and ammunition and unlock all weapons. |
 | `M` | Toggle the textured map overview. |
 | `S` | Save the current level, position, and direction as a quick test location. |

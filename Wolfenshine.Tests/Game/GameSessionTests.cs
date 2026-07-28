@@ -102,6 +102,7 @@ public sealed class GameSessionTests
         session.Update(6.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
         Assert.That(session.WeaponFrame, Is.EqualTo(2));
         Assert.That(session.MuzzleFlash, Is.Zero);
+        Assert.That(session.IsWeaponFlashFrame, Is.True);
 
         session.Update(6.0 / 70.0, new PlayerInput(false, false, false, false, Attack: true));
         var sounds = session.DrainSoundEvents();
@@ -109,6 +110,7 @@ public sealed class GameSessionTests
         {
             Assert.That(session.WeaponFrame, Is.EqualTo(3));
             Assert.That(session.MuzzleFlash, Is.EqualTo(1.0));
+            Assert.That(session.IsWeaponFlashFrame, Is.False);
             Assert.That(session.Ammo, Is.EqualTo(7));
             Assert.That(sounds, Has.Some.Matches<WolfensteinSoundEvent>(sound =>
                 sound.Effect == WolfensteinSoundEffect.AttackPistol && sound.X == null && sound.Y == null));

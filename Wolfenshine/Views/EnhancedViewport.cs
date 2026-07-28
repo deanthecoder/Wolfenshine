@@ -71,6 +71,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(ViewBob));
     public static readonly StyledProperty<double> MuzzleFlashProperty =
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(MuzzleFlash));
+    public static readonly StyledProperty<bool> IsWeaponFlashFrameProperty =
+        AvaloniaProperty.Register<EnhancedViewport, bool>(nameof(IsWeaponFlashFrame));
     public static readonly StyledProperty<IReadOnlyList<WorldSprite>> LightObjectsProperty =
         AvaloniaProperty.Register<EnhancedViewport, IReadOnlyList<WorldSprite>>(nameof(LightObjects));
     public static readonly StyledProperty<IReadOnlyList<WorldLight>> DynamicLightsProperty =
@@ -79,6 +81,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     static EnhancedViewport() => AffectsRender<EnhancedViewport>(
         ViewBobProperty,
         MuzzleFlashProperty,
+        IsWeaponFlashFrameProperty,
         LightObjectsProperty,
         DynamicLightsProperty);
 
@@ -101,6 +104,12 @@ public sealed class EnhancedViewport : SoftwareViewport
     {
         get => GetValue(MuzzleFlashProperty);
         set => SetValue(MuzzleFlashProperty, value);
+    }
+
+    public bool IsWeaponFlashFrame
+    {
+        get => GetValue(IsWeaponFlashFrameProperty);
+        set => SetValue(IsWeaponFlashFrameProperty, value);
     }
 
     public IReadOnlyList<WorldSprite> LightObjects
@@ -147,6 +156,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_cameraDirection,
             m_cameraPlane,
             (float)MuzzleFlash,
+            IsWeaponFlashFrame ? 1.0f : 0.0f,
             playerAmbientScale,
             (float)AreaAmbientMap.MaximumAmbientScale,
             AmbientMapPixelsPerTile,
@@ -555,6 +565,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] cameraDirection,
         float[] cameraPlane,
         float muzzleFlash,
+        float weaponFlash,
         float playerAmbientScale,
         float areaAmbientMaximum,
         float areaAmbientPixelsPerTile,
@@ -598,6 +609,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["cameraDirection"] = cameraDirection,
                 ["cameraPlane"] = cameraPlane,
                 ["muzzleFlash"] = muzzleFlash,
+                ["weaponFlash"] = weaponFlash,
                 ["playerAmbientScale"] = playerAmbientScale,
                 ["areaAmbientMaximum"] = areaAmbientMaximum,
                 ["areaAmbientPixelsPerTile"] = areaAmbientPixelsPerTile,

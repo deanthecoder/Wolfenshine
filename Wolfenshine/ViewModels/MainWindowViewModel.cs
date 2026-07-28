@@ -51,6 +51,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private double m_deathFade;
     private double m_damageFlash;
     private double m_muzzleFlash;
+    private bool m_isWeaponFlashFrame;
     private double m_levelFade;
     private double m_playerSpeed;
     private bool m_isShowingLevelStats;
@@ -158,6 +159,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public double DeathFade => m_deathFade;
     public double DamageFlash => m_damageFlash;
     public double MuzzleFlash => m_muzzleFlash;
+    public bool IsWeaponFlashFrame => m_isWeaponFlashFrame;
     public double LevelFade => m_levelFade;
     public double PlayerSpeed => m_playerSpeed;
     public bool IsShowingLevelStats => m_isShowingLevelStats;
@@ -227,6 +229,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_deathFade, m_gameSession.DeathFade, nameof(DeathFade));
         SetField(ref m_damageFlash, m_gameSession.DamageFlash, nameof(DamageFlash));
         SetField(ref m_muzzleFlash, m_gameSession.MuzzleFlash, nameof(MuzzleFlash));
+        SetField(
+            ref m_isWeaponFlashFrame,
+            m_gameSession.IsWeaponFlashFrame,
+            nameof(IsWeaponFlashFrame));
         SetField(ref m_levelFade, m_gameSession.LevelFade, nameof(LevelFade));
         SetField(ref m_playerSpeed, m_gameSession.PlayerSpeed, nameof(PlayerSpeed));
         SetField(ref m_elevatorSwitch, m_gameSession.ElevatorSwitch, nameof(ElevatorSwitch));
@@ -541,6 +547,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer?.SetMusicFade(startFaded ? 1.0 : 0.0);
         m_worldObjects = CreateWorldObjects();
         m_enemyMuzzleFlashes = [];
+        m_isWeaponFlashFrame = false;
         m_playerSpeed = 0.0;
         m_weaponSprite = Sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? m_weaponSprite;
         StatusText = $"{map.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
@@ -614,9 +621,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        var playerAngle = (Math.Atan2(Camera.DirectionY, Camera.DirectionX) * 180.0 / Math.PI + 360.0) % 360.0;
         Logger.Instance.Info(
             $"Wolfenshine debug snapshot: map {SelectedMap.Slot} ({SelectedMap.Name}), " +
-            $"camera ({Camera.X:0.000}, {Camera.Y:0.000}), direction ({Camera.DirectionX:0.000}, {Camera.DirectionY:0.000}), " +
+            $"player position ({Camera.X:0.000}, {Camera.Y:0.000}), angle {playerAngle:0.0} degrees, " +
+            $"direction ({Camera.DirectionX:0.000}, {Camera.DirectionY:0.000}), " +
             $"plane ({Camera.PlaneX:0.000}, {Camera.PlaneY:0.000}).");
         Logger.Instance.Info(
             $"Player weapon {m_gameSession.Weapon}, frame {m_gameSession.WeaponFrame}, " +

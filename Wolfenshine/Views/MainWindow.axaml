@@ -57,6 +57,7 @@
                                     StatusBar="{Binding StatusBar}"
                                     DamageFlash="{Binding DamageFlash}"
                                     MuzzleFlash="{Binding MuzzleFlash}"
+                                    IsWeaponFlashFrame="{Binding IsWeaponFlashFrame}"
                                     DeathFade="{Binding DeathFade}"
                                     LevelFade="{Binding LevelFade}" />
 
