@@ -59,8 +59,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     private SKBitmap m_wallAtlas;
     private WolfensteinWallTextures m_atlasWallTextures;
     private WolfensteinPalette m_atlasPalette;
-    private WolfensteinMap m_dungeonAmbientSourceMap;
-    private DungeonAmbientMap m_dungeonAmbientMap;
+    private WolfensteinMap m_areaAmbientSourceMap;
+    private AreaAmbientMap m_areaAmbientMap;
 
     public static readonly StyledProperty<double> ViewBobProperty =
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(ViewBob));
@@ -116,11 +116,11 @@ public sealed class EnhancedViewport : SoftwareViewport
             return;
 
         EnsureWallAtlas();
-        EnsureDungeonAmbientMap();
-        var dungeonDarkness = (float)m_dungeonAmbientMap.GetDarkness(Camera.X, Camera.Y);
+        EnsureAreaAmbientMap();
+        var ambientScale = (float)m_areaAmbientMap.GetAmbientScale(Camera.X, Camera.Y, Doors);
         BuildColumnBuffer();
         BuildLightBuffer();
-        BuildSoftwareOverlays(dungeonDarkness);
+        BuildSoftwareOverlays(ambientScale);
         m_playerPosition[0] = (float)Camera.X;
         m_playerPosition[1] = (float)Camera.Y;
         m_cameraDirection[0] = (float)Camera.DirectionX;
@@ -140,7 +140,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_cameraDirection,
             m_cameraPlane,
             (float)MuzzleFlash,
-            dungeonDarkness,
+            ambientScale,
             (float)ViewBob,
             (float)DamageFlash,
             (float)DeathFade,
@@ -188,12 +188,12 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_atlasPalette = Palette;
     }
 
-    private void EnsureDungeonAmbientMap()
+    private void EnsureAreaAmbientMap()
     {
-        if (ReferenceEquals(m_dungeonAmbientSourceMap, Map))
+        if (ReferenceEquals(m_areaAmbientSourceMap, Map))
             return;
-        m_dungeonAmbientSourceMap = Map;
-        m_dungeonAmbientMap = DungeonAmbientMap.FromMap(Map);
+        m_areaAmbientSourceMap = Map;
+        m_areaAmbientMap = AreaAmbientMap.FromMap(Map);
     }
 
     private void BuildColumnBuffer()
@@ -294,7 +294,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_sceneLightRadii[radiusTarget + 1] = downwardRadius;
     }
 
-    private void BuildSoftwareOverlays(float dungeonDarkness)
+    private void BuildSoftwareOverlays(float ambientScale)
     {
         Array.Clear(m_pixels);
         Array.Clear(m_weaponPixels);
@@ -308,7 +308,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 var sprite = StaticObjects[index];
                 m_litWorldSprites[index] = sprite with
                 {
-                    Brightness = CalculateSpriteBrightness(sprite, dungeonDarkness)
+                    Brightness = CalculateSpriteBrightness(sprite, ambientScale)
                 };
             }
             if (m_projectedSprites.Length != StaticObjects.Count)
@@ -356,10 +356,9 @@ public sealed class EnhancedViewport : SoftwareViewport
         CopyPixelsToBitmap(m_weaponPixels, m_weaponOverlayBitmap);
     }
 
-    private float CalculateSpriteBrightness(WorldSprite worldSprite, float dungeonDarkness)
+    private float CalculateSpriteBrightness(WorldSprite worldSprite, float ambientScale)
     {
-        var ambientScale = 1.0f - (Math.Clamp(dungeonDarkness, 0.0f, 1.0f) * 0.45f);
-        var illumination = (worldSprite.IsActor ? 0.60f : 1.0f) * ambientScale;
+        var illumination = (worldSprite.IsActor ? 0.60f : 1.0f) * Math.Clamp(ambientScale, 0.35f, 1.0f);
         if (LightObjects != null)
         {
             foreach (var sprite in LightObjects)
@@ -448,7 +447,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] cameraDirection,
         float[] cameraPlane,
         float muzzleFlash,
-        float dungeonDarkness,
+        float ambientScale,
         float viewBob,
         float damageFlash,
         float deathFade,
@@ -486,7 +485,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["cameraDirection"] = cameraDirection,
                 ["cameraPlane"] = cameraPlane,
                 ["muzzleFlash"] = muzzleFlash,
-                ["dungeonDarkness"] = dungeonDarkness,
+                ["ambientScale"] = ambientScale,
                 ["viewBob"] = viewBob,
                 ["damageFlash"] = damageFlash,
                 ["deathFade"] = deathFade,

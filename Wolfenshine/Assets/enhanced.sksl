@@ -43,7 +43,7 @@ uniform float2 playerPosition;
 uniform float2 cameraDirection;
 uniform float2 cameraPlane;
 uniform float muzzleFlash; // Brief 0..1 player weapon flash.
-uniform float dungeonDarkness; // Smooth 0..1 proximity to a blue-stone jail area.
+uniform float ambientScale; // Per-area ambient light, smoothly blended through open doors.
 
 // A 64-pixel-wide atlas containing every decoded VSWAP wall page. Each page is
 // 64 x 64 and pages are stacked vertically. CPU palette lookup currently makes
@@ -71,7 +71,7 @@ float distanceIllumination(float distance)
 
 float ambientIllumination(float distance)
 {
-    return distanceIllumination(distance) * mix(1.0, 0.55, dungeonDarkness);
+    return distanceIllumination(distance) * ambientScale;
 }
 
 float smoothRamp(float value)
@@ -111,7 +111,7 @@ float weaponIllumination()
 {
     // The weapon starts darker than its original palette values. Downward
     // brightness raises it toward full brightness beneath ceiling light cones.
-    float illumination = 0.60 * mix(1.0, 0.55, dungeonDarkness);
+    float illumination = 0.60 * ambientScale;
     for (int index = 0; index < 32; index++)
     {
         float4 light = sceneLights[index];
