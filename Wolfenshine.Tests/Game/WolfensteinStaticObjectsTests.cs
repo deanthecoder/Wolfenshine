@@ -109,4 +109,18 @@ public sealed class WolfensteinStaticObjectsTests
         Assert.That(upward, Is.EqualTo(expectedUpward));
         Assert.That(downward, Is.EqualTo(expectedDownward));
     }
+
+    [Test]
+    public void GivenGreenCeilingLightCheckColorIsGreenAboveAndNearlyWhiteBelow()
+    {
+        var (upward, downward) = WolfensteinStaticObjects.GetLightColors(16);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(upward.Green, Is.GreaterThan(upward.Red));
+            Assert.That(upward.Green, Is.GreaterThan(upward.Blue));
+            Assert.That(downward.Green - downward.Red, Is.LessThanOrEqualTo(12));
+            Assert.That(downward.Green - downward.Blue, Is.LessThanOrEqualTo(12));
+        });
+    }
 }

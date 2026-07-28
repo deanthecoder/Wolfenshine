@@ -40,6 +40,8 @@ uniform float4 wallColumns[320];
 // object type lets future map objects participate without changing this shader.
 uniform float4 sceneLights[32];
 uniform float2 sceneLightRadii[32]; // Upward and downward radius in map tiles.
+uniform float4 sceneLightUpColors[32]; // RGB tint emitted toward the ceiling.
+uniform float4 sceneLightDownColors[32]; // RGB tint emitted toward the floor.
 uniform float2 playerPosition;
 uniform float2 cameraDirection;
 uniform float2 cameraPlane;
@@ -136,29 +138,30 @@ float weaponIllumination()
     return mix(clamp(illumination, 0.20, 1.0), 1.0, clamp(weaponFlash, 0.0, 1.0));
 }
 
-float muzzleIllumination(float2 worldPosition)
+float3 muzzleIllumination(float2 worldPosition)
 {
     const float radius = 2.50;
     float2 flashPosition = playerPosition + (cameraDirection * 0.35);
     float distance = length(worldPosition - flashPosition);
     float conePosition = clamp(distance / radius, 0.0, 1.0);
     float falloff = 1.0 - (conePosition * conePosition * (3.0 - 2.0 * conePosition));
-    return muzzleFlash * falloff * 0.90;
+    return float3(1.0, 0.85, 0.69) * muzzleFlash * falloff * 0.90;
 }
 
-float surfaceIllumination(float2 worldPosition, float upward)
+float3 surfaceIllumination(float2 worldPosition, float upward)
 {
-    float illumination = 0.0;
+    float3 illumination = float3(0.0);
     for (int index = 0; index < 32; index++)
     {
         float4 light = sceneLights[index];
         float brightness = mix(light.w, light.z, upward);
+        float3 lightColor = mix(sceneLightDownColors[index].rgb, sceneLightUpColors[index].rgb, upward);
         float2 radii = sceneLightRadii[index];
         float radius = max(mix(radii.y, radii.x, upward), 0.0001);
         float distance = length(worldPosition - light.xy);
         float conePosition = clamp(distance / radius, 0.0, 1.0);
         float cone = 1.0 - (conePosition * conePosition * (3.0 - 2.0 * conePosition));
-        illumination += brightness * cone * 0.65;
+        illumination += lightColor * brightness * cone * 0.65;
     }
     return illumination;
 }
@@ -201,7 +204,7 @@ float4 main(float2 fragment)
         // is halfway between floor and ceiling, giving a 100-pixel projection height.
         float ceilingDistance = 100.0 / max(80.0 - scenePosition.y, 0.5);
         float2 ceilingPosition = playerPosition + (rayDirection * ceilingDistance);
-        float illumination = ambientIllumination(ceilingDistance, ceilingPosition);
+        float3 illumination = float3(ambientIllumination(ceilingDistance, ceilingPosition));
         illumination += surfaceIllumination(ceilingPosition, 1.0);
         illumination += muzzleIllumination(ceilingPosition);
         color.rgb *= min(illumination, 1.0);
@@ -212,7 +215,7 @@ float4 main(float2 fragment)
         color = floorColor;
         float floorDistance = 100.0 / max(scenePosition.y - 80.0, 0.5);
         float2 floorPosition = playerPosition + (rayDirection * floorDistance);
-        float illumination = ambientIllumination(floorDistance, floorPosition);
+        float3 illumination = float3(ambientIllumination(floorDistance, floorPosition));
         illumination += surfaceIllumination(floorPosition, 0.0);
         illumination += muzzleIllumination(floorPosition);
         color.rgb *= min(illumination, 1.0);
@@ -247,7 +250,7 @@ float4 main(float2 fragment)
             else
                 ambientPosition.y = wallPosition.y - (sign(rayDirection.y) * 0.51);
         }
-        float illumination = ambientIllumination(distance, ambientPosition);
+        float3 illumination = float3(ambientIllumination(distance, ambientPosition));
         illumination *= mix(1.0, 0.92, orientation);
         // Vertical walls receive a restrained blend of the upward and downward
         // components. This lets local sources such as treasure softly illuminate

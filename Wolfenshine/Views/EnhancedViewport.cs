@@ -36,10 +36,13 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const int LightCount = 32;
     private const int LightChannelCount = 4;
     private const int LightRadiusChannelCount = 2;
+    private const int LightColorChannelCount = 4;
     private const int AmbientMapPixelsPerTile = 16;
     private readonly float[] m_wallColumns = new float[ViewportWidth * ColumnChannelCount];
     private readonly float[] m_sceneLights = new float[LightCount * LightChannelCount];
     private readonly float[] m_sceneLightRadii = new float[LightCount * LightRadiusChannelCount];
+    private readonly float[] m_sceneLightUpColors = new float[LightCount * LightColorChannelCount];
+    private readonly float[] m_sceneLightDownColors = new float[LightCount * LightColorChannelCount];
     private readonly double[] m_sceneLightDistances = new double[LightCount];
     private readonly float[] m_playerPosition = new float[2];
     private readonly float[] m_cameraDirection = new float[2];
@@ -152,6 +155,8 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_wallColumns,
             m_sceneLights,
             m_sceneLightRadii,
+            m_sceneLightUpColors,
+            m_sceneLightDownColors,
             m_playerPosition,
             m_cameraDirection,
             m_cameraPlane,
@@ -330,6 +335,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     {
         Array.Clear(m_sceneLights);
         Array.Clear(m_sceneLightRadii);
+        Array.Clear(m_sceneLightUpColors);
+        Array.Clear(m_sceneLightDownColors);
         Array.Fill(m_sceneLightDistances, double.PositiveInfinity);
         if (LightObjects != null)
         {
@@ -337,9 +344,18 @@ public sealed class EnhancedViewport : SoftwareViewport
             {
                 var (upward, downward) = WolfensteinStaticObjects.GetLightBrightness(sprite.SpriteNumber);
                 var (upwardRadius, downwardRadius) = WolfensteinStaticObjects.GetLightRadii(sprite.SpriteNumber);
+                var (upwardColor, downwardColor) = WolfensteinStaticObjects.GetLightColors(sprite.SpriteNumber);
                 if (upward <= 0.0f && downward <= 0.0f)
                     continue;
-                InsertLight(sprite.X, sprite.Y, upward, downward, upwardRadius, downwardRadius);
+                InsertLight(
+                    sprite.X,
+                    sprite.Y,
+                    upward,
+                    downward,
+                    upwardRadius,
+                    downwardRadius,
+                    upwardColor,
+                    downwardColor);
             }
         }
         if (DynamicLights == null)
@@ -352,7 +368,9 @@ public sealed class EnhancedViewport : SoftwareViewport
                 light.UpwardBrightness,
                 light.DownwardBrightness,
                 light.UpwardRadius,
-                light.DownwardRadius);
+                light.DownwardRadius,
+                light.UpwardColor,
+                light.DownwardColor);
         }
     }
 
@@ -362,7 +380,9 @@ public sealed class EnhancedViewport : SoftwareViewport
         float upward,
         float downward,
         float upwardRadius,
-        float downwardRadius)
+        float downwardRadius,
+        RgbaColor upwardColor,
+        RgbaColor downwardColor)
     {
         var deltaX = x - Camera.X;
         var deltaY = y - Camera.Y;
@@ -393,6 +413,18 @@ public sealed class EnhancedViewport : SoftwareViewport
                 m_sceneLightRadii,
                 index * LightRadiusChannelCount,
                 LightRadiusChannelCount);
+            Array.Copy(
+                m_sceneLightUpColors,
+                (index - 1) * LightColorChannelCount,
+                m_sceneLightUpColors,
+                index * LightColorChannelCount,
+                LightColorChannelCount);
+            Array.Copy(
+                m_sceneLightDownColors,
+                (index - 1) * LightColorChannelCount,
+                m_sceneLightDownColors,
+                index * LightColorChannelCount,
+                LightColorChannelCount);
         }
 
         m_sceneLightDistances[insertAt] = distanceSquared;
@@ -404,6 +436,17 @@ public sealed class EnhancedViewport : SoftwareViewport
         var radiusTarget = insertAt * LightRadiusChannelCount;
         m_sceneLightRadii[radiusTarget] = upwardRadius;
         m_sceneLightRadii[radiusTarget + 1] = downwardRadius;
+        WriteLightColor(m_sceneLightUpColors, insertAt, upwardColor);
+        WriteLightColor(m_sceneLightDownColors, insertAt, downwardColor);
+    }
+
+    private static void WriteLightColor(float[] colors, int lightIndex, RgbaColor color)
+    {
+        var target = lightIndex * LightColorChannelCount;
+        colors[target] = color.Red / 255.0f;
+        colors[target + 1] = color.Green / 255.0f;
+        colors[target + 2] = color.Blue / 255.0f;
+        colors[target + 3] = 1.0f;
     }
 
     private void BuildSoftwareOverlays()
@@ -561,6 +604,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] wallColumns,
         float[] sceneLights,
         float[] sceneLightRadii,
+        float[] sceneLightUpColors,
+        float[] sceneLightDownColors,
         float[] playerPosition,
         float[] cameraDirection,
         float[] cameraPlane,
@@ -605,6 +650,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["wallColumns"] = wallColumns,
                 ["sceneLights"] = sceneLights,
                 ["sceneLightRadii"] = sceneLightRadii,
+                ["sceneLightUpColors"] = sceneLightUpColors,
+                ["sceneLightDownColors"] = sceneLightDownColors,
                 ["playerPosition"] = playerPosition,
                 ["cameraDirection"] = cameraDirection,
                 ["cameraPlane"] = cameraPlane,

@@ -8,6 +8,7 @@
 //
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
+using Wolfenshine.Graphics;
 using Wolfenshine.Maps;
 
 namespace Wolfenshine.Game;
@@ -100,5 +101,17 @@ public static class WolfensteinStaticObjects
         16 => (1.10f, 2.75f), // Green ceiling light with a narrow upward shine.
         31 or 32 or 33 or 34 => (1.25f, 1.25f), // Localized treasure glow.
         _ => (0.0f, 0.0f)
+    };
+
+    /// <summary>
+    /// Gets the upward and downward color tint emitted by a static sprite.
+    /// </summary>
+    public static (RgbaColor Upward, RgbaColor Downward) GetLightColors(int spriteNumber) => spriteNumber switch
+    {
+        5 => (new RgbaColor(255, 232, 196), new RgbaColor(255, 240, 216)), // Floor lamp.
+        6 => (new RgbaColor(255, 232, 192), new RgbaColor(255, 238, 207)), // Chandelier.
+        16 => (new RgbaColor(160, 255, 176), new RgbaColor(244, 255, 246)), // Green ceiling light.
+        31 or 32 or 33 or 34 => (new RgbaColor(255, 214, 128), new RgbaColor(255, 224, 152)), // Treasure glow.
+        _ => (new RgbaColor(255, 255, 255), new RgbaColor(255, 255, 255))
     };
 }

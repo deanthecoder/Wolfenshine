@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using Wolfenshine.Audio;
+using Wolfenshine.Graphics;
 using Wolfenshine.Maps;
 using Wolfenshine.Rendering;
 
@@ -1277,7 +1278,8 @@ public sealed class GameSession
                     flash.RemainingSeconds / EnemyMuzzleFlashDuration,
                     0.0,
                     1.0);
-                return new WorldLight(flash.X, flash.Y, intensity, intensity, 2.5f, 2.5f);
+                var color = new RgbaColor(255, 218, 176);
+                return new WorldLight(flash.X, flash.Y, intensity, intensity, 2.5f, 2.5f, color, color);
             })
             .ToArray();
     }

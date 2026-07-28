@@ -8,6 +8,8 @@
 //
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
+using Wolfenshine.Graphics;
+
 namespace Wolfenshine.Game;
 
 /// <summary>
@@ -22,4 +24,6 @@ public readonly record struct WorldLight(
     float UpwardBrightness,
     float DownwardBrightness,
     float UpwardRadius,
-    float DownwardRadius);
+    float DownwardRadius,
+    RgbaColor UpwardColor,
+    RgbaColor DownwardColor);
