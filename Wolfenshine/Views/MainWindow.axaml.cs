@@ -51,7 +51,7 @@ public sealed partial class MainWindow : Window
     private PlayerWeapon? m_weaponSelection;
 #if DEBUG
     private MapWindow m_mapWindow;
-    private bool m_isCapturingRendererComparison;
+    private bool m_isCapturingScreenshot;
     private readonly HashSet<Key> m_debugKeysDown = [];
 #endif
 
@@ -98,7 +98,10 @@ public sealed partial class MainWindow : Window
         }
         if (e.Key == Key.C)
         {
-            CaptureRendererComparison();
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                CaptureRendererComparison();
+            else
+                CaptureScreenshot();
             e.Handled = true;
             return;
         }
@@ -175,9 +178,44 @@ public sealed partial class MainWindow : Window
     }
 
 #if DEBUG
+    private async void CaptureScreenshot()
+    {
+        if (m_isCapturingScreenshot)
+            return;
+
+        m_isCapturingScreenshot = true;
+        var timerWasEnabled = m_gameTimer.IsEnabled;
+        m_gameTimer.Stop();
+        try
+        {
+            var downloadsPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Downloads");
+            var screenshotDirectory = Directory.CreateDirectory(downloadsPath);
+            var fileName = $"Wolfenshine-{DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff}.png";
+            var screenshotPath = Path.Combine(screenshotDirectory.FullName, fileName);
+            await WaitForRendererFrame();
+            await CaptureMacOsWindow(screenshotPath);
+            Logger.Instance.Info($"Captured Wolfenshine screenshot to {screenshotPath}.");
+        }
+        catch (Exception exception)
+        {
+            Logger.Instance.Error($"Screenshot capture failed: {exception}");
+        }
+        finally
+        {
+            if (timerWasEnabled)
+            {
+                m_gameClock.Restart();
+                m_gameTimer.Start();
+            }
+            m_isCapturingScreenshot = false;
+        }
+    }
+
     private async void CaptureRendererComparison()
     {
-        if (m_isCapturingRendererComparison)
+        if (m_isCapturingScreenshot)
             return;
         if (DataContext is not MainWindowViewModel
             {
@@ -191,7 +229,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        m_isCapturingRendererComparison = true;
+        m_isCapturingScreenshot = true;
         var timerWasEnabled = m_gameTimer.IsEnabled;
         var originalEnhancedMode = viewModel.IsEnhancedRendering;
         m_gameTimer.Stop();
@@ -236,7 +274,7 @@ public sealed partial class MainWindow : Window
                 m_gameClock.Restart();
                 m_gameTimer.Start();
             }
-            m_isCapturingRendererComparison = false;
+            m_isCapturingScreenshot = false;
         }
     }
 

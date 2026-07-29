@@ -1,5 +1,3 @@
-[![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/deanthecoder.svg?style=social&label=Follow%20%40deanthecoder)](https://twitter.com/deanthecoder) [![GitHub Repo stars](https://img.shields.io/github/stars/deanthecoder/Wolfenshine?style=social&label=Star)](https://github.com/deanthecoder/Wolfenshine/stargazers)
-
 # Wolfenshine
 
 **Wolfenstein 3D rebuilt in modern C#—faithful when you want it, shiny when you don't.**
@@ -8,7 +6,26 @@ Wolfenshine is a playable, cross-platform reimplementation of the 1992 classic. 
 
 At its heart is an authentic 320×200 software-rendered experience. Press F2 and that same game becomes something new: colored lights spill across rooms, muzzle flashes illuminate enemies, fog gathers in the distance, and bright doorways cast descending shafts into the darkness.
 
-![Wolfenshine gameplay](img/gameplay.png)
+![Wolfenshine's authentic software-rendered mode](img/gameplay.png)
+
+[![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/deanthecoder.svg?style=social&label=Follow%20%40deanthecoder)](https://twitter.com/deanthecoder) [![GitHub Repo stars](https://img.shields.io/github/stars/deanthecoder/Wolfenshine?style=social&label=Star)](https://github.com/deanthecoder/Wolfenshine/stargazers)
+
+## Then press F2
+
+The enhanced renderer builds on that classic foundation without replacing its pixel art. Rooms gain their own atmosphere: lights cast color, treasure glows, enemies move through illumination, and damage changes the character of the whole screen.
+
+<table>
+  <tr>
+    <td><img src="img/enhanced-green-lighting.png" alt="Green ceiling lights illuminating a blue-stone corridor"></td>
+    <td><img src="img/enhanced-enemy-lighting.png" alt="A guard illuminated beside a bright doorway"></td>
+  </tr>
+  <tr>
+    <td><img src="img/enhanced-treasure-lighting.png" alt="Treasure casting warm light around a hidden room"></td>
+    <td><img src="img/enhanced-damage-feedback.png" alt="Directional blood and damage feedback during combat"></td>
+  </tr>
+</table>
+
+![Low-health damage effects beneath enhanced chandelier lighting](img/enhanced-low-health.png)
 
 ## Classic underneath. Modern light on top.
 
@@ -134,13 +151,14 @@ Debug builds provide a few development conveniences that are omitted from Releas
 | Key | Action |
 |---|---|
 | `I` | Log the player's position and facing angle, weapon, doors, actors, sprite resolution, projection values, and nearby decorations. |
-| `C` | On macOS, capture authentic and enhanced frames and rebuild `img/renderer-comparison.png` with a diagonal split. |
+| `C` | On macOS, save a timestamped screenshot of the current window to `~/Downloads`. |
+| `Shift+C` | Capture authentic and enhanced frames and rebuild `img/renderer-comparison.png` with a diagonal split. |
 | `R` | Restore health and ammunition and unlock all weapons. |
 | `M` | Toggle the textured map overview. |
 | `S` | Save the current level, position, and direction as a quick test location. |
 | `L` | Restart at the saved test location. |
 
-The comparison capture keeps its clean source images in the Git-ignored `local/screenshots/` directory and overwrites the tracked README comparison image only after both renderer captures succeed.
+The Shift+C comparison capture keeps its clean source images in the Git-ignored `local/screenshots/` directory and overwrites the tracked README comparison image only after both renderer captures succeed.
 
 ### Wolfenstein 3D data files
 
