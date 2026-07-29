@@ -126,10 +126,13 @@ Debug builds provide a few development conveniences that are omitted from Releas
 | Key | Action |
 |---|---|
 | `I` | Log the player's position and facing angle, weapon, doors, actors, sprite resolution, projection values, and nearby decorations. |
+| `C` | On macOS, capture authentic and enhanced frames and rebuild `img/renderer-comparison.png` with a diagonal split. |
 | `R` | Restore health and ammunition and unlock all weapons. |
 | `M` | Toggle the textured map overview. |
 | `S` | Save the current level, position, and direction as a quick test location. |
 | `L` | Restart at the saved test location. |
+
+The comparison capture keeps its clean source images in the Git-ignored `local/screenshots/` directory and overwrites the tracked README comparison image only after both renderer captures succeed.
 
 ### Wolfenstein 3D data files
 

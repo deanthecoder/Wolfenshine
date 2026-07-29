@@ -14,6 +14,13 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Wolfenshine.Game;
 using Wolfenshine.ViewModels;
+#if DEBUG
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.VisualTree;
+using DTC.Core;
+using SkiaSharp;
+#endif
 
 namespace Wolfenshine.Views;
 
@@ -44,6 +51,7 @@ public sealed partial class MainWindow : Window
     private PlayerWeapon? m_weaponSelection;
 #if DEBUG
     private MapWindow m_mapWindow;
+    private bool m_isCapturingRendererComparison;
     private readonly HashSet<Key> m_debugKeysDown = [];
 #endif
 
@@ -85,6 +93,12 @@ public sealed partial class MainWindow : Window
         if (e.Key == Key.M)
         {
             ToggleMapWindow();
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.C)
+        {
+            CaptureRendererComparison();
             e.Handled = true;
             return;
         }
@@ -161,6 +175,159 @@ public sealed partial class MainWindow : Window
     }
 
 #if DEBUG
+    private async void CaptureRendererComparison()
+    {
+        if (m_isCapturingRendererComparison)
+            return;
+        if (DataContext is not MainWindowViewModel
+            {
+                HasGameData: true,
+                IsSelectingDifficulty: false,
+                IsShowingLevelStats: false,
+                IsPaused: false
+            } viewModel)
+        {
+            Logger.Instance.Warn("Renderer comparison capture requires active, unpaused gameplay.");
+            return;
+        }
+
+        m_isCapturingRendererComparison = true;
+        var timerWasEnabled = m_gameTimer.IsEnabled;
+        var originalEnhancedMode = viewModel.IsEnhancedRendering;
+        m_gameTimer.Stop();
+        try
+        {
+            Logger.Instance.Info("Capturing authentic and enhanced renderer frames.");
+            var repositoryDirectory = FindRepositoryDirectory();
+            var screenshotDirectory = Directory.CreateDirectory(
+                Path.Combine(repositoryDirectory.FullName, "local", "screenshots"));
+            var authenticPath = Path.Combine(screenshotDirectory.FullName, "renderer-authentic.png");
+            var enhancedPath = Path.Combine(screenshotDirectory.FullName, "renderer-enhanced.png");
+
+            if (viewModel.IsEnhancedRendering)
+                viewModel.ToggleRenderer();
+            await WaitForRendererFrame();
+            await CaptureMacOsWindow(authenticPath);
+
+            viewModel.ToggleRenderer();
+            await WaitForRendererFrame();
+            await CaptureMacOsWindow(enhancedPath);
+
+            using var authentic = SKBitmap.Decode(authenticPath) ??
+                                  throw new InvalidDataException("The authentic screenshot is invalid.");
+            using var enhanced = SKBitmap.Decode(enhancedPath) ??
+                                 throw new InvalidDataException("The enhanced screenshot is invalid.");
+            using var comparison = CreateRendererComparison(authentic, enhanced);
+            var comparisonPath = Path.Combine(repositoryDirectory.FullName, "img", "renderer-comparison.png");
+            SavePng(comparison, comparisonPath);
+            Logger.Instance.Info(
+                $"Captured authentic and enhanced renders, then updated {comparisonPath}.");
+        }
+        catch (Exception exception)
+        {
+            Logger.Instance.Error($"Renderer comparison capture failed: {exception}");
+        }
+        finally
+        {
+            if (viewModel.IsEnhancedRendering != originalEnhancedMode)
+                viewModel.ToggleRenderer();
+            if (timerWasEnabled)
+            {
+                m_gameClock.Restart();
+                m_gameTimer.Start();
+            }
+            m_isCapturingRendererComparison = false;
+        }
+    }
+
+    private SKBitmap CreateRendererComparison(SKBitmap authentic, SKBitmap enhanced)
+    {
+        if (authentic.Width != enhanced.Width || authentic.Height != enhanced.Height)
+            throw new InvalidDataException("Authentic and enhanced screenshots have different dimensions.");
+        var comparison = new SKBitmap(authentic.Info);
+        using var canvas = new SKCanvas(comparison);
+        canvas.DrawBitmap(authentic, 0.0f, 0.0f);
+        var topLeft = GameViewport.TranslatePoint(default, this) ?? default;
+        var bottomRight = GameViewport.TranslatePoint(
+            new Point(GameViewport.Bounds.Width, GameViewport.Bounds.Height),
+            this) ?? default;
+        var scale = RenderScaling;
+        var windowContentOffsetX = (authentic.Width - (Bounds.Width * scale)) * 0.5;
+        var windowContentOffsetY = authentic.Height - (Bounds.Height * scale);
+        using var enhancedTriangle = new SKPath();
+        enhancedTriangle.MoveTo(
+            (float)(windowContentOffsetX + (topLeft.X * scale)),
+            (float)(windowContentOffsetY + (topLeft.Y * scale)));
+        enhancedTriangle.LineTo(
+            (float)(windowContentOffsetX + (bottomRight.X * scale)),
+            (float)(windowContentOffsetY + (topLeft.Y * scale)));
+        enhancedTriangle.LineTo(
+            (float)(windowContentOffsetX + (topLeft.X * scale)),
+            (float)(windowContentOffsetY + (bottomRight.Y * scale)));
+        enhancedTriangle.Close();
+        canvas.Save();
+        canvas.ClipPath(enhancedTriangle, SKClipOperation.Intersect, antialias: true);
+        canvas.DrawBitmap(enhanced, 0.0f, 0.0f);
+        canvas.Restore();
+        return comparison;
+    }
+
+    private async Task WaitForRendererFrame()
+    {
+        UpdateLayout();
+        await Task.Delay(150);
+    }
+
+    private async Task CaptureMacOsWindow(string path)
+    {
+        if (!OperatingSystem.IsMacOS())
+            throw new PlatformNotSupportedException("Renderer comparison capture currently requires macOS.");
+        var platformHandle = TryGetPlatformHandle();
+        if (platformHandle == null || platformHandle.HandleDescriptor != "NSWindow")
+            throw new InvalidOperationException("Could not obtain Wolfenshine's native macOS window.");
+        var selector = SelRegisterName("windowNumber");
+        var windowNumber = ObjcMsgSend(platformHandle.Handle, selector).ToInt64();
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "/usr/sbin/screencapture",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            ArgumentList = { "-x", "-o", "-l", windowNumber.ToString(), path }
+        }) ?? throw new InvalidOperationException("Could not start the macOS screenshot utility.");
+        await process.WaitForExitAsync();
+        if (process.ExitCode != 0 || !File.Exists(path))
+            throw new IOException($"macOS could not capture Wolfenshine's window to {path}.");
+    }
+
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "sel_registerName")]
+    private static extern IntPtr SelRegisterName(string name);
+
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    private static extern IntPtr ObjcMsgSend(IntPtr receiver, IntPtr selector);
+
+    private static DirectoryInfo FindRepositoryDirectory()
+    {
+        foreach (var startingPath in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
+        {
+            for (var directory = new DirectoryInfo(startingPath); directory != null; directory = directory.Parent)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "README.md")) &&
+                    Directory.Exists(Path.Combine(directory.FullName, "img")))
+                {
+                    return directory;
+                }
+            }
+        }
+        throw new DirectoryNotFoundException("Could not locate the Wolfenshine repository directory.");
+    }
+
+    private static void SavePng(SKBitmap bitmap, string path)
+    {
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        if (!bitmap.Encode(stream, SKEncodedImageFormat.Png, 100))
+            throw new IOException($"Could not encode {path}.");
+    }
+
     private void ToggleMapWindow()
     {
         if (m_mapWindow != null)
