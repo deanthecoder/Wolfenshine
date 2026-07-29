@@ -16,6 +16,7 @@
 
 uniform float2 outputResolution; // Actual control size; normally 320 x 240 after 4:3 correction.
 uniform float viewBob;            // Vertical camera displacement in native 320 x 200 pixels.
+uniform float weaponSway;         // Horizontal weapon displacement in native pixels.
 uniform float damageFlash;        // 0..1 red flash applied to the completed frame.
 uniform float deathFade;          // 0..1 dithered red replacement applied to the play view.
 uniform float levelFade;          // 0..1 black fade applied to the completed frame.
@@ -282,7 +283,8 @@ float4 main(float2 fragment)
 
     // Composite the separately rendered weapon after world sprites, matching the
     // software draw order while allowing only the weapon to react to overhead light.
-    float4 weapon = sample(softwareWeaponOverlay, scenePosition);
+    float2 weaponPosition = scenePosition - float2(weaponSway, 0.0);
+    float4 weapon = sample(softwareWeaponOverlay, weaponPosition);
     weapon.rgb *= weaponIllumination();
     color = float4(mix(color.rgb, weapon.rgb, weapon.a), 1.0);
 

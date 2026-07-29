@@ -40,7 +40,7 @@ public sealed class AreaAmbientMapTests
 
         var ambientScale = ambientMap.GetAmbientScale(3.5, 3.5, WolfensteinDoors.FromMap(map));
 
-        Assert.That(ambientScale, Is.InRange(0.55, 0.60));
+        Assert.That(ambientScale, Is.InRange(0.60, 0.65));
     }
 
     [Test]
@@ -73,7 +73,7 @@ public sealed class AreaAmbientMapTests
 
         var ambientScale = ambientMap.GetAmbientScale(5.5, 5.5, WolfensteinDoors.FromMap(map));
 
-        Assert.That(ambientScale, Is.InRange(0.55, 0.60));
+        Assert.That(ambientScale, Is.InRange(0.60, 0.65));
     }
 
     [Test]

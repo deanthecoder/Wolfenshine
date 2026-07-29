@@ -76,6 +76,8 @@ public sealed class EnhancedViewport : SoftwareViewport
 
     public static readonly StyledProperty<double> ViewBobProperty =
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(ViewBob));
+    public static readonly StyledProperty<double> WeaponSwayProperty =
+        AvaloniaProperty.Register<EnhancedViewport, double>(nameof(WeaponSway));
     public static readonly StyledProperty<double> MuzzleFlashProperty =
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(MuzzleFlash));
     public static readonly StyledProperty<bool> IsWeaponFlashFrameProperty =
@@ -87,6 +89,7 @@ public sealed class EnhancedViewport : SoftwareViewport
 
     static EnhancedViewport() => AffectsRender<EnhancedViewport>(
         ViewBobProperty,
+        WeaponSwayProperty,
         MuzzleFlashProperty,
         IsWeaponFlashFrameProperty,
         LightObjectsProperty,
@@ -105,6 +108,12 @@ public sealed class EnhancedViewport : SoftwareViewport
     {
         get => GetValue(ViewBobProperty);
         set => SetValue(ViewBobProperty, value);
+    }
+
+    public double WeaponSway
+    {
+        get => GetValue(WeaponSwayProperty);
+        set => SetValue(WeaponSwayProperty, value);
     }
 
     public double MuzzleFlash
@@ -172,6 +181,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             ToFloats(FogColor),
             [FogStartDistance, FogEndDistance, MaximumFogAmount, 0.0f],
             (float)ViewBob,
+            (float)WeaponSway,
             (float)DamageFlash,
             (float)DeathFade,
             (float)LevelFade,
@@ -643,6 +653,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] fogColor,
         float[] fogParameters,
         float viewBob,
+        float weaponSway,
         float damageFlash,
         float deathFade,
         float levelFade,
@@ -691,6 +702,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["fogColor"] = fogColor,
                 ["fogParameters"] = fogParameters,
                 ["viewBob"] = viewBob,
+                ["weaponSway"] = weaponSway,
                 ["damageFlash"] = damageFlash,
                 ["deathFade"] = deathFade,
                 ["levelFade"] = levelFade,

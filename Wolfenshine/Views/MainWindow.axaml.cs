@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window
     private bool m_rendererKeyDown;
     private double m_viewBobOffset;
     private double m_viewBobPhase;
+    private double m_weaponSwayOffset;
     private PlayerWeapon? m_weaponSelection;
 #if DEBUG
     private MapWindow m_mapWindow;
@@ -219,13 +220,19 @@ public sealed partial class MainWindow : Window
         {
             m_viewBobPhase += elapsedSeconds * (7.0 + (speedRatio * 7.0));
             m_viewBobOffset = Math.Sin(m_viewBobPhase) * (0.5 + (speedRatio * 3.0));
+            m_weaponSwayOffset = Math.Sin(m_viewBobPhase * 0.5) * (0.25 + (speedRatio * 2.25));
             EnhancedViewport.ViewBob = m_viewBobOffset;
+            EnhancedViewport.WeaponSway = m_weaponSwayOffset;
             return;
         }
         m_viewBobOffset *= Math.Pow(0.02, elapsedSeconds);
+        m_weaponSwayOffset *= Math.Pow(0.02, elapsedSeconds);
         if (Math.Abs(m_viewBobOffset) < 0.01)
             m_viewBobOffset = 0.0;
+        if (Math.Abs(m_weaponSwayOffset) < 0.01)
+            m_weaponSwayOffset = 0.0;
         EnhancedViewport.ViewBob = m_viewBobOffset;
+        EnhancedViewport.WeaponSway = m_weaponSwayOffset;
     }
 
     private bool SetKeyState(Key key, bool isDown)

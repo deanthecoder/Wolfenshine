@@ -22,7 +22,7 @@ namespace Wolfenshine.Rendering;
 /// </remarks>
 public sealed class AreaAmbientMap
 {
-    public const double MinimumAmbientScale = 0.42;
+    public const double MinimumAmbientScale = 0.48;
     public const double MaximumAmbientScale = 1.25;
     public const double DoorBlendRadius = 0.75;
     public const double DoorBlendHalfWidth = 0.55;
