@@ -486,6 +486,11 @@ public sealed class GameSessionTests
         Assert.Multiple(() =>
         {
             Assert.That(session.Health, Is.LessThan(100));
+            Assert.That(session.DamageTrauma, Is.GreaterThan(0.0));
+            Assert.That(session.DamageRevision, Is.GreaterThan(0));
+            Assert.That(session.DamageDirection, Is.EqualTo(0.0).Within(0.001));
+            Assert.That(session.BloodAmount, Is.EqualTo(
+                Math.Min(1.0, (100 - session.Health) / 50.0)).Within(0.001));
             Assert.That(session.EnemyMuzzleFlashes, Has.Some.Matches<WorldLight>(light =>
                 light.X == 2.5 && light.Y == 1.5 && light.UpwardBrightness > 0.0f));
             Assert.That(sounds, Has.Some.Matches<WolfensteinSoundEvent>(sound =>
@@ -723,13 +728,25 @@ public sealed class GameSessionTests
         var session = CreateSessionWithObjectAndDog((ushort)marker);
         InflictDogBite(session);
         var damagedHealth = session.Health;
+        var bloodAmount = session.BloodAmount;
+        var damageTint = session.DamageTint;
 
         session.Update(0.2, new PlayerInput(true, false, false, false));
 
         Assert.Multiple(() =>
         {
             Assert.That(session.Health, Is.EqualTo(Math.Min(100, damagedHealth + 10)));
+            Assert.That(session.BloodAmount, Is.EqualTo(bloodAmount));
             Assert.That(session.StaticObjects, Is.Empty);
+        });
+
+        session.Actors[0].Damage(int.MaxValue);
+        session.Update(0.5, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.BloodAmount, Is.LessThan(bloodAmount));
+            Assert.That(session.DamageTint, Is.LessThan(damageTint));
         });
     }
 

@@ -96,6 +96,16 @@ public sealed class EnhancedViewport : SoftwareViewport
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(WeaponSway));
     public static readonly StyledProperty<double> MuzzleFlashProperty =
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(MuzzleFlash));
+    public static readonly StyledProperty<double> DamageTraumaProperty =
+        AvaloniaProperty.Register<EnhancedViewport, double>(nameof(DamageTrauma));
+    public static readonly StyledProperty<double> DamageDirectionProperty =
+        AvaloniaProperty.Register<EnhancedViewport, double>(nameof(DamageDirection));
+    public static readonly StyledProperty<int> DamageSeedProperty =
+        AvaloniaProperty.Register<EnhancedViewport, int>(nameof(DamageSeed));
+    public static readonly StyledProperty<double> DamageTintProperty =
+        AvaloniaProperty.Register<EnhancedViewport, double>(nameof(DamageTint));
+    public static readonly StyledProperty<double> BloodAmountProperty =
+        AvaloniaProperty.Register<EnhancedViewport, double>(nameof(BloodAmount));
     public static readonly StyledProperty<bool> IsWeaponFlashFrameProperty =
         AvaloniaProperty.Register<EnhancedViewport, bool>(nameof(IsWeaponFlashFrame));
     public static readonly StyledProperty<IReadOnlyList<WorldSprite>> LightObjectsProperty =
@@ -107,6 +117,11 @@ public sealed class EnhancedViewport : SoftwareViewport
         ViewBobProperty,
         WeaponSwayProperty,
         MuzzleFlashProperty,
+        DamageTraumaProperty,
+        DamageDirectionProperty,
+        DamageSeedProperty,
+        DamageTintProperty,
+        BloodAmountProperty,
         IsWeaponFlashFrameProperty,
         LightObjectsProperty,
         DynamicLightsProperty);
@@ -136,6 +151,36 @@ public sealed class EnhancedViewport : SoftwareViewport
     {
         get => GetValue(MuzzleFlashProperty);
         set => SetValue(MuzzleFlashProperty, value);
+    }
+
+    public double DamageTrauma
+    {
+        get => GetValue(DamageTraumaProperty);
+        set => SetValue(DamageTraumaProperty, value);
+    }
+
+    public double DamageDirection
+    {
+        get => GetValue(DamageDirectionProperty);
+        set => SetValue(DamageDirectionProperty, value);
+    }
+
+    public int DamageSeed
+    {
+        get => GetValue(DamageSeedProperty);
+        set => SetValue(DamageSeedProperty, value);
+    }
+
+    public double DamageTint
+    {
+        get => GetValue(DamageTintProperty);
+        set => SetValue(DamageTintProperty, value);
+    }
+
+    public double BloodAmount
+    {
+        get => GetValue(BloodAmountProperty);
+        set => SetValue(BloodAmountProperty, value);
     }
 
     public bool IsWeaponFlashFrame
@@ -205,6 +250,11 @@ public sealed class EnhancedViewport : SoftwareViewport
             (float)ViewBob,
             (float)WeaponSway,
             (float)DamageFlash,
+            (float)DamageTrauma,
+            (float)DamageDirection,
+            DamageSeed,
+            (float)DamageTint,
+            (float)BloodAmount,
             (float)DeathFade,
             (float)LevelFade,
             ToFloats(Palette.GetColor(CeilingPaletteIndex)),
@@ -963,6 +1013,11 @@ public sealed class EnhancedViewport : SoftwareViewport
         float viewBob,
         float weaponSway,
         float damageFlash,
+        float damageTrauma,
+        float damageDirection,
+        float damageSeed,
+        float damageTint,
+        float bloodAmount,
         float deathFade,
         float levelFade,
         float[] ceilingColor,
@@ -1017,6 +1072,11 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["viewBob"] = viewBob,
                 ["weaponSway"] = weaponSway,
                 ["damageFlash"] = damageFlash,
+                ["damageTrauma"] = damageTrauma,
+                ["damageDirection"] = damageDirection,
+                ["damageSeed"] = damageSeed,
+                ["damageTint"] = damageTint,
+                ["bloodAmount"] = bloodAmount,
                 ["deathFade"] = deathFade,
                 ["levelFade"] = levelFade,
                 ["ceilingColor"] = ceilingColor,

@@ -54,6 +54,9 @@ public sealed class GameSession
     private const double LevelFadeDuration = 0.5;
     private const double WallHitSoundInterval = 0.2;
     private const double EnemyMuzzleFlashDuration = 6.0 / OriginalTicksPerSecond;
+    private const double MinimumDamageEffectDuration = 1.15;
+    private const double MaximumDamageEffectDuration = 2.75;
+    private const double BloodFadePerSecond = 0.70;
     private const double DeathRotationRadiansPerSecond = 140.0 * Math.PI / 180.0;
     private bool m_useWasDown;
     private double m_useRepeatTime;
@@ -73,6 +76,14 @@ public sealed class GameSession
     private bool m_isFadingIn;
     private double m_deathTime;
     private double m_damageCount;
+    private double m_damageEffectTime;
+    private double m_damageEffectStrength;
+    private double m_damageEffectDuration = MinimumDamageEffectDuration;
+    private double m_damageDirection;
+    private int m_damageRevision;
+    private double m_bloodAmount;
+    private double m_bloodTarget;
+    private double m_damageTint;
     private double m_wallHitSoundTime;
     private double m_velocityX;
     private double m_velocityY;
@@ -161,6 +172,12 @@ public sealed class GameSession
     public double DamageFlash => m_damageCount > 0.0
         ? Math.Min(6.0, Math.Floor(m_damageCount / 10.0) + 1.0) / 8.0
         : 0.0;
+    public double DamageTrauma => m_damageEffectStrength *
+                                  Math.Clamp(m_damageEffectTime / m_damageEffectDuration, 0.0, 1.0);
+    public double DamageDirection => m_damageDirection;
+    public int DamageRevision => m_damageRevision;
+    public double BloodAmount => m_bloodAmount;
+    public double DamageTint => m_damageTint;
     public IReadOnlyList<WorldSprite> StaticObjects => m_staticObjects;
     public IReadOnlyList<WorldSprite> ActorSprites => m_actors.Select(actor => actor.ToWorldSprite()).ToArray();
     public IReadOnlyList<WolfensteinActorState> Actors => m_actors;
@@ -190,7 +207,7 @@ public sealed class GameSession
                       !IsAttacking && Weapon != m_chosenWeapon;
         m_bestWeapon = PlayerWeapon.Chaingun;
         GiveAmmo(MaximumAmmo);
-        Health = MaximumHealth;
+        Heal(MaximumHealth);
         return changed;
     }
 #endif
@@ -692,7 +709,15 @@ public sealed class GameSession
         WolfensteinPickupType.Cross or WolfensteinPickupType.Chalice or WolfensteinPickupType.Bible or
         WolfensteinPickupType.Crown or WolfensteinPickupType.FullHeal;
 
-    private void Heal(int amount) => Health = Math.Min(MaximumHealth, Health + amount);
+    private void Heal(int amount)
+    {
+        var previousHealth = Health;
+        Health = Math.Min(MaximumHealth, Health + amount);
+        var restoredHealth = Health - previousHealth;
+        if (restoredHealth <= 0)
+            return;
+        m_bloodTarget = Math.Max(0.0, m_bloodTarget - (restoredHealth / 50.0));
+    }
 
     private static (double X, double Y) Rotate(double x, double y, double angle)
     {
@@ -1223,7 +1248,33 @@ public sealed class GameSession
             return;
         if (Difficulty == GameDifficulty.Baby)
             damage >>= 2;
+        if (damage <= 0)
+            return;
         m_damageCount += damage;
+        m_damageEffectStrength = Math.Max(
+            m_damageEffectStrength,
+            Math.Clamp(0.35 + (damage / 32.0), 0.35, 1.0));
+        var remainingHealth = Math.Max(0, Health - damage);
+        var missingHealth = 1.0 - (remainingHealth / (double)MaximumHealth);
+        m_damageTint = Math.Max(m_damageTint, missingHealth);
+        m_damageEffectDuration = MinimumDamageEffectDuration +
+                                 ((MaximumDamageEffectDuration - MinimumDamageEffectDuration) * missingHealth);
+        m_damageEffectTime = m_damageEffectDuration;
+        var deltaX = attackerX - Camera.X;
+        var deltaY = attackerY - Camera.Y;
+        var attackerDistance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+        var planeLength = Math.Sqrt(
+            (Camera.PlaneX * Camera.PlaneX) + (Camera.PlaneY * Camera.PlaneY));
+        m_damageDirection = attackerDistance <= double.Epsilon || planeLength <= double.Epsilon
+            ? 0.0
+            : Math.Clamp(
+                ((deltaX * Camera.PlaneX) + (deltaY * Camera.PlaneY)) /
+                (attackerDistance * planeLength),
+                -1.0,
+                1.0);
+        m_damageRevision++;
+        m_bloodTarget = Math.Min(1.0, m_bloodTarget + (damage / 50.0));
+        m_bloodAmount = Math.Max(m_bloodAmount, m_bloodTarget);
         Health = Math.Max(0, Health - damage);
         if (Health > 0)
             return;
@@ -1239,9 +1290,24 @@ public sealed class GameSession
     private bool UpdateFeedback(double elapsedSeconds)
     {
         var previousDamageCount = m_damageCount;
+        var previousDamageEffectTime = m_damageEffectTime;
+        var previousBloodAmount = m_bloodAmount;
+        var previousDamageTint = m_damageTint;
         m_damageCount = Math.Max(0.0, m_damageCount - (elapsedSeconds * OriginalTicksPerSecond));
+        m_damageEffectTime = Math.Max(0.0, m_damageEffectTime - elapsedSeconds);
+        if (m_damageEffectTime <= 0.0)
+            m_damageEffectStrength = 0.0;
+        if (m_bloodAmount > m_bloodTarget)
+            m_bloodAmount = Math.Max(m_bloodTarget, m_bloodAmount - (elapsedSeconds * BloodFadePerSecond));
+        var damageTintTarget = (MaximumHealth - Health) / (double)MaximumHealth;
+        if (m_damageTint > damageTintTarget)
+            m_damageTint = Math.Max(damageTintTarget, m_damageTint - (elapsedSeconds * 0.65));
+        else
+            m_damageTint = damageTintTarget;
         m_wallHitSoundTime = Math.Max(0.0, m_wallHitSoundTime - elapsedSeconds);
-        return UpdateEnemyMuzzleFlashes(elapsedSeconds) || m_damageCount != previousDamageCount;
+        return UpdateEnemyMuzzleFlashes(elapsedSeconds) || m_damageCount != previousDamageCount ||
+               m_damageEffectTime != previousDamageEffectTime || m_bloodAmount != previousBloodAmount ||
+               m_damageTint != previousDamageTint;
     }
 
     private bool UpdateEnemyMuzzleFlashes(double elapsedSeconds)
@@ -1368,6 +1434,13 @@ public sealed class GameSession
         m_nextFaceChange = 1.0;
         m_chaingunGrinTime = 0.0;
         m_damageCount = 0.0;
+        m_damageEffectTime = 0.0;
+        m_damageEffectStrength = 0.0;
+        m_damageEffectDuration = MinimumDamageEffectDuration;
+        m_damageDirection = 0.0;
+        m_bloodAmount = 0.0;
+        m_bloodTarget = 0.0;
+        m_damageTint = 0.0;
         m_wallHitSoundTime = 0.0;
         ResetMovementMomentum();
         m_enemyMuzzleFlashes.Clear();

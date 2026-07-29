@@ -50,6 +50,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool m_isGameOver;
     private double m_deathFade;
     private double m_damageFlash;
+    private double m_damageTrauma;
+    private double m_damageDirection;
+    private int m_damageRevision;
+    private int m_health = 100;
+    private double m_bloodAmount;
+    private double m_damageTint;
     private double m_muzzleFlash;
     private bool m_isWeaponFlashFrame;
     private double m_levelFade;
@@ -158,6 +164,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool IsGameOver => m_isGameOver;
     public double DeathFade => m_deathFade;
     public double DamageFlash => m_damageFlash;
+    public double DamageTrauma => m_damageTrauma;
+    public double DamageDirection => m_damageDirection;
+    public int DamageRevision => m_damageRevision;
+    public int Health => m_health;
+    public double BloodAmount => m_bloodAmount;
+    public double DamageTint => m_damageTint;
     public double MuzzleFlash => m_muzzleFlash;
     public bool IsWeaponFlashFrame => m_isWeaponFlashFrame;
     public double LevelFade => m_levelFade;
@@ -228,6 +240,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_camera, m_gameSession.Camera, nameof(Camera));
         SetField(ref m_deathFade, m_gameSession.DeathFade, nameof(DeathFade));
         SetField(ref m_damageFlash, m_gameSession.DamageFlash, nameof(DamageFlash));
+        SetField(ref m_damageTrauma, m_gameSession.DamageTrauma, nameof(DamageTrauma));
+        SetField(ref m_damageDirection, m_gameSession.DamageDirection, nameof(DamageDirection));
+        SetField(ref m_damageRevision, m_gameSession.DamageRevision, nameof(DamageRevision));
+        SetField(ref m_health, m_gameSession.Health, nameof(Health));
+        SetField(ref m_bloodAmount, m_gameSession.BloodAmount, nameof(BloodAmount));
+        SetField(ref m_damageTint, m_gameSession.DamageTint, nameof(DamageTint));
         SetField(ref m_muzzleFlash, m_gameSession.MuzzleFlash, nameof(MuzzleFlash));
         SetField(
             ref m_isWeaponFlashFrame,
@@ -366,6 +384,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_elevatorSwitch, null, nameof(ElevatorSwitch));
         SetField(ref m_deathFade, 0.0, nameof(DeathFade));
         SetField(ref m_damageFlash, 0.0, nameof(DamageFlash));
+        SetField(ref m_damageTrauma, 0.0, nameof(DamageTrauma));
+        SetField(ref m_damageDirection, 0.0, nameof(DamageDirection));
+        SetField(ref m_damageRevision, 0, nameof(DamageRevision));
+        SetField(ref m_health, 100, nameof(Health));
+        SetField(ref m_bloodAmount, 0.0, nameof(BloodAmount));
+        SetField(ref m_damageTint, 0.0, nameof(DamageTint));
         SetField(ref m_levelFade, 0.0, nameof(LevelFade));
         SetField(ref m_playerSpeed, 0.0, nameof(PlayerSpeed));
         SetField(ref m_isGameOver, false, nameof(IsGameOver));
@@ -547,6 +571,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer?.SetMusicFade(startFaded ? 1.0 : 0.0);
         m_worldObjects = CreateWorldObjects();
         m_enemyMuzzleFlashes = [];
+        SetField(ref m_damageFlash, 0.0, nameof(DamageFlash));
+        SetField(ref m_damageTrauma, 0.0, nameof(DamageTrauma));
+        SetField(ref m_damageDirection, 0.0, nameof(DamageDirection));
+        SetField(ref m_damageRevision, 0, nameof(DamageRevision));
+        SetField(ref m_health, m_gameSession.Health, nameof(Health));
+        SetField(ref m_bloodAmount, 0.0, nameof(BloodAmount));
+        SetField(ref m_damageTint, 0.0, nameof(DamageTint));
         m_isWeaponFlashFrame = false;
         m_playerSpeed = 0.0;
         m_weaponSprite = Sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? m_weaponSprite;
