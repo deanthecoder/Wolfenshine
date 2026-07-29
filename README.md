@@ -2,44 +2,68 @@
 
 # Wolfenshine
 
-A modern C# port of the original Wolfenstein 3D experience.
+**Wolfenstein 3D rebuilt in modern C#—faithful when you want it, shiny when you don't.**
 
-Wolfenshine rebuilds the complete game around a clean, cross-platform .NET codebase while loading the artwork, maps, music, and sounds from your own copy of Wolfenstein 3D. It currently includes the original-style difficulty menu, all six episodes, textured software rendering, enemies, weapons, pickups, doors, secret walls, elevators, sound, music, death and respawning, and end-of-level statistics.
+Wolfenshine is a playable, cross-platform reimplementation of the 1992 classic. It reads the maps, artwork, music, and sounds from your own copy of Wolfenstein 3D, then brings them to life through a clean .NET engine written from scratch.
 
-The first goal is to reproduce how the 1992 game looks and plays. That gives us a trustworthy foundation for an optional enhanced renderer with colored lighting, atmospheric fog, shadows, and other shader effects—without losing the original version along the way.
+At its heart is an authentic 320×200 software-rendered experience. Press F2 and that same game becomes something new: colored lights spill across rooms, muzzle flashes illuminate enemies, fog gathers in the distance, and bright doorways cast descending shafts into the darkness.
 
 ![Wolfenshine gameplay](img/gameplay.png)
 
-### Authentic and enhanced rendering
+## Classic underneath. Modern light on top.
 
-Press F2 at any time during play to switch between the faithful software renderer and the experimental shader renderer. The comparison below shows enhanced distance shading on the left and the authentic presentation on the right.
+Wolfenshine keeps the original-style renderer and enhanced renderer side by side. Switch between them instantly during play; the world, AI, input, and game state never change underneath you.
 
 ![A 50/50 comparison of Wolfenshine's enhanced and authentic renderers](img/renderer-comparison.png)
 
-The enhanced renderer also applies dynamic light to enemies. The example below shows a guard moving into and out of a ceiling light, with gunfire briefly illuminating both the enemy and the surrounding room.
+### Authentic mode
+
+- Original 320×200 composition presented at the correct 4:3 aspect ratio.
+- Indexed VGA artwork and palette-driven wall textures.
+- Familiar movement, weapon animation, HUD, menus, pause plaque, and intermission screen.
+- A reusable C# software framebuffer with the classic raycast presentation intact.
+
+### Enhanced mode
+
+- Colored, directional ceiling lights, chandeliers, lamps, treasure glow, and muzzle flashes.
+- Atmospheric doorway shafts that descend from bright rooms into darker ones, illuminate objects, and fade naturally with the viewing direction.
+- Geometry-aware room ambience, doorway light spill, distance shading, and subtle fog.
+- Generated wall relief with material-specific specular response.
+- Bloom, ambient occlusion, enemy shadows, view bob, weapon sway, and momentum-based movement.
+- Dynamic enemy illumination plus directional damage tint and accumulating blood at the screen edges.
+
+The original pixel art remains at the center of the presentation. Enhanced effects respond to it rather than replacing it with a different asset pack.
 
 ![A guard moving through ceiling light and being illuminated by muzzle flashes](img/enemy-lighting.webp)
 
-## What works today
+## More than a rendering demo
 
-- All 60 maps from the six-episode edition load directly from the original data files.
-- The 320×200 presentation retains the original 4:3 display proportions and indexed VGA artwork.
-- Guards, officers, SS soldiers, mutants, and dogs see, hear, chase, attack, take damage, and die.
-- Weapons, ammunition, health, treasure, keys, doors, pushwalls, elevators, death, and level progression work.
-- Original digitized and AdLib effects are played spatially through OpenAL; original IMF music is rendered through OPL emulation.
-- Difficulty affects enemy placement, health, behavior, and incoming damage in the same places it did originally.
-- An authentic-looking difficulty screen, HUD, pause plaque, and intermission screen complete the experience.
-- F2 switches live between authentic movement/software rendering and an experimental enhanced mode with momentum-based movement, view bob and weapon sway, colored directional lighting, muzzle-flash illumination, doorway light spill and atmospheric shafts, selective bloom, generated wall relief with material-specific specular highlights, directional edge damage and accumulating blood effects, distance shading and fog, geometry-aware ambient occlusion, room ambience derived from local light coverage, and soft ground shadows beneath enemies.
+Wolfenshine includes the game systems that make the renderer worth exploring:
 
-Wolfenshine is still under development. Bosses, episode endings, save games, and some less common gameplay details remain to be implemented.
+- All 60 maps from the six-episode edition load directly from the original data.
+- Guards, officers, SS soldiers, mutants, and dogs see, hear, chase, attack, take damage, animate, and die.
+- Four weapons, ammunition, health, treasure, keys, scoring, pickups, and enemy drops.
+- Sliding and locked doors, secret pushwalls, elevators, death, respawning, level progression, and end-of-level statistics.
+- Difficulty-dependent enemy placement, health, behavior, and incoming damage.
+- Spatial digitized and AdLib sound through OpenAL, plus original IMF music rendered through OPL emulation.
+- Original-style difficulty selection, HUD, animated face, pause display, and intermission presentation.
 
 ![Difficulty selection](img/difficulty-selection.png)
 
-## Add the original game resources
+## Play Wolfenshine
 
-Wolfenshine does not distribute Wolfenstein 3D's copyrighted game data. You need a legitimately obtained copy of the full six-episode edition, plus its original VGA palette.
+You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) and a legitimate copy of the full six-episode Wolfenstein 3D data. Wolfenshine does not distribute id Software's copyrighted game assets.
 
-Create this private, Git-ignored directory inside your checkout:
+Clone the repository and its submodules:
+
+```shell
+git clone --recurse-submodules https://github.com/deanthecoder/Wolfenshine.git
+cd Wolfenshine
+```
+
+### Add the original game data
+
+The repository contains a ready-made, Git-ignored location for your private game data:
 
 ```text
 local/game-data/
@@ -58,60 +82,44 @@ VGAHEAD.WL6
 VSWAP.WL6
 ```
 
-Then download [GAMEPAL.OBJ](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/OBJ/GAMEPAL.OBJ) from id Software's official source release and place that single file in the same directory:
+Download [GAMEPAL.OBJ](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/OBJ/GAMEPAL.OBJ) from id Software's official source release and place it beside those files:
 
 ```text
 GAMEPAL.OBJ
 ```
 
-`GAMEPAL.OBJ` supplies the original VGA palette used by the indexed game resources; no original C source or source checkout is needed. The build copies these private files into the application's output directory when they are present. If any are missing, Wolfenshine still builds and opens, then reports exactly which files it needs.
+`GAMEPAL.OBJ` supplies the original VGA palette. You do not need the original C source or a source checkout. When the private files are present, the build copies them into Wolfenshine's output directory automatically. If anything is missing, the app opens with a clear list of the files it still needs.
 
-Only the full `.WL6` data set is supported at present. Shareware `.WL1` and data from other releases may follow later.
+Wolfenshine currently reads the full `.WL6` data set.
 
-## Controls
-
-| Action | Key                        |
-|---|----------------------------|
-| Move and turn | Arrow keys                 |
-| Run | Shift                      |
-| Strafe | Alt + Left/Right           |
-| Use doors, switches, and secret walls | Space                      |
-| Fire | Control / Command |
-| Select an owned weapon | 1–4                        |
-| Pause or resume | P                          |
-| Toggle authentic/enhanced rendering | F2    |
-
-## Build and run
-
-Wolfenshine requires the .NET 8 SDK. Clone the repository and its submodules, add the resources above, then run it:
+### Run it
 
 ```shell
-git clone --recurse-submodules https://github.com/deanthecoder/Wolfenshine.git
-cd Wolfenshine
 dotnet run --project Wolfenshine/Wolfenshine.csproj
 ```
 
 ![Starting an episode](img/episode-start.png)
 
-## Why C#?
+### Controls
 
-Wolfenstein 3D has many excellent source ports already, but rebuilding it in modern C# makes a particularly approachable playground for old-school rendering, binary file formats, game AI, audio emulation, and future shader experiments. The project deliberately favors clear components and testable behavior over a mechanical C-to-C# translation.
+| Action | Key |
+|---|---|
+| Move and turn | Arrow keys |
+| Run | Shift |
+| Strafe | Alt + Left/Right |
+| Use doors, switches, and secret walls | Space |
+| Fire | Control / Command |
+| Select an owned weapon | 1–4 |
+| Pause or resume | P |
+| Toggle authentic/enhanced rendering | F2 |
 
-## Beyond the basics
+## Why build Wolfenstein 3D again?
 
-Once the original game data, rendering, and core behavior are working, possible enhanced-mode experiments include:
+Because the original game is an unusually good laboratory.
 
-- Damage feedback using edge-focused display blur and blood on the screen.
-- Subtle peripheral motion blur while moving, strengthened while running.
-- An optional LCD-screen shader for a stylized modern display treatment.
-- Persistent enemy blood splats.
-- Flickering lights in dungeon-like areas.
-- Expanded ambient occlusion for added depth around sprites and other objects.
-- Dynamic shadows.
-- Optional hint HUD components, such as a floor-projected route to the nearest exit.
-- A toggle that redirects the route hint toward the nearest unvisited treasure room.
+Its compact grid world is understandable enough to rebuild, yet rich enough to explore raycasting, binary formats, sprite projection, game AI, spatial audio, OPL emulation, software rendering, and modern shader effects in one coherent project. C# makes those systems approachable without turning Wolfenshine into a mechanical line-for-line translation of 1990s C.
 
-These are ideas rather than compatibility requirements. A faithful rendering path should remain available alongside later visual and audio enhancements.
+The result is both a game and a guided tour through how one of PC gaming's foundations works.
 
 ## Developer notes
 
