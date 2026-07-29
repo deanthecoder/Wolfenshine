@@ -22,4 +22,5 @@ public readonly record struct WorldSprite(
     int SpriteNumber,
     int FacingDirection = -1,
     bool IsActor = false,
-    float Brightness = 1.0f);
+    float Brightness = 1.0f,
+    float GodRayAmount = 0.0f);

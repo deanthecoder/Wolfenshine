@@ -404,6 +404,138 @@ float3 doorwaySpillIllumination(float2 worldPosition)
     return float3(1.0, 0.95, 0.84) * illumination;
 }
 
+float2 clipGodRayInterval(float2 interval, float startValue, float rate)
+{
+    if (abs(rate) < 0.00001)
+    {
+        if (startValue < 0.0)
+            return float2(1.0, 0.0);
+        return interval;
+    }
+    float crossing = -startValue / rate;
+    if (rate > 0.0)
+        interval.x = max(interval.x, crossing);
+    else
+        interval.y = min(interval.y, crossing);
+    return interval;
+}
+
+float doorwayPrismIntersection(
+    float2 rayDirection,
+    float rayVertical,
+    float sceneDistance,
+    float4 spill,
+    float shaftLength,
+    float widthExpansion,
+    float heightExpansion)
+{
+    const float baseHalfWidth = 0.36;
+    const float widthSlope = 0.20;
+    float strength = length(spill.zw);
+    if (strength <= 0.0001)
+        return 0.0;
+
+    float2 direction = spill.zw / strength;
+    float2 cameraRelative = playerPosition - spill.xy;
+    float forwardStart = dot(cameraRelative, direction);
+    float forwardRate = dot(rayDirection, direction);
+    float lateralStart = (cameraRelative.x * direction.y) - (cameraRelative.y * direction.x);
+    float lateralRate = (rayDirection.x * direction.y) - (rayDirection.y * direction.x);
+    float widthStart = baseHalfWidth + widthExpansion + (forwardStart * widthSlope);
+    float widthRate = forwardRate * widthSlope;
+
+    float2 interval = float2(0.02, min(sceneDistance, 9.0));
+    interval = clipGodRayInterval(interval, forwardStart, forwardRate);
+    interval = clipGodRayInterval(interval, shaftLength - forwardStart, -forwardRate);
+    interval = clipGodRayInterval(
+        interval,
+        widthStart + lateralStart,
+        widthRate + lateralRate);
+    interval = clipGodRayInterval(
+        interval,
+        widthStart - lateralStart,
+        widthRate - lateralRate);
+    // The upper face slopes from the top of the doorway down to the floor,
+    // forming the visible diagonal prism requested for a bright-to-dark threshold.
+    interval = clipGodRayInterval(
+        interval,
+        0.5 + heightExpansion - (forwardStart / shaftLength),
+        -rayVertical - (forwardRate / shaftLength));
+    if (interval.y <= interval.x)
+        return 0.0;
+    return (interval.y - interval.x) * length(float3(rayDirection, rayVertical));
+}
+
+float3 doorwayGodRayScattering(
+    float2 rayDirection,
+    float rayVertical,
+    float sceneDistance)
+{
+    float scattering = 0.0;
+    for (int index = 0; index < 32; index++)
+    {
+        float4 spill = doorwaySpills[index];
+        float strength = length(spill.zw);
+        if (strength <= 0.0001)
+            continue;
+        float innerLength = doorwayPrismIntersection(
+            rayDirection,
+            rayVertical,
+            sceneDistance,
+            spill,
+            4.5,
+            0.0,
+            0.0);
+        float outerLength = doorwayPrismIntersection(
+            rayDirection,
+            rayVertical,
+            sceneDistance,
+            spill,
+            5.4,
+            0.22,
+            0.14);
+        // Use the core/outer overlap as a continuous edge profile. Adding two
+        // independent prisms made the feathered shell appear as a bright outline
+        // when looking along the shaft from the illuminated room.
+        float coreCoverage = clamp(innerLength / max(outerLength, 0.0001), 0.0, 1.0);
+        float edgeProfile = smoothRamp(coreCoverage);
+        float2 direction = spill.zw / strength;
+        float towardLight = clamp((-dot(cameraDirection, direction) + 0.10) / 0.70, 0.0, 1.0);
+        float viewFade = smoothRamp(towardLight);
+        scattering += strength * outerLength * 0.147 * edgeProfile * viewFade;
+    }
+    return float3(1.0, 0.95, 0.84) * scattering;
+}
+
+float3 doorwayPrismSurfaceIllumination(float2 worldPosition, float surfaceHeight)
+{
+    const float shaftLength = 4.5;
+    float illumination = 0.0;
+    for (int index = 0; index < 32; index++)
+    {
+        float4 spill = doorwaySpills[index];
+        float strength = length(spill.zw);
+        if (strength <= 0.0001)
+            continue;
+        float2 direction = spill.zw / strength;
+        float2 relative = worldPosition - spill.xy;
+        float forward = dot(relative, direction);
+        if (forward < 0.0 || forward > shaftLength)
+            continue;
+        float lateral = abs((relative.x * direction.y) - (relative.y * direction.x));
+        float halfWidth = 0.36 + (forward * 0.20);
+        float prismTop = 1.0 - (forward / shaftLength);
+        if (lateral >= halfWidth || surfaceHeight > prismTop + 0.08)
+            continue;
+        float edgeFade = 1.0 - smoothRamp(lateral / halfWidth);
+        float endFade = 1.0 - smoothRamp(forward / shaftLength);
+        float topFade = 1.0 - smoothRamp(
+            max(surfaceHeight - (prismTop - 0.18), 0.0) / 0.26);
+        illumination += strength * edgeFade * endFade * topFade * 0.30;
+    }
+    return float3(1.0, 0.95, 0.84) * illumination;
+}
+
 float4 main(float2 fragment)
 {
     const float nativeWidth = 320.0;
@@ -430,6 +562,7 @@ float4 main(float2 fragment)
     float projectedHeight = nativeHeight / distance;
     float wallTop = (nativePlayHeight - projectedHeight) * 0.5;
     float sceneDistance = distance;
+    float rayVertical = 0.0;
 
     float4 color;
     if (!isPlayView)
@@ -443,10 +576,12 @@ float4 main(float2 fragment)
         // is halfway between floor and ceiling, giving a 100-pixel projection height.
         float ceilingDistance = 100.0 / max(80.0 - scenePosition.y, 0.5);
         sceneDistance = ceilingDistance;
+        rayVertical = 0.5 / ceilingDistance;
         float2 ceilingPosition = playerPosition + (rayDirection * ceilingDistance);
         float3 illumination = float3(ambientIllumination(ceilingDistance, ceilingPosition));
         illumination += surfaceIllumination(ceilingPosition, 1.0);
         illumination += muzzleIllumination(ceilingPosition);
+        illumination += doorwayPrismSurfaceIllumination(ceilingPosition, 1.0);
         color.rgb *= min(illumination, 1.0);
         color.rgb *= surfaceContactAmbientOcclusion(wallTop - scenePosition.y, projectedHeight);
     }
@@ -455,6 +590,7 @@ float4 main(float2 fragment)
         color = floorColor;
         float floorDistance = 100.0 / max(scenePosition.y - 80.0, 0.5);
         sceneDistance = floorDistance;
+        rayVertical = -0.5 / floorDistance;
         float2 floorPosition = playerPosition + (rayDirection * floorDistance);
         float3 illumination = float3(ambientIllumination(floorDistance, floorPosition));
         illumination += surfaceIllumination(floorPosition, 0.0);
@@ -483,6 +619,7 @@ float4 main(float2 fragment)
         float2 wallPosition = playerPosition + (rayDirection * distance);
         float orientation = column.w - (floor(column.w / 2.0) * 2.0);
         float wallHeight = 1.0 - textureV;
+        rayVertical = (wallHeight - 0.5) / distance;
         float3 wallNormal = wallSurfaceNormal(
             textureX,
             textureV,
@@ -508,6 +645,7 @@ float4 main(float2 fragment)
         // components. This lets local sources such as treasure softly illuminate
         // nearby walls without overpowering their directional floor/ceiling light.
         illumination += muzzleIllumination(wallPosition);
+        illumination += doorwayPrismSurfaceIllumination(wallPosition, wallHeight);
         color.rgb *= min(illumination, 1.0);
         color.rgb *= wallAmbientRelief(wallNormal, orientation, rayDirection);
         color.rgb = min(color.rgb + wallLocalIllumination(
@@ -518,6 +656,16 @@ float4 main(float2 fragment)
                 material.g,
                 material.b), float3(1.0));
         color.rgb *= wallAmbientOcclusion(column.y, textureV, column.w);
+    }
+
+    if (isPlayView)
+    {
+        color.rgb = min(
+            color.rgb + (doorwayGodRayScattering(
+                rayDirection,
+                rayVertical,
+                sceneDistance)),
+            float3(1.0));
     }
 
     if (isPlayView)

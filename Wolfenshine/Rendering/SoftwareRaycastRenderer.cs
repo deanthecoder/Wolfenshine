@@ -179,10 +179,14 @@ public static class SoftwareRaycastRenderer
             var sprite = sprites.Get(projected.SpriteNumber);
             var left = projected.CenterX - (projected.RenderedSize / 2);
             var top = (height - projected.RenderedSize) / 2;
+            var sourceHeight = Math.Clamp(projected.SourceHeight, 1, WolfensteinSprite.Size);
             var firstX = Math.Max(0, left);
             var lastX = Math.Min(width, left + projected.RenderedSize);
             var firstY = Math.Max(0, top);
-            var lastY = Math.Min(height, top + projected.RenderedSize);
+            var renderedSourceHeight =
+                ((projected.RenderedSize * sourceHeight) + WolfensteinSprite.Size - 1) /
+                WolfensteinSprite.Size;
+            var lastY = Math.Min(height, top + renderedSourceHeight);
             for (var x = firstX; x < lastX; x++)
             {
                 if (projected.Depth >= wallColumns[x].Distance)
@@ -194,6 +198,12 @@ public static class SoftwareRaycastRenderer
                     if (!sprite.TryGetIndex(sourceX, sourceY, out var index))
                         continue;
                     var color = palette.GetColor(index).Scale(projected.Brightness);
+                    if (projected.GodRayAmount > 0.0f)
+                    {
+                        color = color.Blend(
+                            new RgbaColor(255, 238, 207),
+                            Math.Clamp(projected.GodRayAmount * 0.14, 0.0, 0.14));
+                    }
                     if (fogColor is { } fog && projected.FogAmount > 0.0f)
                         color = color.Blend(fog, projected.FogAmount);
                     WritePixel(pixels, width, x, y, color);

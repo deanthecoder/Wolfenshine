@@ -724,9 +724,14 @@ public sealed class EnhancedViewport : SoftwareViewport
             for (var index = 0; index < StaticObjects.Count; index++)
             {
                 var sprite = StaticObjects[index];
+                var godRayAmount = CalculateSpriteGodRayAmount(sprite);
                 m_litWorldSprites[index] = sprite with
                 {
-                    Brightness = CalculateSpriteBrightness(sprite)
+                    Brightness = Math.Clamp(
+                        CalculateSpriteBrightness(sprite) + (godRayAmount * 0.20f),
+                        0.20f,
+                        1.0f),
+                    GodRayAmount = godRayAmount
                 };
             }
             if (m_projectedSprites.Length != StaticObjects.Count)
@@ -746,7 +751,10 @@ public sealed class EnhancedViewport : SoftwareViewport
                 var projected = m_projectedSprites[index];
                 m_projectedSprites[index] = projected with
                 {
-                    FogAmount = CalculateFogAmount(projected.Depth)
+                    FogAmount = CalculateFogAmount(projected.Depth),
+                    SourceHeight = projected.SpriteNumber is 6 or 16
+                        ? WolfensteinSprite.Size / 2
+                        : WolfensteinSprite.Size
                 };
             }
             SoftwareRaycastRenderer.DrawWorldSprites(
@@ -937,6 +945,45 @@ public sealed class EnhancedViewport : SoftwareViewport
                 2.50f);
         }
         return Math.Clamp(illumination, 0.20f, 1.0f);
+    }
+
+    /// <summary>
+    /// Approximates how much of a sprite's center lies inside a descending doorway-light prism.
+    /// </summary>
+    private float CalculateSpriteGodRayAmount(WorldSprite worldSprite)
+    {
+        const double shaftLength = 4.5;
+        const double baseHalfWidth = 0.36;
+        const double widthSlope = 0.20;
+        var surfaceHeight = worldSprite.IsActor ? 0.50 : 0.35;
+        var illumination = 0.0;
+        for (var index = 0; index < DoorwaySpillCount; index++)
+        {
+            var source = index * DoorwaySpillChannelCount;
+            var directionX = m_doorwaySpills[source + 2];
+            var directionY = m_doorwaySpills[source + 3];
+            var strength = Math.Sqrt((directionX * directionX) + (directionY * directionY));
+            if (strength <= 0.0001)
+                continue;
+            directionX /= (float)strength;
+            directionY /= (float)strength;
+            var relativeX = worldSprite.X - m_doorwaySpills[source];
+            var relativeY = worldSprite.Y - m_doorwaySpills[source + 1];
+            var forward = (relativeX * directionX) + (relativeY * directionY);
+            if (forward < 0.0 || forward > shaftLength)
+                continue;
+            var lateral = Math.Abs((relativeX * directionY) - (relativeY * directionX));
+            var halfWidth = baseHalfWidth + (forward * widthSlope);
+            var prismTop = 1.0 - (forward / shaftLength);
+            if (lateral >= halfWidth || surfaceHeight > prismTop + 0.08)
+                continue;
+            var edgePosition = Math.Clamp(lateral / halfWidth, 0.0, 1.0);
+            var edgeFade = 1.0 - (edgePosition * edgePosition * (3.0 - (2.0 * edgePosition)));
+            var endPosition = Math.Clamp(forward / shaftLength, 0.0, 1.0);
+            var endFade = 1.0 - (endPosition * endPosition * (3.0 - (2.0 * endPosition)));
+            illumination += strength * edgeFade * endFade;
+        }
+        return (float)Math.Clamp(illumination, 0.0, 1.0);
     }
 
     private static float CalculateLightContribution(

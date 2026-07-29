@@ -23,4 +23,6 @@ public readonly record struct ProjectedWorldSprite(
     int RenderedSize,
     float Brightness = 1.0f,
     float FogAmount = 0.0f,
-    bool CastsGroundShadow = false);
+    bool CastsGroundShadow = false,
+    float GodRayAmount = 0.0f,
+    int SourceHeight = 64);
