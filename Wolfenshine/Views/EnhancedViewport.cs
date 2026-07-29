@@ -56,6 +56,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly float[] m_cameraDirection = new float[2];
     private readonly float[] m_cameraPlane = new float[2];
     private readonly byte[] m_weaponPixels = new byte[ViewportWidth * ViewportHeight * 4];
+    private readonly byte[] m_bloomPixels = new byte[ViewportWidth * ViewportHeight * 4];
     private byte[] m_areaAmbientPixels = [];
     private byte[] m_areaAmbientBasePixels = [];
     private bool m_areaAmbientBitmapDirty;
@@ -70,6 +71,11 @@ public sealed class EnhancedViewport : SoftwareViewport
         ViewportHeight,
         SKColorType.Rgba8888,
         SKAlphaType.Unpremul));
+    private readonly SKBitmap m_bloomOverlayBitmap = new(new SKImageInfo(
+        ViewportWidth,
+        ViewportHeight,
+        SKColorType.Rgba8888,
+        SKAlphaType.Opaque));
     private readonly SKRuntimeEffect m_effect;
     private SKBitmap m_wallAtlas;
     private SKBitmap m_areaAmbientBitmap;
@@ -77,6 +83,9 @@ public sealed class EnhancedViewport : SoftwareViewport
     private WolfensteinPalette m_atlasPalette;
     private WolfensteinMap m_areaAmbientSourceMap;
     private AreaAmbientMap m_areaAmbientMap;
+    private WolfensteinSpriteSet m_bloomSpriteSet;
+    private WolfensteinPalette m_bloomPalette;
+    private readonly Dictionary<int, BloomProfile> m_bloomProfiles = [];
 
     public static readonly StyledProperty<double> ViewBobProperty =
         AvaloniaProperty.Register<EnhancedViewport, double>(nameof(ViewBob));
@@ -170,6 +179,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_areaAmbientBitmap,
             m_overlayBitmap,
             m_weaponOverlayBitmap,
+            m_bloomOverlayBitmap,
             m_wallColumns,
             m_sceneLights,
             m_sceneLightRadii,
@@ -201,6 +211,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         base.OnDetachedFromVisualTree(e);
         m_overlayBitmap.Dispose();
         m_weaponOverlayBitmap.Dispose();
+        m_bloomOverlayBitmap.Dispose();
         m_wallAtlas?.Dispose();
         m_areaAmbientBitmap?.Dispose();
         m_effect.Dispose();
@@ -536,6 +547,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     {
         Array.Clear(m_pixels);
         Array.Clear(m_weaponPixels);
+        Array.Clear(m_bloomPixels);
         var playViewPixels = m_pixels.AsSpan(0, ViewportWidth * PlayViewHeight * 4);
         if (Sprites != null && StaticObjects != null)
         {
@@ -558,6 +570,9 @@ public sealed class EnhancedViewport : SoftwareViewport
                 PlayViewHeight,
                 ViewportHeight,
                 m_projectedSprites);
+            EnsureBloomProfiles();
+            for (var index = 0; index < visibleSpriteCount; index++)
+                DrawBloom(m_projectedSprites[index]);
             for (var index = 0; index < visibleSpriteCount; index++)
             {
                 var projected = m_projectedSprites[index];
@@ -602,6 +617,109 @@ public sealed class EnhancedViewport : SoftwareViewport
         }
         CopyPixelsToBitmap(m_pixels, m_overlayBitmap);
         CopyPixelsToBitmap(m_weaponPixels, m_weaponOverlayBitmap);
+        CopyPixelsToBitmap(m_bloomPixels, m_bloomOverlayBitmap);
+    }
+
+    private void EnsureBloomProfiles()
+    {
+        if (ReferenceEquals(m_bloomSpriteSet, Sprites) && ReferenceEquals(m_bloomPalette, Palette))
+            return;
+        m_bloomProfiles.Clear();
+        int[] bloomSpriteNumbers = [6, 16, 31, 32, 33, 34];
+        foreach (var spriteNumber in bloomSpriteNumbers)
+        {
+            if (spriteNumber >= Sprites.Count)
+                continue;
+            var sprite = Sprites.Get(spriteNumber);
+            var totalWeight = 0.0;
+            var weightedX = 0.0;
+            var weightedY = 0.0;
+            // Ceiling fixtures include a painted floor shadow in the lower half;
+            // exclude it so the glow is centered on the luminous fixture itself.
+            var maximumY = spriteNumber is 6 or 16
+                ? WolfensteinSprite.Size / 2
+                : WolfensteinSprite.Size;
+            for (var y = 0; y < maximumY; y++)
+            {
+                for (var x = 0; x < WolfensteinSprite.Size; x++)
+                {
+                    if (!sprite.TryGetIndex(x, y, out var paletteIndex))
+                        continue;
+                    var color = Palette.GetColor(paletteIndex);
+                    var brightness = Math.Max(color.Red, Math.Max(color.Green, color.Blue)) / 255.0;
+                    var weight = brightness * brightness;
+                    totalWeight += weight;
+                    weightedX += (x + 0.5) * weight;
+                    weightedY += (y + 0.5) * weight;
+                }
+            }
+            if (totalWeight <= 0.0)
+                continue;
+            var (upwardColor, downwardColor) = WolfensteinStaticObjects.GetLightColors(spriteNumber);
+            var bloomColor = spriteNumber == 16 ? upwardColor : downwardColor;
+            var radiusScale = spriteNumber switch
+            {
+                16 => 0.38,
+                6 => 0.34,
+                _ => 0.26
+            };
+            m_bloomProfiles[spriteNumber] = new BloomProfile(
+                weightedX / totalWeight / WolfensteinSprite.Size,
+                weightedY / totalWeight / WolfensteinSprite.Size,
+                radiusScale,
+                spriteNumber is 6 or 16 ? 0.90 : 0.75,
+                bloomColor);
+        }
+        m_bloomSpriteSet = Sprites;
+        m_bloomPalette = Palette;
+    }
+
+    private void DrawBloom(ProjectedWorldSprite projected)
+    {
+        if (!m_bloomProfiles.TryGetValue(projected.SpriteNumber, out var profile))
+            return;
+        var left = projected.CenterX - (projected.RenderedSize * 0.5);
+        var top = (PlayViewHeight - projected.RenderedSize) * 0.5;
+        var centerX = left + (profile.CenterX * projected.RenderedSize);
+        var centerY = top + (profile.CenterY * projected.RenderedSize);
+        var radiusX = Math.Max(2.0, projected.RenderedSize * profile.RadiusScale);
+        var radiusY = Math.Max(2.0, radiusX * 0.82);
+        var firstX = Math.Max(0, (int)Math.Floor(centerX - radiusX));
+        var lastX = Math.Min(ViewportWidth - 1, (int)Math.Ceiling(centerX + radiusX));
+        var firstY = Math.Max(0, (int)Math.Floor(centerY - radiusY));
+        var lastY = Math.Min(PlayViewHeight - 1, (int)Math.Ceiling(centerY + radiusY));
+        var fogScale = 1.0 - CalculateFogAmount(projected.Depth);
+        for (var x = firstX; x <= lastX; x++)
+        {
+            if (projected.Depth >= m_columns[x].Distance)
+                continue;
+            var normalizedX = (x + 0.5 - centerX) / radiusX;
+            for (var y = firstY; y <= lastY; y++)
+            {
+                var normalizedY = (y + 0.5 - centerY) / radiusY;
+                var distanceSquared = (normalizedX * normalizedX) + (normalizedY * normalizedY);
+                if (distanceSquared >= 1.0)
+                    continue;
+                var falloff = 1.0 - Math.Sqrt(distanceSquared);
+                var intensity = falloff * falloff * 0.62 * profile.IntensityScale * fogScale;
+                AddBloomPixel(x, y, profile.Color, intensity);
+            }
+        }
+    }
+
+    private void AddBloomPixel(int x, int y, RgbaColor color, double intensity)
+    {
+        var target = ((y * ViewportWidth) + x) * 4;
+        m_bloomPixels[target] = (byte)Math.Min(
+            byte.MaxValue,
+            m_bloomPixels[target] + (color.Red * intensity));
+        m_bloomPixels[target + 1] = (byte)Math.Min(
+            byte.MaxValue,
+            m_bloomPixels[target + 1] + (color.Green * intensity));
+        m_bloomPixels[target + 2] = (byte)Math.Min(
+            byte.MaxValue,
+            m_bloomPixels[target + 2] + (color.Blue * intensity));
+        m_bloomPixels[target + 3] = byte.MaxValue;
     }
 
     private float CalculateSpriteBrightness(WorldSprite worldSprite)
@@ -704,6 +822,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         SKBitmap areaAmbientMap,
         SKBitmap spriteOverlay,
         SKBitmap weaponOverlay,
+        SKBitmap bloomOverlay,
         float[] wallColumns,
         float[] sceneLights,
         float[] sceneLightRadii,
@@ -751,6 +870,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 SKShaderTileMode.Clamp);
             using var overlayShader = spriteOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             using var weaponShader = weaponOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+            using var bloomShader = bloomOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             var uniforms = new SKRuntimeEffectUniforms(effect)
             {
                 ["outputResolution"] = new[] { (float)Bounds.Width, (float)Bounds.Height },
@@ -784,11 +904,19 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["wallTextureAtlas"] = textureShader,
                 ["areaAmbientMap"] = areaAmbientShader,
                 ["softwareSpriteOverlay"] = overlayShader,
-                ["softwareWeaponOverlay"] = weaponShader
+                ["softwareWeaponOverlay"] = weaponShader,
+                ["softwareBloomOverlay"] = bloomShader
             };
             using var shader = effect.ToShader(false, uniforms, children);
             using var paint = new SKPaint { Shader = shader, IsAntialias = false };
             lease.SkCanvas.DrawRect(SKRect.Create((float)Bounds.Width, (float)Bounds.Height), paint);
         }
     }
+
+    private readonly record struct BloomProfile(
+        double CenterX,
+        double CenterY,
+        double RadiusScale,
+        double IntensityScale,
+        RgbaColor Color);
 }

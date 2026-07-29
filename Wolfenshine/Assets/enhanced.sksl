@@ -79,6 +79,10 @@ uniform shader softwareSpriteOverlay;
 // changing the brightness of enemies or the fixed HUD.
 uniform shader softwareWeaponOverlay;
 
+// Additive screen-space glow centered on luminous ceiling fixtures, chandeliers,
+// and treasure. It is generated from the original sprite artwork on the CPU.
+uniform shader softwareBloomOverlay;
+
 float randomHash(float2 position)
 {
     return fract(sin(dot(position, float2(12.9898, 78.233))) * 43758.5453);
@@ -310,6 +314,10 @@ float4 main(float2 fragment)
 
     if (isPlayView)
         color.rgb = mix(color.rgb, fogColor.rgb, distanceFogAmount(sceneDistance));
+
+    // Bloom sits behind the sharp original sprite so its pixel artwork remains intact.
+    float3 bloom = sample(softwareBloomOverlay, scenePosition).rgb;
+    color.rgb = min(color.rgb + bloom, float3(1.0));
 
     // World sprites follow view bob; the HUD remains fixed.
     float4 overlay = sample(softwareSpriteOverlay, isPlayView ? scenePosition : nativePosition);
