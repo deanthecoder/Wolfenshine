@@ -1279,7 +1279,7 @@ public sealed class GameSession
                     0.0,
                     1.0);
                 var color = new RgbaColor(255, 218, 176);
-                return new WorldLight(flash.X, flash.Y, intensity, intensity, 2.5f, 2.5f, color, color);
+                return new WorldLight(flash.X, flash.Y, intensity, intensity, 2.5f, 2.5f, color, color, 0.55f);
             })
             .ToArray();
     }

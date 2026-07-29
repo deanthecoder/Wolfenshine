@@ -114,4 +114,16 @@ public static class WolfensteinStaticObjects
         31 or 32 or 33 or 34 => (new RgbaColor(255, 214, 128), new RgbaColor(255, 224, 152)), // Treasure glow.
         _ => (new RgbaColor(255, 255, 255), new RgbaColor(255, 255, 255))
     };
+
+    /// <summary>
+    /// Gets the light source's approximate height within its map tile.
+    /// </summary>
+    public static float GetLightHeight(int spriteNumber) => spriteNumber switch
+    {
+        5 => 0.34f, // Floor lamp.
+        6 => 0.78f, // Chandelier.
+        16 => 0.94f, // Green ceiling light.
+        31 or 32 or 33 or 34 => 0.22f, // Treasure glow.
+        _ => 0.5f
+    };
 }

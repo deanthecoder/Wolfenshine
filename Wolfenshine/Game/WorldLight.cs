@@ -26,4 +26,5 @@ public readonly record struct WorldLight(
     float UpwardRadius,
     float DownwardRadius,
     RgbaColor UpwardColor,
-    RgbaColor DownwardColor);
+    RgbaColor DownwardColor,
+    float Height = 0.5f);

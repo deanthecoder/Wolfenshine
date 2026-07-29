@@ -123,4 +123,14 @@ public sealed class WolfensteinStaticObjectsTests
             Assert.That(downward.Green - downward.Blue, Is.LessThanOrEqualTo(12));
         });
     }
+
+    [TestCase(5, 0.34f)] // Floor lamp.
+    [TestCase(6, 0.78f)] // Chandelier.
+    [TestCase(16, 0.94f)] // Green ceiling light.
+    [TestCase(31, 0.22f)] // Treasure.
+    [TestCase(2, 0.50f)] // Non-light scenery default.
+    public void GivenStaticSpriteCheckLightHeightIsIdentified(int spriteNumber, float expected)
+    {
+        Assert.That(WolfensteinStaticObjects.GetLightHeight(spriteNumber), Is.EqualTo(expected));
+    }
 }

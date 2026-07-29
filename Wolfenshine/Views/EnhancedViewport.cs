@@ -49,6 +49,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly float[] m_sceneLightRadii = new float[LightCount * LightRadiusChannelCount];
     private readonly float[] m_sceneLightUpColors = new float[LightCount * LightColorChannelCount];
     private readonly float[] m_sceneLightDownColors = new float[LightCount * LightColorChannelCount];
+    private readonly float[] m_sceneLightHeights = new float[LightCount];
     private readonly double[] m_sceneLightDistances = new double[LightCount];
     private readonly float[] m_doorwaySpills = new float[DoorwaySpillCount * DoorwaySpillChannelCount];
     private readonly double[] m_doorwaySpillDistances = new double[DoorwaySpillCount];
@@ -78,6 +79,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         SKAlphaType.Opaque));
     private readonly SKRuntimeEffect m_effect;
     private SKBitmap m_wallAtlas;
+    private SKBitmap m_wallHeightAtlas;
+    private SKBitmap m_wallMaterialMap;
     private SKBitmap m_areaAmbientBitmap;
     private WolfensteinWallTextures m_atlasWallTextures;
     private WolfensteinPalette m_atlasPalette;
@@ -176,6 +179,8 @@ public sealed class EnhancedViewport : SoftwareViewport
             new Rect(Bounds.Size),
             m_effect,
             m_wallAtlas,
+            m_wallHeightAtlas,
+            m_wallMaterialMap,
             m_areaAmbientBitmap,
             m_overlayBitmap,
             m_weaponOverlayBitmap,
@@ -185,6 +190,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_sceneLightRadii,
             m_sceneLightUpColors,
             m_sceneLightDownColors,
+            m_sceneLightHeights,
             m_doorwaySpills,
             m_playerPosition,
             m_cameraDirection,
@@ -213,6 +219,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_weaponOverlayBitmap.Dispose();
         m_bloomOverlayBitmap.Dispose();
         m_wallAtlas?.Dispose();
+        m_wallHeightAtlas?.Dispose();
+        m_wallMaterialMap?.Dispose();
         m_areaAmbientBitmap?.Dispose();
         m_effect.Dispose();
     }
@@ -222,29 +230,132 @@ public sealed class EnhancedViewport : SoftwareViewport
         if (ReferenceEquals(m_atlasWallTextures, WallTextures) && ReferenceEquals(m_atlasPalette, Palette))
             return;
         m_wallAtlas?.Dispose();
+        m_wallHeightAtlas?.Dispose();
+        m_wallMaterialMap?.Dispose();
         m_wallAtlas = new SKBitmap(new SKImageInfo(
             WolfensteinWallTexture.Size,
             WallTextures.Pages.Count * WolfensteinWallTexture.Size,
             SKColorType.Rgba8888,
             SKAlphaType.Opaque));
+        m_wallHeightAtlas = new SKBitmap(new SKImageInfo(
+            WolfensteinWallTexture.Size,
+            WallTextures.Pages.Count * WolfensteinWallTexture.Size,
+            SKColorType.Rgba8888,
+            SKAlphaType.Opaque));
+        m_wallMaterialMap = new SKBitmap(new SKImageInfo(
+            WallTextures.Pages.Count,
+            1,
+            SKColorType.Rgba8888,
+            SKAlphaType.Opaque));
         for (var page = 0; page < WallTextures.Pages.Count; page++)
         {
             var texture = WallTextures.Pages[page];
+            var heights = BuildWallHeightMap(texture);
             for (var y = 0; y < WolfensteinWallTexture.Size; y++)
             {
                 for (var x = 0; x < WolfensteinWallTexture.Size; x++)
                 {
                     var color = Palette.GetColor(texture.GetIndex(x, y));
+                    var height = heights[(y * WolfensteinWallTexture.Size) + x];
                     m_wallAtlas.SetPixel(
                         x,
                         (page * WolfensteinWallTexture.Size) + y,
                         new SKColor(color.Red, color.Green, color.Blue, color.Alpha));
+                    m_wallHeightAtlas.SetPixel(
+                        x,
+                        (page * WolfensteinWallTexture.Size) + y,
+                        new SKColor(height, height, height));
                 }
             }
+            var material = ClassifyWallMaterial(texture, page >= WallTextures.SpriteStart - 8);
+            m_wallMaterialMap.SetPixel(
+                page,
+                0,
+                new SKColor(
+                    ToByte(material.BumpStrength),
+                    ToByte(material.SpecularStrength),
+                    ToByte(material.Gloss)));
         }
         m_atlasWallTextures = WallTextures;
         m_atlasPalette = Palette;
     }
+
+    private byte[] BuildWallHeightMap(WolfensteinWallTexture texture)
+    {
+        var heights = new double[WolfensteinWallTexture.DataLength];
+        var minimum = double.MaxValue;
+        var maximum = double.MinValue;
+        for (var y = 0; y < WolfensteinWallTexture.Size; y++)
+        {
+            for (var x = 0; x < WolfensteinWallTexture.Size; x++)
+            {
+                var weightedLuminance = 0.0;
+                var totalWeight = 0.0;
+                for (var offsetY = -1; offsetY <= 1; offsetY++)
+                {
+                    for (var offsetX = -1; offsetX <= 1; offsetX++)
+                    {
+                        var sampleX = Math.Clamp(x + offsetX, 0, WolfensteinWallTexture.Size - 1);
+                        var sampleY = Math.Clamp(y + offsetY, 0, WolfensteinWallTexture.Size - 1);
+                        var color = Palette.GetColor(texture.GetIndex(sampleX, sampleY));
+                        var weight = (offsetX == 0 ? 2.0 : 1.0) * (offsetY == 0 ? 2.0 : 1.0);
+                        weightedLuminance += GetLuminance(color) * weight;
+                        totalWeight += weight;
+                    }
+                }
+                var luminance = weightedLuminance / totalWeight;
+                heights[(y * WolfensteinWallTexture.Size) + x] = luminance;
+                minimum = Math.Min(minimum, luminance);
+                maximum = Math.Max(maximum, luminance);
+            }
+        }
+
+        var result = new byte[heights.Length];
+        var range = Math.Max(maximum - minimum, 0.05);
+        for (var index = 0; index < heights.Length; index++)
+        {
+            result[index] = ToByte((heights[index] - minimum) / range);
+        }
+        return result;
+    }
+
+    private WallMaterial ClassifyWallMaterial(WolfensteinWallTexture texture, bool isDoor)
+    {
+        if (isDoor)
+            return new WallMaterial(0.28, 0.46, 0.72);
+
+        var red = 0.0;
+        var green = 0.0;
+        var blue = 0.0;
+        for (var y = 0; y < WolfensteinWallTexture.Size; y++)
+        {
+            for (var x = 0; x < WolfensteinWallTexture.Size; x++)
+            {
+                var color = Palette.GetColor(texture.GetIndex(x, y));
+                red += color.Red;
+                green += color.Green;
+                blue += color.Blue;
+            }
+        }
+        var scale = 1.0 / (WolfensteinWallTexture.DataLength * byte.MaxValue);
+        red *= scale;
+        green *= scale;
+        blue *= scale;
+        var chroma = Math.Max(red, Math.Max(green, blue)) - Math.Min(red, Math.Min(green, blue));
+        if (blue > red * 1.25 && blue > green * 1.10)
+            return new WallMaterial(1.00, 0.28, 0.50); // Blue stone and brick.
+        if (red > blue * 1.28 && red > green * 1.04)
+            return new WallMaterial(0.50, 0.06, 0.16); // Soft, matte wood paneling.
+        if (chroma < 0.10)
+            return new WallMaterial(0.82, 0.18, 0.30); // Grey stone and concrete.
+        return new WallMaterial(0.62, 0.11, 0.25);
+    }
+
+    private static double GetLuminance(RgbaColor color) =>
+        ((color.Red * 0.2126) + (color.Green * 0.7152) + (color.Blue * 0.0722)) / byte.MaxValue;
+
+    private static byte ToByte(double value) =>
+        (byte)Math.Round(Math.Clamp(value, 0.0, 1.0) * byte.MaxValue);
 
     private void EnsureAreaAmbientMap()
     {
@@ -370,6 +481,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         Array.Clear(m_sceneLightRadii);
         Array.Clear(m_sceneLightUpColors);
         Array.Clear(m_sceneLightDownColors);
+        Array.Clear(m_sceneLightHeights);
         Array.Fill(m_sceneLightDistances, double.PositiveInfinity);
         if (LightObjects != null)
         {
@@ -378,6 +490,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 var (upward, downward) = WolfensteinStaticObjects.GetLightBrightness(sprite.SpriteNumber);
                 var (upwardRadius, downwardRadius) = WolfensteinStaticObjects.GetLightRadii(sprite.SpriteNumber);
                 var (upwardColor, downwardColor) = WolfensteinStaticObjects.GetLightColors(sprite.SpriteNumber);
+                var height = WolfensteinStaticObjects.GetLightHeight(sprite.SpriteNumber);
                 if (upward <= 0.0f && downward <= 0.0f)
                     continue;
                 InsertLight(
@@ -388,7 +501,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                     upwardRadius,
                     downwardRadius,
                     upwardColor,
-                    downwardColor);
+                    downwardColor,
+                    height);
             }
         }
         if (DynamicLights == null)
@@ -403,7 +517,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 light.UpwardRadius,
                 light.DownwardRadius,
                 light.UpwardColor,
-                light.DownwardColor);
+                light.DownwardColor,
+                light.Height);
         }
     }
 
@@ -415,7 +530,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         float upwardRadius,
         float downwardRadius,
         RgbaColor upwardColor,
-        RgbaColor downwardColor)
+        RgbaColor downwardColor,
+        float height)
     {
         var deltaX = x - Camera.X;
         var deltaY = y - Camera.Y;
@@ -458,6 +574,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 m_sceneLightDownColors,
                 index * LightColorChannelCount,
                 LightColorChannelCount);
+            m_sceneLightHeights[index] = m_sceneLightHeights[index - 1];
         }
 
         m_sceneLightDistances[insertAt] = distanceSquared;
@@ -471,6 +588,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_sceneLightRadii[radiusTarget + 1] = downwardRadius;
         WriteLightColor(m_sceneLightUpColors, insertAt, upwardColor);
         WriteLightColor(m_sceneLightDownColors, insertAt, downwardColor);
+        m_sceneLightHeights[insertAt] = height;
     }
 
     private void BuildDoorwaySpillBuffer()
@@ -819,6 +937,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         Rect bounds,
         SKRuntimeEffect effect,
         SKBitmap wallTextures,
+        SKBitmap wallHeights,
+        SKBitmap wallMaterials,
         SKBitmap areaAmbientMap,
         SKBitmap spriteOverlay,
         SKBitmap weaponOverlay,
@@ -828,6 +948,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] sceneLightRadii,
         float[] sceneLightUpColors,
         float[] sceneLightDownColors,
+        float[] sceneLightHeights,
         float[] doorwaySpills,
         float[] playerPosition,
         float[] cameraDirection,
@@ -865,6 +986,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 return;
             using var lease = leaseFeature.Lease();
             using var textureShader = wallTextures.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+            using var heightShader = wallHeights.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+            using var materialShader = wallMaterials.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             using var areaAmbientShader = areaAmbientMap.ToShader(
                 SKShaderTileMode.Clamp,
                 SKShaderTileMode.Clamp);
@@ -879,6 +1002,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["sceneLightRadii"] = sceneLightRadii,
                 ["sceneLightUpColors"] = sceneLightUpColors,
                 ["sceneLightDownColors"] = sceneLightDownColors,
+                ["sceneLightHeights"] = sceneLightHeights,
                 ["doorwaySpills"] = doorwaySpills,
                 ["playerPosition"] = playerPosition,
                 ["cameraDirection"] = cameraDirection,
@@ -902,6 +1026,8 @@ public sealed class EnhancedViewport : SoftwareViewport
             var children = new SKRuntimeEffectChildren(effect)
             {
                 ["wallTextureAtlas"] = textureShader,
+                ["wallHeightAtlas"] = heightShader,
+                ["wallMaterialMap"] = materialShader,
                 ["areaAmbientMap"] = areaAmbientShader,
                 ["softwareSpriteOverlay"] = overlayShader,
                 ["softwareWeaponOverlay"] = weaponShader,
@@ -919,4 +1045,9 @@ public sealed class EnhancedViewport : SoftwareViewport
         double RadiusScale,
         double IntensityScale,
         RgbaColor Color);
+
+    private readonly record struct WallMaterial(
+        double BumpStrength,
+        double SpecularStrength,
+        double Gloss);
 }

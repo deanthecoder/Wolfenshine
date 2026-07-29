@@ -43,6 +43,7 @@ uniform float4 sceneLights[32];
 uniform float2 sceneLightRadii[32]; // Upward and downward radius in map tiles.
 uniform float4 sceneLightUpColors[32]; // RGB tint emitted toward the ceiling.
 uniform float4 sceneLightDownColors[32]; // RGB tint emitted toward the floor.
+uniform float sceneLightHeights[32]; // Approximate source height within its map tile, 0..1.
 
 // The thirty-two nearest open doors separating differently lit rooms:
 //   X/Y = door center
@@ -64,6 +65,12 @@ uniform float4 fogParameters; // Start distance, end distance, maximum blend, un
 // 64 x 64 and pages are stacked vertically. CPU palette lookup currently makes
 // this an RGBA atlas; a future version can instead send indices plus a palette.
 uniform shader wallTextureAtlas;
+
+// Generated from a softly blurred luminance version of each original wall page.
+// Material values are stored separately as bump strength, specular strength,
+// and gloss so wood, stone, blue brick, and metal can respond differently.
+uniform shader wallHeightAtlas;
+uniform shader wallMaterialMap;
 
 // One texel per map tile stores ambience for the geometry-derived room or corridor.
 // Sampling it at each surface position lets a bright room remain visible through
@@ -186,6 +193,114 @@ float3 surfaceIllumination(float2 worldPosition, float upward)
     return illumination;
 }
 
+float3 wallSurfaceNormal(
+    float textureX,
+    float textureV,
+    float texturePage,
+    float orientation,
+    float2 rayDirection,
+    float bumpStrength)
+{
+    const float textureSize = 64.0;
+    float localY = floor(textureV * textureSize) + 0.5;
+    float atlasY = (texturePage * textureSize) + localY;
+    float leftHeight = sample(wallHeightAtlas, float2(max(textureX - 1.0, 0.5), atlasY)).r;
+    float rightHeight = sample(wallHeightAtlas, float2(min(textureX + 1.0, 63.5), atlasY)).r;
+    float upperHeight = sample(
+        wallHeightAtlas,
+        float2(textureX, (texturePage * textureSize) + max(localY - 1.0, 0.5))).r;
+    float lowerHeight = sample(
+        wallHeightAtlas,
+        float2(textureX, (texturePage * textureSize) + min(localY + 1.0, 63.5))).r;
+    float horizontalSlope = (rightHeight - leftHeight) * bumpStrength * 2.15;
+    float verticalSlope = (lowerHeight - upperHeight) * bumpStrength * 2.15;
+
+    float3 geometricNormal;
+    float3 horizontalTangent;
+    if (orientation < 0.5)
+    {
+        geometricNormal = float3(-sign(rayDirection.x), 0.0, 0.0);
+        horizontalTangent = float3(0.0, sign(rayDirection.x), 0.0);
+    }
+    else
+    {
+        geometricNormal = float3(0.0, -sign(rayDirection.y), 0.0);
+        horizontalTangent = float3(-sign(rayDirection.y), 0.0, 0.0);
+    }
+    // Texture V increases downward while world Z increases upward.
+    float3 verticalTangent = float3(0.0, 0.0, -1.0);
+    return normalize(
+        geometricNormal -
+        (horizontalTangent * horizontalSlope) -
+        (verticalTangent * verticalSlope));
+}
+
+float3 wallLocalIllumination(
+    float2 worldPosition,
+    float wallHeight,
+    float3 normal,
+    float3 albedo,
+    float specularStrength,
+    float gloss)
+{
+    float3 viewDirection = normalize(float3(playerPosition - worldPosition, 0.5 - wallHeight));
+    // The pixel artwork represents fairly coarse surfaces, so broad highlights
+    // read better than physically sharp points at Wolfenstein's native resolution.
+    float exponent = mix(3.0, 26.0, gloss);
+    float3 contribution = float3(0.0);
+    for (int index = 0; index < 32; index++)
+    {
+        float4 light = sceneLights[index];
+        float sourceHeight = sceneLightHeights[index];
+        float upward = wallHeight >= sourceHeight ? 1.0 : 0.0;
+        float brightness = mix(light.w, light.z, upward);
+        float3 lightColor = mix(sceneLightDownColors[index].rgb, sceneLightUpColors[index].rgb, upward);
+        float2 radii = sceneLightRadii[index];
+        float radius = max(mix(radii.y, radii.x, upward), 0.0001);
+        float horizontalDistance = length(worldPosition - light.xy);
+        float conePosition = clamp(horizontalDistance / radius, 0.0, 1.0);
+        float cone = 1.0 - (conePosition * conePosition * (3.0 - 2.0 * conePosition));
+        float3 lightDirection = normalize(float3(light.xy - worldPosition, sourceHeight - wallHeight));
+        float facing = max(dot(normal, lightDirection), 0.0);
+        float diffuse = mix(0.22, 1.0, facing);
+        float3 halfDirection = normalize(lightDirection + viewDirection);
+        float highlight = pow(max(dot(normal, halfDirection), 0.0), exponent) *
+                          mix(0.30, 1.0, facing);
+        contribution += (albedo * lightColor * brightness * cone * diffuse * 0.44) +
+                        (lightColor * brightness * cone * highlight * specularStrength * 2.55);
+    }
+
+    const float muzzleRadius = 2.5;
+    float3 muzzlePosition = float3(playerPosition + (cameraDirection * 0.35), 0.55);
+    float3 surfacePosition = float3(worldPosition, wallHeight);
+    float3 muzzleDelta = muzzlePosition - surfacePosition;
+    float muzzleDistance = length(muzzleDelta);
+    float muzzlePositionInRadius = clamp(muzzleDistance / muzzleRadius, 0.0, 1.0);
+    float muzzleFalloff = 1.0 -
+                          (muzzlePositionInRadius * muzzlePositionInRadius *
+                           (3.0 - (2.0 * muzzlePositionInRadius)));
+    float3 muzzleDirection = normalize(muzzleDelta);
+    float muzzleFacing = max(dot(normal, muzzleDirection), 0.0);
+    float3 muzzleHalfDirection = normalize(muzzleDirection + viewDirection);
+    float muzzleHighlight = pow(max(dot(normal, muzzleHalfDirection), 0.0), exponent) * muzzleFacing;
+    contribution += float3(1.0, 0.85, 0.69) * muzzleFlash * muzzleFalloff *
+                    muzzleHighlight * specularStrength * 1.80;
+    return contribution;
+}
+
+float wallAmbientRelief(float3 normal, float orientation, float2 rayDirection)
+{
+    float3 geometricNormal = orientation < 0.5
+        ? float3(-sign(rayDirection.x), 0.0, 0.0)
+        : float3(0.0, -sign(rayDirection.y), 0.0);
+    // A soft overhead/world-space fill makes generated relief readable outside
+    // direct light cones without pretending every wall has a glossy headlamp.
+    float3 fillDirection = normalize(geometricNormal + float3(0.24, -0.18, 0.58));
+    float flatResponse = dot(geometricNormal, fillDirection);
+    float bumpedResponse = dot(normal, fillDirection);
+    return clamp(1.0 + ((bumpedResponse - flatResponse) * 1.15), 0.78, 1.20);
+}
+
 float3 doorwaySpillIllumination(float2 worldPosition)
 {
     const float spillLength = 4.0;
@@ -282,6 +397,8 @@ float4 main(float2 fragment)
         float texturePage = floor(column.z + 0.5);
         float textureY = (texturePage * textureSize) + floor(textureV * textureSize) + 0.5;
         color = sample(wallTextureAtlas, float2(textureX, textureY));
+        float3 wallAlbedo = color.rgb;
+        float3 material = sample(wallMaterialMap, float2(texturePage + 0.5, 0.5)).rgb;
 
         // Distance is perpendicular to the camera plane, so this darkening does
         // not bow across the screen and can later be combined with real lights.
@@ -289,6 +406,14 @@ float4 main(float2 fragment)
         // the room being viewed rather than the solid wall tile itself.
         float2 wallPosition = playerPosition + (rayDirection * distance);
         float orientation = column.w - (floor(column.w / 2.0) * 2.0);
+        float wallHeight = 1.0 - textureV;
+        float3 wallNormal = wallSurfaceNormal(
+            textureX,
+            textureV,
+            texturePage,
+            orientation,
+            rayDirection,
+            material.r);
         float isDoor = floor(column.w / 8.0) - (floor(column.w / 16.0) * 2.0);
         float2 ambientPosition = wallPosition - (rayDirection * 0.01);
         if (isDoor > 0.5)
@@ -306,9 +431,16 @@ float4 main(float2 fragment)
         // Vertical walls receive a restrained blend of the upward and downward
         // components. This lets local sources such as treasure softly illuminate
         // nearby walls without overpowering their directional floor/ceiling light.
-        illumination += surfaceIllumination(wallPosition, 0.5) * 0.60;
         illumination += muzzleIllumination(wallPosition);
         color.rgb *= min(illumination, 1.0);
+        color.rgb *= wallAmbientRelief(wallNormal, orientation, rayDirection);
+        color.rgb = min(color.rgb + wallLocalIllumination(
+                wallPosition,
+                wallHeight,
+                wallNormal,
+                wallAlbedo,
+                material.g,
+                material.b), float3(1.0));
         color.rgb *= wallAmbientOcclusion(column.y, textureV, column.w);
     }
 
