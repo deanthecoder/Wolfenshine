@@ -43,6 +43,12 @@ uniform float4 sceneLights[32];
 uniform float2 sceneLightRadii[32]; // Upward and downward radius in map tiles.
 uniform float4 sceneLightUpColors[32]; // RGB tint emitted toward the ceiling.
 uniform float4 sceneLightDownColors[32]; // RGB tint emitted toward the floor.
+
+// The thirty-two nearest open doors separating differently lit rooms:
+//   X/Y = door center
+//   Z/W = direction from the brighter room into the darker room, with vector
+//         length encoding ambient contrast multiplied by the door's opening.
+uniform float4 doorwaySpills[32];
 uniform float2 playerPosition;
 uniform float2 cameraDirection;
 uniform float2 cameraPlane;
@@ -176,6 +182,33 @@ float3 surfaceIllumination(float2 worldPosition, float upward)
     return illumination;
 }
 
+float3 doorwaySpillIllumination(float2 worldPosition)
+{
+    const float spillLength = 4.0;
+    float illumination = 0.0;
+    for (int index = 0; index < 32; index++)
+    {
+        float4 spill = doorwaySpills[index];
+        float strength = length(spill.zw);
+        if (strength <= 0.0001)
+            continue;
+        float2 direction = spill.zw / strength;
+        float2 relative = worldPosition - spill.xy;
+        float forward = dot(relative, direction);
+        if (forward < -0.15 || forward > spillLength)
+            continue;
+        float lateral = abs((relative.x * direction.y) - (relative.y * direction.x));
+        float halfWidth = 0.52 + (max(forward, 0.0) * 0.22);
+        if (lateral >= halfWidth)
+            continue;
+        float thresholdFade = smoothRamp((forward + 0.15) / 0.45);
+        float lengthFade = 1.0 - smoothRamp(max(forward, 0.0) / spillLength);
+        float edgeFade = 1.0 - smoothRamp(lateral / halfWidth);
+        illumination += strength * thresholdFade * lengthFade * edgeFade * 0.55;
+    }
+    return float3(1.0, 0.95, 0.84) * illumination;
+}
+
 float4 main(float2 fragment)
 {
     const float nativeWidth = 320.0;
@@ -231,6 +264,7 @@ float4 main(float2 fragment)
         float3 illumination = float3(ambientIllumination(floorDistance, floorPosition));
         illumination += surfaceIllumination(floorPosition, 0.0);
         illumination += muzzleIllumination(floorPosition);
+        illumination += doorwaySpillIllumination(floorPosition);
         color.rgb *= min(illumination, 1.0);
         color.rgb *= surfaceContactAmbientOcclusion(
             scenePosition.y - (wallTop + projectedHeight),

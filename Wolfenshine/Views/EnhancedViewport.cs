@@ -37,6 +37,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const int LightChannelCount = 4;
     private const int LightRadiusChannelCount = 2;
     private const int LightColorChannelCount = 4;
+    private const int DoorwaySpillCount = 32;
+    private const int DoorwaySpillChannelCount = 4;
     private const int AmbientMapPixelsPerTile = 16;
     private const float FogStartDistance = 5.0f;
     private const float FogEndDistance = 18.0f;
@@ -48,6 +50,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly float[] m_sceneLightUpColors = new float[LightCount * LightColorChannelCount];
     private readonly float[] m_sceneLightDownColors = new float[LightCount * LightColorChannelCount];
     private readonly double[] m_sceneLightDistances = new double[LightCount];
+    private readonly float[] m_doorwaySpills = new float[DoorwaySpillCount * DoorwaySpillChannelCount];
+    private readonly double[] m_doorwaySpillDistances = new double[DoorwaySpillCount];
     private readonly float[] m_playerPosition = new float[2];
     private readonly float[] m_cameraDirection = new float[2];
     private readonly float[] m_cameraPlane = new float[2];
@@ -151,6 +155,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         var playerAmbientScale = (float)m_areaAmbientMap.GetAmbientScale(Camera.X, Camera.Y, Doors);
         BuildColumnBuffer();
         BuildLightBuffer();
+        BuildDoorwaySpillBuffer();
         BuildSoftwareOverlays();
         m_playerPosition[0] = (float)Camera.X;
         m_playerPosition[1] = (float)Camera.Y;
@@ -170,6 +175,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_sceneLightRadii,
             m_sceneLightUpColors,
             m_sceneLightDownColors,
+            m_doorwaySpills,
             m_playerPosition,
             m_cameraDirection,
             m_cameraPlane,
@@ -456,6 +462,67 @@ public sealed class EnhancedViewport : SoftwareViewport
         WriteLightColor(m_sceneLightDownColors, insertAt, downwardColor);
     }
 
+    private void BuildDoorwaySpillBuffer()
+    {
+        Array.Clear(m_doorwaySpills);
+        Array.Fill(m_doorwaySpillDistances, double.PositiveInfinity);
+        foreach (var door in Doors.Items)
+        {
+            if (door.OpenAmount <= 0.0)
+                continue;
+            var normalX = door.Orientation == DoorOrientation.Vertical ? 1.0 : 0.0;
+            var normalY = door.Orientation == DoorOrientation.Horizontal ? 1.0 : 0.0;
+            var centerX = door.X + 0.5;
+            var centerY = door.Y + 0.5;
+            var negativeAmbient = m_areaAmbientMap.GetAmbientScale(centerX - normalX, centerY - normalY);
+            var positiveAmbient = m_areaAmbientMap.GetAmbientScale(centerX + normalX, centerY + normalY);
+            var ambientDifference = positiveAmbient - negativeAmbient;
+            if (Math.Abs(ambientDifference) < 0.01)
+                continue;
+            var spillStrength = Math.Min(Math.Abs(ambientDifference), 1.0) * door.OpenAmount;
+            var direction = ambientDifference > 0.0 ? -1.0 : 1.0;
+            InsertDoorwaySpill(
+                centerX,
+                centerY,
+                normalX * direction * spillStrength,
+                normalY * direction * spillStrength);
+        }
+    }
+
+    private void InsertDoorwaySpill(double x, double y, double directionX, double directionY)
+    {
+        var deltaX = x - Camera.X;
+        var deltaY = y - Camera.Y;
+        var distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
+        var insertAt = -1;
+        for (var index = 0; index < DoorwaySpillCount; index++)
+        {
+            if (distanceSquared >= m_doorwaySpillDistances[index])
+                continue;
+            insertAt = index;
+            break;
+        }
+        if (insertAt < 0)
+            return;
+
+        for (var index = DoorwaySpillCount - 1; index > insertAt; index--)
+        {
+            m_doorwaySpillDistances[index] = m_doorwaySpillDistances[index - 1];
+            Array.Copy(
+                m_doorwaySpills,
+                (index - 1) * DoorwaySpillChannelCount,
+                m_doorwaySpills,
+                index * DoorwaySpillChannelCount,
+                DoorwaySpillChannelCount);
+        }
+        m_doorwaySpillDistances[insertAt] = distanceSquared;
+        var target = insertAt * DoorwaySpillChannelCount;
+        m_doorwaySpills[target] = (float)x;
+        m_doorwaySpills[target + 1] = (float)y;
+        m_doorwaySpills[target + 2] = (float)directionX;
+        m_doorwaySpills[target + 3] = (float)directionY;
+    }
+
     private static void WriteLightColor(float[] colors, int lightIndex, RgbaColor color)
     {
         var target = lightIndex * LightColorChannelCount;
@@ -642,6 +709,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] sceneLightRadii,
         float[] sceneLightUpColors,
         float[] sceneLightDownColors,
+        float[] doorwaySpills,
         float[] playerPosition,
         float[] cameraDirection,
         float[] cameraPlane,
@@ -691,6 +759,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["sceneLightRadii"] = sceneLightRadii,
                 ["sceneLightUpColors"] = sceneLightUpColors,
                 ["sceneLightDownColors"] = sceneLightDownColors,
+                ["doorwaySpills"] = doorwaySpills,
                 ["playerPosition"] = playerPosition,
                 ["cameraDirection"] = cameraDirection,
                 ["cameraPlane"] = cameraPlane,
