@@ -35,6 +35,8 @@ public sealed partial class MainWindow : Window
 {
     private static readonly TimeSpan s_gameInterval = TimeSpan.FromSeconds(1.0 / 60.0);
     private static readonly TimeSpan s_fpsSampleInterval = TimeSpan.FromSeconds(0.5);
+    private static readonly Cursor s_hiddenCursor = new(StandardCursorType.None);
+    private static readonly Cursor s_arrowCursor = new(StandardCursorType.Arrow);
     private readonly DispatcherTimer m_gameTimer;
     private readonly Stopwatch m_gameClock = new();
     private readonly Stopwatch m_fpsClock = new();
@@ -83,8 +85,10 @@ public sealed partial class MainWindow : Window
         if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
         {
             if (!m_fullScreenKeyDown)
+            {
+                m_fullScreenKeyDown = true;
                 ToggleFullScreen();
-            m_fullScreenKeyDown = true;
+            }
             m_strafe = false;
             m_use = false;
             e.Handled = true;
@@ -117,8 +121,10 @@ public sealed partial class MainWindow : Window
         if (e.Key == Key.F11 && !OperatingSystem.IsMacOS())
         {
             if (!m_fullScreenKeyDown)
+            {
+                m_fullScreenKeyDown = true;
                 ToggleFullScreen();
-            m_fullScreenKeyDown = true;
+            }
             e.Handled = true;
             return;
         }
@@ -532,6 +538,11 @@ public sealed partial class MainWindow : Window
 
     private void UpdateFullScreenPresentation(bool isFullScreen)
     {
+        // macOS can consume the Enter release while switching spaces. The completed window-state
+        // transition is the reliable point at which to allow the next Option-Enter gesture.
+        if (OperatingSystem.IsMacOS())
+            m_fullScreenKeyDown = false;
+        Cursor = isFullScreen ? s_hiddenCursor : s_arrowCursor;
         GameFrame.Margin = isFullScreen ? new Thickness(0) : new Thickness(24);
         GameFrame.BorderThickness = isFullScreen ? new Thickness(0) : new Thickness(1);
         DesktopStatusBar.IsVisible = !isFullScreen;
