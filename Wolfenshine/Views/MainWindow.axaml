@@ -54,6 +54,7 @@
                                     Sprites="{Binding Sprites}"
                                     StaticObjects="{Binding WorldObjects}"
                                     LightObjects="{Binding AccessibleLightObjects}"
+                                    EnvironmentalEffectObjects="{Binding AccessibleEnvironmentalEffects}"
                                     DynamicLights="{Binding EnemyMuzzleFlashes}"
                                     HasGoldKey="{Binding HasGoldKey}"
                                     HasSilverKey="{Binding HasSilverKey}"

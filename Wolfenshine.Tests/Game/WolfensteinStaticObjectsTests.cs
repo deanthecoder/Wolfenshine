@@ -133,4 +133,22 @@ public sealed class WolfensteinStaticObjectsTests
     {
         Assert.That(WolfensteinStaticObjects.GetLightHeight(spriteNumber), Is.EqualTo(expected));
     }
+
+    [TestCase(2, 1.35f, 0.70f)] // Puddle.
+    [TestCase(38, 1.95f, 1.00f)] // Filled well.
+    [TestCase(39, 0.00f, 0.00f)] // Empty well.
+    [TestCase(5, 0.00f, 0.00f)] // Unrelated scenery.
+    public void GivenStaticSpriteCheckWaterCausticIsIdentified(
+        int spriteNumber,
+        float expectedRadius,
+        float expectedStrength)
+    {
+        var (radius, strength) = WolfensteinStaticObjects.GetWaterCaustic(spriteNumber);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(radius, Is.EqualTo(expectedRadius));
+            Assert.That(strength, Is.EqualTo(expectedStrength));
+        });
+    }
 }

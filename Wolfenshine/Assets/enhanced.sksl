@@ -63,6 +63,13 @@ uniform float4 doorwaySpills[32];
 // These are separate from scene lights because each describes a descending
 // cone rather than a point source and should not consume the shared light cap.
 uniform float4 pickupSpotlights[8];
+
+// The eight nearest reachable water-bearing decorations:
+//   X/Y = puddle or filled-well center in map tiles
+//   Z = reflection radius in map tiles
+//   W = relative reflection strength; zero marks an unused record
+// Closed doors remove sources on the far side before this buffer reaches the shader.
+uniform float4 waterCaustics[8];
 uniform float2 playerPosition;
 uniform float2 cameraDirection;
 uniform float2 cameraPlane;
@@ -609,6 +616,42 @@ float3 pickupSpotlightScattering(
     return float3(1.0, 0.92, 0.72) * scattering;
 }
 
+float waterCausticPattern(float2 worldPosition, float time)
+{
+    // Adapted from https://www.shadertoy.com/view/XtKfRG.
+    float3x3 transform = float3x3(-2,-1,2, 3,-2,1, 1,2,2);
+    float3 first = float3(worldPosition * 0.50, time * 0.1) * transform;
+    float3 second = first * transform * 0.40;
+    float3 third = second * transform * 0.30;
+    float distanceToCell = min(
+        min(length(float3(0.50) - fract(first)), length(float3(0.50) - fract(second))),
+        length(float3(0.50) - fract(third)));
+    return pow(distanceToCell, 7.0) * 6.0;
+}
+
+float3 waterCausticIllumination(float2 worldPosition)
+{
+    float time = navigationGuideTime * 1.15;
+    float sourceInfluence = 0.0;
+    for (int index = 0; index < 8; index++)
+    {
+        float4 water = waterCaustics[index];
+        if (water.w <= 0.0)
+            continue;
+        float2 offset = worldPosition - water.xy;
+        float radial = 1.0 - smoothRamp(length(offset) / max(water.z, 0.0001));
+        if (radial <= 0.0)
+            continue;
+        sourceInfluence = max(sourceInfluence, radial * water.w);
+    }
+    if (sourceInfluence <= 0.0)
+        return float3(0.0);
+
+    float pattern = waterCausticPattern(worldPosition, time);
+    return float3(0.16, 0.72, 0.92) *
+           pattern * sourceInfluence * 1.0;
+}
+
 float2 navigationDirection(float encodedDirection)
 {
     float direction = floor((encodedDirection * 255.0) + 0.5);
@@ -753,6 +796,9 @@ float4 main(float2 fragment)
         illumination += doorwayPrismSurfaceIllumination(ceilingPosition, 1.0);
         illumination += pickupSpotlightSurfaceIllumination(ceilingPosition, 1.0);
         color.rgb *= min(illumination, 1.0);
+        color.rgb = min(
+            color.rgb + waterCausticIllumination(ceilingPosition),
+            float3(1.0));
         color.rgb *= surfaceContactAmbientOcclusion(wallTop - scenePosition.y, projectedHeight);
     }
     else if (scenePosition.y >= wallTop + projectedHeight)

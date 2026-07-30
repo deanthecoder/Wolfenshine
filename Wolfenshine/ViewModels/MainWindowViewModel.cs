@@ -70,6 +70,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private WolfensteinElevatorSwitch m_elevatorSwitch;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
     private IReadOnlyList<WorldSprite> m_accessibleLightObjects = [];
+    private IReadOnlyList<WorldSprite> m_accessibleEnvironmentalEffects = [];
     private IReadOnlyList<WorldLight> m_enemyMuzzleFlashes = [];
     private bool m_isSelectingDifficulty;
     private bool m_difficultyInputReleased = true;
@@ -160,6 +161,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<WolfensteinActor> Actors { get; private set; }
     public IReadOnlyList<WorldSprite> WorldObjects => m_worldObjects;
     public IReadOnlyList<WorldSprite> AccessibleLightObjects => m_accessibleLightObjects;
+    public IReadOnlyList<WorldSprite> AccessibleEnvironmentalEffects => m_accessibleEnvironmentalEffects;
     public IReadOnlyList<WorldLight> EnemyMuzzleFlashes => m_enemyMuzzleFlashes;
     public string StatusText { get; private set; }
     public string DataErrorMessage { get; }
@@ -387,6 +389,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         StaticObjects = [];
         SetField(ref m_worldObjects, [], nameof(WorldObjects));
         SetField(ref m_accessibleLightObjects, [], nameof(AccessibleLightObjects));
+        SetField(ref m_accessibleEnvironmentalEffects, [], nameof(AccessibleEnvironmentalEffects));
         SetField(ref m_camera, null, nameof(Camera));
         SetField(ref m_elevatorSwitch, null, nameof(ElevatorSwitch));
         SetField(ref m_deathFade, 0.0, nameof(DeathFade));
@@ -545,6 +548,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(StaticObjects));
         OnPropertyChanged(nameof(WorldObjects));
         OnPropertyChanged(nameof(AccessibleLightObjects));
+        OnPropertyChanged(nameof(AccessibleEnvironmentalEffects));
         OnPropertyChanged(nameof(WeaponSprite));
         OnPropertyChanged(nameof(StatusBar));
         OnPropertyChanged(nameof(Doors));
@@ -615,6 +619,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             ref m_accessibleLightObjects,
             m_accessibleLightCache.Lights,
             nameof(AccessibleLightObjects));
+        SetField(
+            ref m_accessibleEnvironmentalEffects,
+            m_accessibleLightCache.EnvironmentalEffects,
+            nameof(AccessibleEnvironmentalEffects));
     }
 
 #if DEBUG

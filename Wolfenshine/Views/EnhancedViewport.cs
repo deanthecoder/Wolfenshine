@@ -41,6 +41,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const int DoorwaySpillChannelCount = 4;
     private const int PickupSpotlightCount = 8;
     private const int PickupSpotlightChannelCount = 4;
+    private const int WaterCausticCount = 8;
+    private const int WaterCausticChannelCount = 4;
     private const int AmbientMapPixelsPerTile = 16;
     private const float FogStartDistance = 5.0f;
     private const float FogEndDistance = 18.0f;
@@ -57,6 +59,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly double[] m_doorwaySpillDistances = new double[DoorwaySpillCount];
     private readonly float[] m_pickupSpotlights = new float[PickupSpotlightCount * PickupSpotlightChannelCount];
     private readonly double[] m_pickupSpotlightDistances = new double[PickupSpotlightCount];
+    private readonly float[] m_waterCaustics = new float[WaterCausticCount * WaterCausticChannelCount];
+    private readonly double[] m_waterCausticDistances = new double[WaterCausticCount];
     private readonly float[] m_playerPosition = new float[2];
     private readonly float[] m_cameraDirection = new float[2];
     private readonly float[] m_cameraPlane = new float[2];
@@ -125,6 +129,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         AvaloniaProperty.Register<EnhancedViewport, bool>(nameof(IsWeaponFlashFrame));
     public static readonly StyledProperty<IReadOnlyList<WorldSprite>> LightObjectsProperty =
         AvaloniaProperty.Register<EnhancedViewport, IReadOnlyList<WorldSprite>>(nameof(LightObjects));
+    public static readonly StyledProperty<IReadOnlyList<WorldSprite>> EnvironmentalEffectObjectsProperty =
+        AvaloniaProperty.Register<EnhancedViewport, IReadOnlyList<WorldSprite>>(nameof(EnvironmentalEffectObjects));
     public static readonly StyledProperty<IReadOnlyList<WorldLight>> DynamicLightsProperty =
         AvaloniaProperty.Register<EnhancedViewport, IReadOnlyList<WorldLight>>(nameof(DynamicLights));
     public static readonly StyledProperty<bool> HasGoldKeyProperty =
@@ -147,6 +153,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         BloodAmountProperty,
         IsWeaponFlashFrameProperty,
         LightObjectsProperty,
+        EnvironmentalEffectObjectsProperty,
         DynamicLightsProperty,
         HasGoldKeyProperty,
         HasSilverKeyProperty,
@@ -222,6 +229,12 @@ public sealed class EnhancedViewport : SoftwareViewport
         set => SetValue(LightObjectsProperty, value);
     }
 
+    public IReadOnlyList<WorldSprite> EnvironmentalEffectObjects
+    {
+        get => GetValue(EnvironmentalEffectObjectsProperty);
+        set => SetValue(EnvironmentalEffectObjectsProperty, value);
+    }
+
     public IReadOnlyList<WorldLight> DynamicLights
     {
         get => GetValue(DynamicLightsProperty);
@@ -266,6 +279,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         BuildLightBuffer();
         BuildDoorwaySpillBuffer();
         BuildPickupSpotlightBuffer();
+        BuildWaterCausticBuffer();
         BuildSoftwareOverlays();
         m_playerPosition[0] = (float)Camera.X;
         m_playerPosition[1] = (float)Camera.Y;
@@ -292,6 +306,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_sceneLightHeights,
             m_doorwaySpills,
             m_pickupSpotlights,
+            m_waterCaustics,
             m_playerPosition,
             m_cameraDirection,
             m_cameraPlane,
@@ -933,6 +948,55 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_pickupSpotlights[target + 2] = 1.0f;
     }
 
+    private void BuildWaterCausticBuffer()
+    {
+        Array.Clear(m_waterCaustics);
+        Array.Fill(m_waterCausticDistances, double.PositiveInfinity);
+        if (EnvironmentalEffectObjects == null)
+            return;
+        foreach (var sprite in EnvironmentalEffectObjects)
+        {
+            var (radius, strength) = WolfensteinStaticObjects.GetWaterCaustic(sprite.SpriteNumber);
+            if (strength <= 0.0f)
+                continue;
+            InsertWaterCaustic(sprite.X, sprite.Y, radius, strength);
+        }
+    }
+
+    private void InsertWaterCaustic(double x, double y, float radius, float strength)
+    {
+        var deltaX = x - Camera.X;
+        var deltaY = y - Camera.Y;
+        var distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
+        var insertAt = -1;
+        for (var index = 0; index < WaterCausticCount; index++)
+        {
+            if (distanceSquared >= m_waterCausticDistances[index])
+                continue;
+            insertAt = index;
+            break;
+        }
+        if (insertAt < 0)
+            return;
+
+        for (var index = WaterCausticCount - 1; index > insertAt; index--)
+        {
+            m_waterCausticDistances[index] = m_waterCausticDistances[index - 1];
+            Array.Copy(
+                m_waterCaustics,
+                (index - 1) * WaterCausticChannelCount,
+                m_waterCaustics,
+                index * WaterCausticChannelCount,
+                WaterCausticChannelCount);
+        }
+        m_waterCausticDistances[insertAt] = distanceSquared;
+        var target = insertAt * WaterCausticChannelCount;
+        m_waterCaustics[target] = (float)x;
+        m_waterCaustics[target + 1] = (float)y;
+        m_waterCaustics[target + 2] = radius;
+        m_waterCaustics[target + 3] = strength;
+    }
+
     private static void WriteLightColor(float[] colors, int lightIndex, RgbaColor color)
     {
         var target = lightIndex * LightColorChannelCount;
@@ -1288,6 +1352,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] sceneLightHeights,
         float[] doorwaySpills,
         float[] pickupSpotlights,
+        float[] waterCaustics,
         float[] playerPosition,
         float[] cameraDirection,
         float[] cameraPlane,
@@ -1353,6 +1418,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["sceneLightHeights"] = sceneLightHeights,
                 ["doorwaySpills"] = doorwaySpills,
                 ["pickupSpotlights"] = pickupSpotlights,
+                ["waterCaustics"] = waterCaustics,
                 ["playerPosition"] = playerPosition,
                 ["cameraDirection"] = cameraDirection,
                 ["cameraPlane"] = cameraPlane,

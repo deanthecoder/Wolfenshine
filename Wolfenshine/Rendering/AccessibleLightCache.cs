@@ -34,6 +34,7 @@ public sealed class AccessibleLightCache
     private int m_staticObjectCount = -1;
 
     public IReadOnlyList<WorldSprite> Lights { get; private set; } = [];
+    public IReadOnlyList<WorldSprite> EnvironmentalEffects { get; private set; } = [];
 
     /// <summary>
     /// Rebuilds the accessible light list when map topology or the static-object collection has changed.
@@ -77,19 +78,25 @@ public sealed class AccessibleLightCache
         CaptureDoorConnections(doors);
         CapturePushWallTopology(pushWalls);
         BuildAccessibleTiles(map, doors, pushWalls, playerX, playerY);
-        Lights = staticObjects.Where(IsAccessibleLight).ToArray();
+        EnvironmentalEffects = staticObjects.Where(IsAccessibleEnvironmentalEffect).ToArray();
+        Lights = EnvironmentalEffects.Where(IsLight).ToArray();
         m_staticObjectCount = staticObjects.Count;
         return true;
     }
 
-    private bool IsAccessibleLight(WorldSprite sprite)
+    private bool IsAccessibleEnvironmentalEffect(WorldSprite sprite)
     {
-        var (upward, downward) = WolfensteinStaticObjects.GetLightBrightness(sprite.SpriteNumber);
-        if (upward <= 0.0f && downward <= 0.0f)
+        if (!IsLight(sprite) && WolfensteinStaticObjects.GetWaterCaustic(sprite.SpriteNumber).Strength <= 0.0f)
             return false;
         var x = (int)Math.Floor(sprite.X);
         var y = (int)Math.Floor(sprite.Y);
         return IsCachedAccessible(m_map, x, y);
+    }
+
+    private static bool IsLight(WorldSprite sprite)
+    {
+        var (upward, downward) = WolfensteinStaticObjects.GetLightBrightness(sprite.SpriteNumber);
+        return upward > 0.0f || downward > 0.0f;
     }
 
     private bool HaveDoorConnectionsChanged(WolfensteinDoors doors)

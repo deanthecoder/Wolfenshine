@@ -126,4 +126,17 @@ public static class WolfensteinStaticObjects
         31 or 32 or 33 or 34 => 0.22f, // Treasure glow.
         _ => 0.5f
     };
+
+    /// <summary>
+    /// Gets the radius and strength of animated ceiling reflections from water-bearing scenery.
+    /// </summary>
+    /// <remarks>
+    /// The original puddle and filled well contain visible water; the neighboring empty-well sprite deliberately does not.
+    /// </remarks>
+    public static (float Radius, float Strength) GetWaterCaustic(int spriteNumber) => spriteNumber switch
+    {
+        2 => (1.35f, 0.70f), // Puddle.
+        38 => (1.95f, 1.00f), // Filled well.
+        _ => (0.0f, 0.0f)
+    };
 }

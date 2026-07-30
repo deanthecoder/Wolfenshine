@@ -37,6 +37,27 @@ public sealed class AccessibleLightCacheTests
     }
 
     [Test]
+    public void GivenClosedDoorCheckOnlyWaterEffectsOnPlayerSideAreAccessible()
+    {
+        var (map, doors, _) = CreateDoorMap();
+        IReadOnlyList<WorldSprite> objects =
+        [
+            new WorldSprite(2.5, 2.5, 38),
+            new WorldSprite(6.5, 2.5, 2),
+            new WorldSprite(3.5, 2.5, 39)
+        ];
+        var cache = new AccessibleLightCache();
+
+        cache.Refresh(map, doors, new WolfensteinPushWalls(map), CreateCamera(2.5), objects);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cache.EnvironmentalEffects, Is.EqualTo(new[] { objects[0] }));
+            Assert.That(cache.Lights, Is.Empty);
+        });
+    }
+
+    [Test]
     public void GivenDoorStartsOpeningCheckLightsBeyondItBecomeAccessibleImmediately()
     {
         var (map, doors, lights) = CreateDoorMap();
