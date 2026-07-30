@@ -39,6 +39,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const int LightColorChannelCount = 4;
     private const int DoorwaySpillCount = 32;
     private const int DoorwaySpillChannelCount = 4;
+    private const int PickupSpotlightCount = 8;
+    private const int PickupSpotlightChannelCount = 4;
     private const int AmbientMapPixelsPerTile = 16;
     private const float FogStartDistance = 5.0f;
     private const float FogEndDistance = 18.0f;
@@ -53,6 +55,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly double[] m_sceneLightDistances = new double[LightCount];
     private readonly float[] m_doorwaySpills = new float[DoorwaySpillCount * DoorwaySpillChannelCount];
     private readonly double[] m_doorwaySpillDistances = new double[DoorwaySpillCount];
+    private readonly float[] m_pickupSpotlights = new float[PickupSpotlightCount * PickupSpotlightChannelCount];
+    private readonly double[] m_pickupSpotlightDistances = new double[PickupSpotlightCount];
     private readonly float[] m_playerPosition = new float[2];
     private readonly float[] m_cameraDirection = new float[2];
     private readonly float[] m_cameraPlane = new float[2];
@@ -213,6 +217,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         BuildColumnBuffer();
         BuildLightBuffer();
         BuildDoorwaySpillBuffer();
+        BuildPickupSpotlightBuffer();
         BuildSoftwareOverlays();
         m_playerPosition[0] = (float)Camera.X;
         m_playerPosition[1] = (float)Camera.Y;
@@ -237,6 +242,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_sceneLightDownColors,
             m_sceneLightHeights,
             m_doorwaySpills,
+            m_pickupSpotlights,
             m_playerPosition,
             m_cameraDirection,
             m_cameraPlane,
@@ -702,6 +708,53 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_doorwaySpills[target + 3] = (float)directionY;
     }
 
+    private void BuildPickupSpotlightBuffer()
+    {
+        Array.Clear(m_pickupSpotlights);
+        Array.Fill(m_pickupSpotlightDistances, double.PositiveInfinity);
+        if (StaticObjects == null)
+            return;
+        foreach (var sprite in StaticObjects)
+        {
+            if (!IsSpotlightPickup(sprite))
+                continue;
+            InsertPickupSpotlight(sprite.X, sprite.Y);
+        }
+    }
+
+    private void InsertPickupSpotlight(double x, double y)
+    {
+        var deltaX = x - Camera.X;
+        var deltaY = y - Camera.Y;
+        var distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
+        var insertAt = -1;
+        for (var index = 0; index < PickupSpotlightCount; index++)
+        {
+            if (distanceSquared >= m_pickupSpotlightDistances[index])
+                continue;
+            insertAt = index;
+            break;
+        }
+        if (insertAt < 0)
+            return;
+
+        for (var index = PickupSpotlightCount - 1; index > insertAt; index--)
+        {
+            m_pickupSpotlightDistances[index] = m_pickupSpotlightDistances[index - 1];
+            Array.Copy(
+                m_pickupSpotlights,
+                (index - 1) * PickupSpotlightChannelCount,
+                m_pickupSpotlights,
+                index * PickupSpotlightChannelCount,
+                PickupSpotlightChannelCount);
+        }
+        m_pickupSpotlightDistances[insertAt] = distanceSquared;
+        var target = insertAt * PickupSpotlightChannelCount;
+        m_pickupSpotlights[target] = (float)x;
+        m_pickupSpotlights[target + 1] = (float)y;
+        m_pickupSpotlights[target + 2] = 1.0f;
+    }
+
     private static void WriteLightColor(float[] colors, int lightIndex, RgbaColor color)
     {
         var target = lightIndex * LightColorChannelCount;
@@ -725,12 +778,12 @@ public sealed class EnhancedViewport : SoftwareViewport
             {
                 var sprite = StaticObjects[index];
                 var godRayAmount = CalculateSpriteGodRayAmount(sprite);
+                var brightness = CalculateSpriteBrightness(sprite) + (godRayAmount * 0.20f);
+                if (IsSpotlightPickup(sprite))
+                    brightness = Math.Max(brightness, 0.94f);
                 m_litWorldSprites[index] = sprite with
                 {
-                    Brightness = Math.Clamp(
-                        CalculateSpriteBrightness(sprite) + (godRayAmount * 0.20f),
-                        0.20f,
-                        1.0f),
+                    Brightness = Math.Clamp(brightness, 0.20f, 1.0f),
                     GodRayAmount = godRayAmount
                 };
             }
@@ -1030,6 +1083,14 @@ public sealed class EnhancedViewport : SoftwareViewport
     private static float[] ToFloats(RgbaColor color) =>
         [color.Red / 255.0f, color.Green / 255.0f, color.Blue / 255.0f, color.Alpha / 255.0f];
 
+    private static bool IsSpotlightPickup(WorldSprite sprite) =>
+        WolfensteinStaticObjects.GetPickupType(sprite.SpriteNumber) is
+            WolfensteinPickupType.MachineGun or
+            WolfensteinPickupType.Chaingun or
+            WolfensteinPickupType.GoldKey or
+            WolfensteinPickupType.SilverKey or
+            WolfensteinPickupType.FullHeal;
+
     private sealed class ShaderDrawOperation(
         Rect bounds,
         SKRuntimeEffect effect,
@@ -1047,6 +1108,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] sceneLightDownColors,
         float[] sceneLightHeights,
         float[] doorwaySpills,
+        float[] pickupSpotlights,
         float[] playerPosition,
         float[] cameraDirection,
         float[] cameraPlane,
@@ -1106,6 +1168,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["sceneLightDownColors"] = sceneLightDownColors,
                 ["sceneLightHeights"] = sceneLightHeights,
                 ["doorwaySpills"] = doorwaySpills,
+                ["pickupSpotlights"] = pickupSpotlights,
                 ["playerPosition"] = playerPosition,
                 ["cameraDirection"] = cameraDirection,
                 ["cameraPlane"] = cameraPlane,

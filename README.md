@@ -24,6 +24,9 @@ The enhanced renderer builds on that classic foundation without replacing its pi
     <td><img src="img/enhanced-damage-feedback.png" alt="Directional blood and damage feedback during combat"></td>
   </tr>
   <tr>
+    <td colspan="2"><img src="img/enhanced-pickup-spotlight.png" alt="A machine-gun pickup beneath a focused overhead spotlight"></td>
+  </tr>
+  <tr>
     <td><img src="img/enhanced-exit-room-god-rays.png" alt="An illuminated exit room casting god rays into a dark corridor"></td>
     <td><img src="img/enhanced-low-health.png" alt="Low-health damage effects beneath enhanced chandelier lighting"></td>
   </tr>
@@ -46,6 +49,7 @@ Wolfenshine keeps the original-style renderer and enhanced renderer side by side
 
 - Colored, directional ceiling lights, chandeliers, lamps, treasure glow, and muzzle flashes.
 - Atmospheric doorway shafts that descend from bright rooms into darker ones, illuminate objects, and fade naturally with the viewing direction.
+- Focused overhead spotlights draw attention to uncollected weapons, keys, and full-heal pickups.
 - Geometry-aware room ambience, doorway light spill, distance shading, and subtle fog.
 - Generated wall relief with material-specific specular response.
 - Bloom, ambient occlusion, enemy shadows, view bob, weapon sway, and momentum-based movement.

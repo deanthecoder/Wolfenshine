@@ -55,6 +55,14 @@ uniform float sceneLightHeights[32]; // Approximate source height within its map
 //   Z/W = direction from the brighter room into the darker room, with vector
 //         length encoding ambient contrast multiplied by the door's opening.
 uniform float4 doorwaySpills[32];
+
+// The eight nearest uncollected weapon, key, or full-heal pickups:
+//   X/Y = pickup center in map tiles
+//   Z = active spotlight strength; zero marks an unused record
+//   W = reserved
+// These are separate from scene lights because each describes a descending
+// cone rather than a point source and should not consume the shared light cap.
+uniform float4 pickupSpotlights[8];
 uniform float2 playerPosition;
 uniform float2 cameraDirection;
 uniform float2 cameraPlane;
@@ -536,6 +544,63 @@ float3 doorwayPrismSurfaceIllumination(float2 worldPosition, float surfaceHeight
     return float3(1.0, 0.95, 0.84) * illumination;
 }
 
+float pickupSpotlightRadius(float surfaceHeight)
+{
+    return mix(0.48, 0.07, smoothRamp(surfaceHeight));
+}
+
+float pickupSpotlightCoverage(float normalizedDistance)
+{
+    // Preserve a bright core across most of the shaft, then feather only its
+    // outer third so the cone reads clearly without introducing a hard alias.
+    return 1.0 - smoothRamp((normalizedDistance - 0.66) / 0.34);
+}
+
+float3 pickupSpotlightSurfaceIllumination(float2 worldPosition, float surfaceHeight)
+{
+    float illumination = 0.0;
+    for (int index = 0; index < 8; index++)
+    {
+        float4 spotlight = pickupSpotlights[index];
+        if (spotlight.z <= 0.0)
+            continue;
+        float radius = pickupSpotlightRadius(surfaceHeight);
+        float distance = length(worldPosition - spotlight.xy);
+        float coverage = pickupSpotlightCoverage(distance / max(radius, 0.0001));
+        illumination += spotlight.z * coverage * mix(0.50, 0.15, surfaceHeight);
+    }
+    return float3(1.0, 0.92, 0.72) * illumination;
+}
+
+float3 pickupSpotlightScattering(
+    float2 rayDirection,
+    float rayVertical,
+    float sceneDistance)
+{
+    float scattering = 0.0;
+    float horizontalSpeedSquared = max(dot(rayDirection, rayDirection), 0.0001);
+    float maximumDistance = min(sceneDistance, 10.0);
+    for (int index = 0; index < 8; index++)
+    {
+        float4 spotlight = pickupSpotlights[index];
+        if (spotlight.z <= 0.0)
+            continue;
+        float closestDistance = dot(spotlight.xy - playerPosition, rayDirection) /
+                                horizontalSpeedSquared;
+        closestDistance = clamp(closestDistance, 0.02, maximumDistance);
+        float height = 0.5 + (rayVertical * closestDistance);
+        if (height < 0.0 || height > 1.0)
+            continue;
+        float2 closestPosition = playerPosition + (rayDirection * closestDistance);
+        float radius = pickupSpotlightRadius(height);
+        float distanceFromAxis = length(closestPosition - spotlight.xy);
+        float coverage = pickupSpotlightCoverage(distanceFromAxis / max(radius, 0.0001));
+        float shaftFade = smoothRamp(height / 0.10) * smoothRamp((1.0 - height) / 0.10);
+        scattering += spotlight.z * coverage * shaftFade * radius * 0.82;
+    }
+    return float3(1.0, 0.92, 0.72) * scattering;
+}
+
 float4 main(float2 fragment)
 {
     const float nativeWidth = 320.0;
@@ -582,6 +647,7 @@ float4 main(float2 fragment)
         illumination += surfaceIllumination(ceilingPosition, 1.0);
         illumination += muzzleIllumination(ceilingPosition);
         illumination += doorwayPrismSurfaceIllumination(ceilingPosition, 1.0);
+        illumination += pickupSpotlightSurfaceIllumination(ceilingPosition, 1.0);
         color.rgb *= min(illumination, 1.0);
         color.rgb *= surfaceContactAmbientOcclusion(wallTop - scenePosition.y, projectedHeight);
     }
@@ -596,6 +662,7 @@ float4 main(float2 fragment)
         illumination += surfaceIllumination(floorPosition, 0.0);
         illumination += muzzleIllumination(floorPosition);
         illumination += doorwaySpillIllumination(floorPosition);
+        illumination += pickupSpotlightSurfaceIllumination(floorPosition, 0.0);
         color.rgb *= min(illumination, 1.0);
         color.rgb *= surfaceContactAmbientOcclusion(
             scenePosition.y - (wallTop + projectedHeight),
@@ -646,6 +713,7 @@ float4 main(float2 fragment)
         // nearby walls without overpowering their directional floor/ceiling light.
         illumination += muzzleIllumination(wallPosition);
         illumination += doorwayPrismSurfaceIllumination(wallPosition, wallHeight);
+        illumination += pickupSpotlightSurfaceIllumination(wallPosition, wallHeight);
         color.rgb *= min(illumination, 1.0);
         color.rgb *= wallAmbientRelief(wallNormal, orientation, rayDirection);
         color.rgb = min(color.rgb + wallLocalIllumination(
@@ -662,6 +730,9 @@ float4 main(float2 fragment)
     {
         color.rgb = min(
             color.rgb + (doorwayGodRayScattering(
+                rayDirection,
+                rayVertical,
+                sceneDistance)) + (pickupSpotlightScattering(
                 rayDirection,
                 rayVertical,
                 sceneDistance)),
