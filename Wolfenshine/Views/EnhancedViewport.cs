@@ -30,6 +30,8 @@ namespace Wolfenshine.Views;
 /// </remarks>
 public sealed class EnhancedViewport : SoftwareViewport
 {
+    private const int InternalRenderWidth = 640;
+    private const int InternalRenderHeight = 480;
     private const byte CeilingPaletteIndex = 0x1D;
     private const byte FloorPaletteIndex = 0x19;
     private const int ColumnChannelCount = 4;
@@ -64,6 +66,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly float[] m_playerPosition = new float[2];
     private readonly float[] m_cameraDirection = new float[2];
     private readonly float[] m_cameraPlane = new float[2];
+    private readonly FixedRenderTarget m_renderTarget = new(InternalRenderWidth, InternalRenderHeight);
     private readonly byte[] m_weaponPixels = new byte[ViewportWidth * ViewportHeight * 4];
     private readonly byte[] m_bloomPixels = new byte[ViewportWidth * ViewportHeight * 4];
     private byte[] m_areaAmbientPixels = [];
@@ -292,6 +295,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         context.Custom(new ShaderDrawOperation(
             new Rect(Bounds.Size),
             m_effect,
+            m_renderTarget,
             m_wallAtlas,
             m_wallHeightAtlas,
             m_wallMaterialMap,
@@ -348,6 +352,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_wallMaterialMap?.Dispose();
         m_areaAmbientBitmap?.Dispose();
         m_navigationRouteBitmap?.Dispose();
+        m_renderTarget.Dispose();
         m_effect.Dispose();
     }
 
@@ -1339,6 +1344,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private sealed class ShaderDrawOperation(
         Rect bounds,
         SKRuntimeEffect effect,
+        FixedRenderTarget renderTarget,
         SKBitmap wallTextures,
         SKBitmap wallHeights,
         SKBitmap wallMaterials,
@@ -1413,7 +1419,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             using var bloomShader = bloomOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             var uniforms = new SKRuntimeEffectUniforms(effect)
             {
-                ["outputResolution"] = new[] { (float)Bounds.Width, (float)Bounds.Height },
+                ["outputResolution"] = new[] { (float)renderTarget.Width, (float)renderTarget.Height },
                 ["wallColumns"] = wallColumns,
                 ["sceneLights"] = sceneLights,
                 ["sceneLightRadii"] = sceneLightRadii,
@@ -1462,8 +1468,69 @@ public sealed class EnhancedViewport : SoftwareViewport
             };
             using var shader = effect.ToShader(false, uniforms, children);
             using var paint = new SKPaint { Shader = shader, IsAntialias = false };
-            lease.SkCanvas.DrawRect(SKRect.Create((float)Bounds.Width, (float)Bounds.Height), paint);
+            renderTarget.Draw(lease.GrContext, lease.SkCanvas, Bounds, paint);
             frameRendered();
+        }
+    }
+
+    /// <summary>
+    /// Keeps the expensive shader pass independent of the final window pixel count.
+    /// </summary>
+    private sealed class FixedRenderTarget(int width, int height) : IDisposable
+    {
+        private readonly object m_lock = new();
+        private GRContext m_context;
+        private SKSurface m_surface;
+
+        public int Width { get; } = width;
+        public int Height { get; } = height;
+
+        public void Draw(GRContext context, SKCanvas destination, Rect destinationBounds, SKPaint shaderPaint)
+        {
+            lock (m_lock)
+            {
+                EnsureSurface(context);
+                var renderCanvas = m_surface.Canvas;
+                renderCanvas.DrawRect(SKRect.Create(Width, Height), shaderPaint);
+                using var frame = m_surface.Snapshot();
+                using var scalePaint = new SKPaint
+                {
+                    FilterQuality = SKFilterQuality.Low,
+                    IsAntialias = false
+                };
+                destination.DrawImage(
+                    frame,
+                    SKRect.Create((float)destinationBounds.Width, (float)destinationBounds.Height),
+                    scalePaint);
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (m_lock)
+            {
+                m_surface?.Dispose();
+                m_surface = null;
+                m_context = null;
+            }
+        }
+
+        private void EnsureSurface(GRContext context)
+        {
+            if (m_surface != null && ReferenceEquals(m_context, context))
+                return;
+            m_surface?.Dispose();
+            var imageInfo = new SKImageInfo(
+                Width,
+                Height,
+                SKColorType.Rgba8888,
+                SKAlphaType.Premul);
+            m_surface = context == null
+                ? SKSurface.Create(imageInfo)
+                : SKSurface.Create(context, false, imageInfo);
+            if (m_surface == null)
+                throw new InvalidOperationException("Could not create the enhanced renderer's fixed-size surface.");
+            m_context = context;
         }
     }
 
