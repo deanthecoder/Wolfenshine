@@ -78,6 +78,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private GameDifficulty m_difficulty = GameDifficulty.Normal;
     private bool m_isPaused;
     private bool m_isEnhancedRendering;
+    private bool m_showFramesPerSecond;
+    private int m_framesPerSecond;
     private bool m_isDisposed;
 
     public MainWindowViewModel()
@@ -111,6 +113,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer = audioPlayer;
         m_settings = settings;
         m_isEnhancedRendering = settings?.UseEnhancedRenderer == true;
+        m_showFramesPerSecond = settings?.ShowFramesPerSecond == true;
         IntermissionGraphics = intermissionGraphics;
         DifficultyGraphics = difficultyGraphics;
         m_weaponSprite = weaponSprite;
@@ -187,6 +190,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool IsEnhancedRendering => m_isEnhancedRendering;
     public bool IsAuthenticRendering => HasGameData && !m_isEnhancedRendering;
     public string RenderModeText => m_isEnhancedRendering ? "RENDERER: ENHANCED" : "RENDERER: AUTHENTIC";
+    public bool ShowFramesPerSecond => m_showFramesPerSecond;
+    public string FramesPerSecondText => $"{m_framesPerSecond} FPS";
     public int SelectedDifficultyIndex => m_selectedDifficultyIndex;
     public GameDifficulty Difficulty => m_difficulty;
     public WolfensteinLevelStats LevelStats => m_levelStats;
@@ -329,6 +334,28 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             ? "Enhanced shader renderer · F2 returns to authentic rendering"
             : "Authentic software renderer · F2 enables enhanced rendering";
         OnPropertyChanged(nameof(StatusText));
+    }
+
+    /// <summary>
+    /// Shows or hides the renderer frame-rate counter and persists the choice.
+    /// </summary>
+    public void ToggleFramesPerSecond()
+    {
+        SetField(ref m_showFramesPerSecond, !m_showFramesPerSecond, nameof(ShowFramesPerSecond));
+        if (m_settings != null)
+            m_settings.ShowFramesPerSecond = m_showFramesPerSecond;
+    }
+
+    /// <summary>
+    /// Publishes the most recent renderer frame-rate sample.
+    /// </summary>
+    public void SetFramesPerSecond(double framesPerSecond)
+    {
+        var roundedFramesPerSecond = Math.Max(0, (int)Math.Round(framesPerSecond));
+        if (m_framesPerSecond == roundedFramesPerSecond)
+            return;
+        m_framesPerSecond = roundedFramesPerSecond;
+        OnPropertyChanged(nameof(FramesPerSecondText));
     }
 
     private void UpdateDifficultySelection(PlayerInput input)

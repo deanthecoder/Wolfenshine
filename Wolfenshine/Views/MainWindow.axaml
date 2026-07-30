@@ -91,6 +91,19 @@
                                  Palette="{Binding Palette}"
                                  RenderOptions.BitmapInterpolationMode="LowQuality" />
 
+            <Border IsVisible="{Binding ShowFramesPerSecond}"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,3,4,0"
+                    Padding="2,1"
+                    CornerRadius="1"
+                    Background="#A0000000">
+              <TextBlock Text="{Binding FramesPerSecondText}"
+                         FontSize="6"
+                         FontWeight="SemiBold"
+                         Foreground="#FFFFFF" />
+            </Border>
+
             <StackPanel IsVisible="{Binding !HasGameData}"
                         Width="280"
                         HorizontalAlignment="Center"

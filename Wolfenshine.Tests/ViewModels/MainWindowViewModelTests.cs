@@ -187,6 +187,21 @@ public sealed class MainWindowViewModelTests
     }
 
     [Test]
+    public void GivenFrameRateCounterToggledCheckMeasuredRateIsShown()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.ToggleFramesPerSecond();
+        viewModel.SetFramesPerSecond(59.6);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.ShowFramesPerSecond, Is.True);
+            Assert.That(viewModel.FramesPerSecondText, Is.EqualTo("60 FPS"));
+        });
+    }
+
+    [Test]
     public void GivenHardDifficultySelectedCheckHardActorsArePlaced()
     {
         const int size = 5;

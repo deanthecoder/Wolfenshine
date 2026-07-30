@@ -333,7 +333,8 @@ public sealed class EnhancedViewport : SoftwareViewport
             (float)LevelFade,
             ToFloats(Palette.GetColor(CeilingPaletteIndex)),
             ToFloats(Palette.GetColor(FloorPaletteIndex)),
-            ToFloats(Palette.GetColor(4))));
+            ToFloats(Palette.GetColor(4)),
+            NotifyFrameRendered));
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -1379,7 +1380,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         float levelFade,
         float[] ceilingColor,
         float[] floorColor,
-        float[] deathColor) : ICustomDrawOperation
+        float[] deathColor,
+        Action frameRendered) : ICustomDrawOperation
     {
         public Rect Bounds { get; } = bounds;
 
@@ -1461,6 +1463,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             using var shader = effect.ToShader(false, uniforms, children);
             using var paint = new SKPaint { Shader = shader, IsAntialias = false };
             lease.SkCanvas.DrawRect(SKRect.Create((float)Bounds.Width, (float)Bounds.Height), paint);
+            frameRendered();
         }
     }
 

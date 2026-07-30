@@ -147,6 +147,7 @@ dotnet run --project Wolfenshine/Wolfenshine.csproj
 | Select an owned weapon | 1–4 |
 | Pause or resume | P |
 | Toggle authentic/enhanced rendering | F2 |
+| Toggle FPS counter | F3 |
 | Show navigation guide | Hold Tab |
 
 ## Why build Wolfenstein 3D again?

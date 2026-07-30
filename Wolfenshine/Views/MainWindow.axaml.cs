@@ -33,8 +33,11 @@ namespace Wolfenshine.Views;
 public sealed partial class MainWindow : Window
 {
     private static readonly TimeSpan s_gameInterval = TimeSpan.FromSeconds(1.0 / 60.0);
+    private static readonly TimeSpan s_fpsSampleInterval = TimeSpan.FromSeconds(0.5);
     private readonly DispatcherTimer m_gameTimer;
     private readonly Stopwatch m_gameClock = new();
+    private readonly Stopwatch m_fpsClock = new();
+    private int m_renderedFrameCount;
     private bool m_moveForward;
     private bool m_moveBackward;
     private bool m_turnLeft;
@@ -46,6 +49,7 @@ public sealed partial class MainWindow : Window
     private bool m_showNavigationGuide;
     private bool m_pauseKeyDown;
     private bool m_rendererKeyDown;
+    private bool m_fpsKeyDown;
     private double m_viewBobOffset;
     private double m_viewBobPhase;
     private double m_weaponSwayOffset;
@@ -64,6 +68,8 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         m_gameTimer = new DispatcherTimer { Interval = s_gameInterval };
         m_gameTimer.Tick += OnGameTick;
+        SoftwareViewport.FrameRendered += OnFrameRendered;
+        EnhancedViewport.FrameRendered += OnFrameRendered;
         Opened += OnOpened;
         Closed += OnClosed;
         Deactivated += OnDeactivated;
@@ -85,6 +91,14 @@ public sealed partial class MainWindow : Window
             if (!m_rendererKeyDown && DataContext is MainWindowViewModel viewModel)
                 viewModel.ToggleRenderer();
             m_rendererKeyDown = true;
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.F3)
+        {
+            if (!m_fpsKeyDown && DataContext is MainWindowViewModel viewModel)
+                viewModel.ToggleFramesPerSecond();
+            m_fpsKeyDown = true;
             e.Handled = true;
             return;
         }
@@ -164,6 +178,12 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             return;
         }
+        if (e.Key == Key.F3)
+        {
+            m_fpsKeyDown = false;
+            e.Handled = true;
+            return;
+        }
 #if DEBUG
         m_debugKeysDown.Remove(e.Key);
 #endif
@@ -173,6 +193,7 @@ public sealed partial class MainWindow : Window
     private void OnOpened(object sender, EventArgs e)
     {
         m_gameClock.Restart();
+        m_fpsClock.Restart();
         m_gameTimer.Start();
         Focus();
     }
@@ -186,6 +207,7 @@ public sealed partial class MainWindow : Window
 #endif
         m_gameTimer.Stop();
         m_gameClock.Stop();
+        m_fpsClock.Stop();
         (DataContext as IDisposable)?.Dispose();
     }
 
@@ -411,6 +433,7 @@ public sealed partial class MainWindow : Window
         m_gameClock.Restart();
         if (DataContext is not MainWindowViewModel viewModel)
             return;
+        UpdateFramesPerSecond(viewModel);
         viewModel.UpdateGame(
             elapsedSeconds,
             new PlayerInput(
@@ -428,6 +451,19 @@ public sealed partial class MainWindow : Window
         m_weaponSelection = null;
         if (viewModel.IsGameOver)
             Close();
+    }
+
+    private void OnFrameRendered(object sender, EventArgs e) =>
+        Interlocked.Increment(ref m_renderedFrameCount);
+
+    private void UpdateFramesPerSecond(MainWindowViewModel viewModel)
+    {
+        if (m_fpsClock.Elapsed < s_fpsSampleInterval)
+            return;
+        var elapsedSeconds = m_fpsClock.Elapsed.TotalSeconds;
+        var renderedFrames = Interlocked.Exchange(ref m_renderedFrameCount, 0);
+        m_fpsClock.Restart();
+        viewModel.SetFramesPerSecond(renderedFrames / elapsedSeconds);
     }
 
     private void UpdateViewBob(double elapsedSeconds, MainWindowViewModel viewModel)
@@ -543,6 +579,7 @@ public sealed partial class MainWindow : Window
         m_showNavigationGuide = false;
         m_pauseKeyDown = false;
         m_rendererKeyDown = false;
+        m_fpsKeyDown = false;
         m_weaponSelection = null;
     }
 }

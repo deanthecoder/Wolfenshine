@@ -44,6 +44,11 @@ public class SoftwareViewport : Control
     private double m_renderedDamageFlash = -1.0;
     private double m_renderedLevelFade = -1.0;
 
+    /// <summary>
+    /// Occurs after this viewport has submitted a completed frame for display.
+    /// </summary>
+    public event EventHandler FrameRendered;
+
     public static readonly StyledProperty<WolfensteinMap> MapProperty =
         AvaloniaProperty.Register<SoftwareViewport, WolfensteinMap>(nameof(Map));
     public static readonly StyledProperty<RaycastCamera> CameraProperty =
@@ -186,7 +191,13 @@ public class SoftwareViewport : Control
             m_renderedLevelFade != LevelFade)
             RenderFrame();
         context.DrawImage(m_bitmap, Bounds);
+        NotifyFrameRendered();
     }
+
+    /// <summary>
+    /// Reports a completed software or shader frame to performance observers.
+    /// </summary>
+    protected void NotifyFrameRendered() => FrameRendered?.Invoke(this, EventArgs.Empty);
 
     protected void RenderFrame()
     {
