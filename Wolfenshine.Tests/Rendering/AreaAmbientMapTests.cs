@@ -189,6 +189,22 @@ public sealed class AreaAmbientMapTests
         Assert.That(visibleSide, Is.EqualTo(secretSide).Within(0.0001));
     }
 
+    [Test]
+    public void GivenUnlitExitRoomCheckInvisibleAreaLightMakesItFullyLit()
+    {
+        var map = CreateExitRoomMap();
+        var ambientMap = AreaAmbientMap.FromMap(map);
+
+        var darkRoom = ambientMap.GetAmbientScale(2.5, 2.5);
+        var exitRoom = ambientMap.GetAmbientScale(6.5, 2.5);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(darkRoom, Is.EqualTo(AreaAmbientMap.MinimumAmbientScale).Within(0.0001));
+            Assert.That(exitRoom, Is.EqualTo(1.0).Within(0.0001));
+        });
+    }
+
     private static WolfensteinMap CreateSingleAreaMap(
         int width,
         int height,
@@ -246,5 +262,28 @@ public sealed class AreaAmbientMapTests
         objects[(2 * width) + 6] = lightMarker;
         objects[(3 * width) + 5] = lightMarker;
         return new WolfensteinMap(0, "Small Room Ambient Test", width, height, walls, objects);
+    }
+
+    private static WolfensteinMap CreateExitRoomMap()
+    {
+        const int width = 9;
+        const int height = 5;
+        var walls = Enumerable.Repeat((ushort)1, width * height).ToArray();
+        for (var y = 1; y <= 3; y++)
+        {
+            for (var x = 1; x <= 3; x++)
+                walls[(y * width) + x] = 107;
+            for (var x = 5; x <= 7; x++)
+                walls[(y * width) + x] = 107;
+        }
+        walls[(2 * width) + 4] = 100;
+        walls[(2 * width) + 8] = 21;
+        return new WolfensteinMap(
+            0,
+            "Exit Room Ambient Test",
+            width,
+            height,
+            walls,
+            new ushort[width * height]);
     }
 }

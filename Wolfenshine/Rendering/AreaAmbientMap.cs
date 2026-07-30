@@ -29,6 +29,7 @@ public sealed class AreaAmbientMap
     private const ushort AmbushTile = 106;
     private const ushort FirstAreaTile = 107;
     private const ushort PushwallMarker = 98;
+    private const ushort ElevatorSwitchTile = 21;
     private const int SmallRoomTileCount = 16;
     private const double SmallRoomInheritance = 0.75;
     private const double ChandelierAmbientBoost = MaximumAmbientScale - 1.0;
@@ -96,6 +97,7 @@ public sealed class AreaAmbientMap
             zoneFixtureCounts,
             layout.TileCounts,
             doorTransitions);
+        IlluminateExitRooms(map, layout.ZoneByTile, zoneAmbientScales);
         return new AreaAmbientMap(map, layout.ZoneByTile, zoneAmbientScales, doorTransitions);
     }
 
@@ -280,6 +282,34 @@ public sealed class AreaAmbientMap
                     ambientScales[zone],
                     adjoiningScale,
                     SmallRoomInheritance);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Treats the room adjoining an elevator switch as fully lit, even when the original map contains no light sprite.
+    /// This gives an open elevator doorway the same ambient contrast and light spill as a visibly illuminated room.
+    /// </summary>
+    private static void IlluminateExitRooms(
+        WolfensteinMap map,
+        int[] zoneByTile,
+        double[] ambientScales)
+    {
+        for (var y = 0; y < map.Height; y++)
+        {
+            for (var x = 0; x < map.Width; x++)
+            {
+                if (map.GetWall(x, y) != ElevatorSwitchTile)
+                    continue;
+                var adjoiningZones = new[]
+                {
+                    GetZone(zoneByTile, map, x - 1, y),
+                    GetZone(zoneByTile, map, x + 1, y),
+                    GetZone(zoneByTile, map, x, y - 1),
+                    GetZone(zoneByTile, map, x, y + 1)
+                };
+                foreach (var zone in adjoiningZones.Where(zone => zone >= 0).Distinct())
+                    ambientScales[zone] = Math.Max(ambientScales[zone], 1.0);
             }
         }
     }
