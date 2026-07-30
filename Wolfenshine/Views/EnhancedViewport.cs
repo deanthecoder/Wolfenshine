@@ -387,6 +387,11 @@ public sealed class EnhancedViewport : SoftwareViewport
         for (var page = 0; page < WallTextures.Pages.Count; page++)
         {
             var texture = WallTextures.Pages[page];
+            if (texture == null)
+            {
+                m_wallMaterialMap.SetPixel(page, 0, SKColors.Black);
+                continue;
+            }
             var heights = BuildWallHeightMap(texture);
             for (var y = 0; y < WolfensteinWallTexture.Size; y++)
             {

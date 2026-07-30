@@ -46,6 +46,7 @@ public sealed class WolfensteinSpriteSet
     {
         ArgumentOutOfRangeException.ThrowIfNegative(spriteNumber);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(spriteNumber, Count);
-        return m_sprites[spriteNumber];
+        return m_sprites[spriteNumber] ?? throw new InvalidDataException(
+            $"Sprite {spriteNumber} is absent from this game-data edition.");
     }
 }

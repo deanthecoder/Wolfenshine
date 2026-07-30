@@ -39,7 +39,8 @@ public sealed class WolfensteinWallTextures
     public WolfensteinWallTexture GetTexture(WallColumn column)
     {
         var page = GetPageIndex(column);
-        return Pages[page];
+        return Pages[page] ?? throw new InvalidDataException(
+            $"Wall tile {column.Tile} requires VSWAP page {page}, which is absent from this game-data edition.");
     }
 
     /// <summary>

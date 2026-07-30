@@ -36,6 +36,43 @@ public sealed class WolfensteinResourcesTests
     }
 
     [Test]
+    public void GivenCompleteSharewareDataSetCheckWl1EditionIsDetected()
+    {
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+        {
+            var sharewareName = Path.ChangeExtension(fileName, ".WL1");
+            File.WriteAllBytes(Path.Combine(directory.FullName, sharewareName), [1]);
+        }
+
+        var resources = WolfensteinResources.Load(directory);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resources.Edition, Is.EqualTo(WolfensteinDataEdition.Shareware));
+            Assert.That(resources.MapSlotCount, Is.EqualTo(10));
+            Assert.That(resources.GetFile(WolfensteinResourceKind.MapData).Name, Is.EqualTo("GAMEMAPS.WL1"));
+        });
+    }
+
+    [Test]
+    public void GivenBothCompleteDataSetsCheckFullEditionIsPreferred()
+    {
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+        {
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+            File.WriteAllBytes(Path.Combine(directory.FullName, Path.ChangeExtension(fileName, ".WL1")), [1]);
+        }
+
+        var resources = WolfensteinResources.Load(directory);
+
+        Assert.That(resources.Edition, Is.EqualTo(WolfensteinDataEdition.Full));
+    }
+
+    [Test]
     public void GivenMissingDataCheckUsefulExceptionIsThrown()
     {
         using var tempDirectory = new TempDirectory();

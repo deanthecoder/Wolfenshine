@@ -23,7 +23,6 @@ namespace Wolfenshine.Maps;
 public static class WolfensteinMapLoader
 {
     private const uint SparseMapOffset = uint.MaxValue;
-    private const int WolfensteinMapCount = 60;
     private const int MapPlaneCount = 3;
     private const int LoadedPlaneCount = 2;
     private const int MapNameLength = 16;
@@ -40,11 +39,11 @@ public static class WolfensteinMapLoader
 
         using var headerReader = new BinaryReader(resources.OpenRead(WolfensteinResourceKind.MapHeader));
         if (headerReader.BaseStream.Length < sizeof(ushort) + sizeof(uint))
-            throw new InvalidDataException("MAPHEAD.WL6 is too short to contain a map offset table.");
+            throw new InvalidDataException("The map-header file is too short to contain a map offset table.");
 
         var rlewTag = headerReader.ReadUInt16();
         var headerOffsets = new List<uint>();
-        while (headerOffsets.Count < WolfensteinMapCount &&
+        while (headerOffsets.Count < resources.MapSlotCount &&
                headerReader.BaseStream.Position + sizeof(uint) <= headerReader.BaseStream.Length)
             headerOffsets.Add(headerReader.ReadUInt32());
 
@@ -101,6 +100,6 @@ public static class WolfensteinMapLoader
     private static void EnsureRange(Stream stream, long offset, int length, string description)
     {
         if (length <= 0 || offset < 0 || offset > stream.Length - length)
-            throw new InvalidDataException($"The {description} lies outside GAMEMAPS.WL6.");
+            throw new InvalidDataException($"The {description} lies outside the map-data file.");
     }
 }

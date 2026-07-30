@@ -61,25 +61,35 @@ public sealed class WolfensteinMapLoaderTests
         Assert.That(exception.Message, Does.Contain("map slot 0 plane 0"));
     }
 
-    private static TempDirectory CreateResources()
+    [Test]
+    public void GivenSharewareMapHeaderCheckOnlyTenReservedSlotsAreRead()
+    {
+        using var tempDirectory = CreateResources(".WL1", sharewareOffsets: true);
+
+        var mapSet = WolfensteinMapLoader.Load(WolfensteinResources.Load(tempDirectory));
+
+        Assert.That(mapSet.Maps, Has.Count.EqualTo(1));
+    }
+
+    private static TempDirectory CreateResources(string extension = ".WL6", bool sharewareOffsets = false)
     {
         var tempDirectory = new TempDirectory();
         DirectoryInfo directory = tempDirectory;
         foreach (var fileName in WolfensteinResources.FileNames.Values)
-            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+            File.WriteAllBytes(Path.Combine(directory.FullName, Path.ChangeExtension(fileName, extension)), [1]);
 
-        WriteMapHeader(new FileInfo(Path.Combine(directory.FullName, "MAPHEAD.WL6")));
-        WriteMapData(new FileInfo(Path.Combine(directory.FullName, "GAMEMAPS.WL6")));
+        WriteMapHeader(new FileInfo(Path.Combine(directory.FullName, $"MAPHEAD{extension}")), sharewareOffsets);
+        WriteMapData(new FileInfo(Path.Combine(directory.FullName, $"GAMEMAPS{extension}")));
         return tempDirectory;
     }
 
-    private static void WriteMapHeader(FileInfo file)
+    private static void WriteMapHeader(FileInfo file, bool sharewareOffsets)
     {
         using var writer = new BinaryWriter(file.Open(FileMode.Create, FileAccess.Write));
         writer.Write(RlewTag);
         writer.Write((uint)0);
-        for (var i = 1; i < 100; i++)
-            writer.Write(uint.MaxValue);
+        for (var slot = 1; slot < 100; slot++)
+            writer.Write(sharewareOffsets && slot >= 10 ? 0U : uint.MaxValue);
     }
 
     private static void WriteMapData(FileInfo file)

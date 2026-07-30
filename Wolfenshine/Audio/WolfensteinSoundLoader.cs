@@ -193,13 +193,21 @@ public static class WolfensteinSoundLoader
                 break;
             var samples = new byte[byteLength];
             var destination = 0;
+            var isAvailable = true;
             for (var page = soundStart + relativePage; destination < samples.Length && page < pageCount - 1; page++)
             {
+                if (lengths[page] == 0)
+                {
+                    isAvailable = false;
+                    break;
+                }
                 var data = ReadPage(reader, offsets, lengths, page);
                 var count = Math.Min(data.Length, samples.Length - destination);
                 data.AsSpan(0, count).CopyTo(samples.AsSpan(destination));
                 destination += count;
             }
+            if (!isAvailable)
+                continue;
             if (destination != samples.Length)
                 throw new InvalidDataException($"Digitized sound {sound} ends before its declared length.");
             result[sound] = new WolfensteinSound(samples, DigitizedSampleRate);

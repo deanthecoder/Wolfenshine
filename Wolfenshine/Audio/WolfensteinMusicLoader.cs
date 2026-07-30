@@ -14,7 +14,7 @@ using Wolfenshine.Resources;
 namespace Wolfenshine.Audio;
 
 /// <summary>
-/// Loads the original Wolfenstein 3D IMF music sequences from AUDIOT.WL6.
+/// Loads the original Wolfenstein 3D IMF music sequences from the selected audio-data edition.
 /// </summary>
 public static class WolfensteinMusicLoader
 {

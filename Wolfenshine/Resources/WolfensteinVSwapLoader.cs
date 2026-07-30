@@ -32,6 +32,8 @@ public static class WolfensteinVSwapLoader
         var walls = new WolfensteinWallTexture[directory.SpriteStart];
         for (var page = 0; page < walls.Length; page++)
         {
+            if (directory.Lengths[page] == 0)
+                continue;
             if (directory.Lengths[page] != WolfensteinWallTexture.DataLength)
             {
                 throw new InvalidDataException(
@@ -40,8 +42,9 @@ public static class WolfensteinVSwapLoader
             walls[page] = new WolfensteinWallTexture(ReadPage(reader, directory, page));
         }
 
+        var loadedWallCount = walls.Count(wall => wall != null);
         Logger.Instance.Info(
-            $"Loaded {walls.Length} indexed wall pages from VSWAP ({directory.PageCount} pages, sprites at {directory.SpriteStart}, sounds at {directory.SoundStart}).");
+            $"Loaded {loadedWallCount} of {walls.Length} indexed wall pages from VSWAP ({directory.PageCount} pages, sprites at {directory.SpriteStart}, sounds at {directory.SoundStart}).");
         return new WolfensteinWallTextures(walls, directory.SpriteStart);
     }
 
@@ -51,7 +54,7 @@ public static class WolfensteinVSwapLoader
         using var reader = new BinaryReader(resources.OpenRead(WolfensteinResourceKind.SwapData));
         var directory = ReadDirectory(reader);
         if (directory.SoundStart - directory.SpriteStart < WeaponSpriteCount)
-            throw new InvalidDataException("VSWAP.WL6 does not contain the expected weapon sprite pages.");
+            throw new InvalidDataException("The swap data does not contain the expected weapon sprite pages.");
         var page = directory.SoundStart - WeaponSpriteCount + PistolReadyWeaponOffset;
         var sprite = DecodeSprite(ReadPage(reader, directory, page));
         Logger.Instance.Info($"Loaded ready-pistol sprite from VSWAP page {page}.");
@@ -68,24 +71,27 @@ public static class WolfensteinVSwapLoader
         for (var spriteNumber = 0; spriteNumber < sprites.Length; spriteNumber++)
         {
             var page = directory.SpriteStart + spriteNumber;
+            if (directory.Lengths[page] == 0)
+                continue;
             sprites[spriteNumber] = DecodeSprite(ReadPage(reader, directory, page));
         }
-        Logger.Instance.Info($"Loaded {sprites.Length} indexed sprites from VSWAP.");
+        var loadedSpriteCount = sprites.Count(sprite => sprite != null);
+        Logger.Instance.Info($"Loaded {loadedSpriteCount} of {sprites.Length} indexed sprites from VSWAP.");
         return new WolfensteinSpriteSet(sprites);
     }
 
     private static VSwapDirectory ReadDirectory(BinaryReader reader)
     {
         if (reader.BaseStream.Length < 6)
-            throw new InvalidDataException("VSWAP.WL6 is too short to contain its page header.");
+            throw new InvalidDataException("The swap data is too short to contain its page header.");
         var pageCount = reader.ReadUInt16();
         var spriteStart = reader.ReadUInt16();
         var soundStart = reader.ReadUInt16();
         if (pageCount == 0 || spriteStart == 0 || spriteStart > soundStart || soundStart > pageCount)
-            throw new InvalidDataException("VSWAP.WL6 contains invalid page boundaries.");
+            throw new InvalidDataException("The swap data contains invalid page boundaries.");
         var tableByteLength = checked(pageCount * (sizeof(uint) + sizeof(ushort)));
         if (reader.BaseStream.Position + tableByteLength > reader.BaseStream.Length)
-            throw new InvalidDataException("VSWAP.WL6 ends inside its page tables.");
+            throw new InvalidDataException("The swap data ends inside its page tables.");
         var offsets = Enumerable.Range(0, pageCount).Select(_ => reader.ReadUInt32()).ToArray();
         var lengths = Enumerable.Range(0, pageCount).Select(_ => reader.ReadUInt16()).ToArray();
         return new VSwapDirectory(pageCount, spriteStart, soundStart, offsets, lengths);

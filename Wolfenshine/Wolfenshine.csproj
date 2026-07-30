@@ -39,13 +39,51 @@
   </ItemGroup>
 
   <ItemGroup>
-    <LocalWolfensteinData Include="$(MSBuildProjectDirectory)/../local/game-data/*.WL6" />
+    <LocalWolfensteinFullData Include="$(MSBuildProjectDirectory)/../local/game-data/*.WL6" />
+    <LocalWolfensteinSharewareData Include="$(MSBuildProjectDirectory)/../local/game-data/*.WL1" />
+    <LocalWolfensteinSharewareArchive Include="$(MSBuildProjectDirectory)/../local/game-data/w3d-box.zip"
+                                      Condition="Exists('$(MSBuildProjectDirectory)/../local/game-data/w3d-box.zip')" />
   </ItemGroup>
 
-  <Target Name="CopyLocalWolfensteinData" AfterTargets="Build" Condition="'@(LocalWolfensteinData)' != ''">
+  <Target Name="CopyLocalWolfensteinData" AfterTargets="Build"
+          Condition="'@(LocalWolfensteinFullData)' != '' or '@(LocalWolfensteinSharewareData)' != '' or '@(LocalWolfensteinSharewareArchive)' != ''">
     <MakeDir Directories="$(TargetDir)GameData" />
-    <Copy SourceFiles="@(LocalWolfensteinData)"
+    <Unzip SourceFiles="@(LocalWolfensteinSharewareArchive)"
+           DestinationFolder="$(IntermediateOutputPath)WolfensteinShareware"
+           SkipUnchangedFiles="true"
+           Condition="'@(LocalWolfensteinFullData)' == '' and '@(LocalWolfensteinSharewareData)' == '' and '@(LocalWolfensteinSharewareArchive)' != ''" />
+    <ItemGroup>
+      <ExtractedWolfensteinSharewareData Include="$(IntermediateOutputPath)WolfensteinShareware/WOLF3D/AUDIOHED.WL1;
+                                                   $(IntermediateOutputPath)WolfensteinShareware/WOLF3D/AUDIOT.WL1;
+                                                   $(IntermediateOutputPath)WolfensteinShareware/WOLF3D/GAMEMAPS.WL1;
+                                                   $(IntermediateOutputPath)WolfensteinShareware/WOLF3D/MAPHEAD.WL1;
+                                                   $(IntermediateOutputPath)WolfensteinShareware/WOLF3D/VGADICT.WL1;
+                                                   $(IntermediateOutputPath)WolfensteinShareware/WOLF3D/VGAGRAPH.WL1;
+                                                   $(IntermediateOutputPath)WolfensteinShareware/WOLF3D/VGAHEAD.WL1;
+                                                   $(IntermediateOutputPath)WolfensteinShareware/WOLF3D/VSWAP.WL1"
+                                         Condition="'@(LocalWolfensteinFullData)' == '' and '@(LocalWolfensteinSharewareData)' == ''" />
+      <ExistingWolfensteinFullOutput Include="$(TargetDir)GameData/*.WL6" />
+      <ExistingWolfensteinSharewareOutput Include="$(TargetDir)GameData/*.WL1" />
+      <ObsoleteWolfensteinPaletteOutput Include="$(TargetDir)GameData/GAMEPAL.OBJ" />
+      <UnneededWolfensteinConfigOutput Include="$(TargetDir)GameData/CONFIG.WL1" />
+    </ItemGroup>
+    <Delete Files="@(ObsoleteWolfensteinPaletteOutput)" />
+    <Delete Files="@(UnneededWolfensteinConfigOutput)" />
+    <Delete Files="@(ExistingWolfensteinSharewareOutput)"
+            Condition="'@(LocalWolfensteinFullData)' != ''" />
+    <Delete Files="@(ExistingWolfensteinFullOutput)"
+            Condition="'@(LocalWolfensteinFullData)' == '' and ('@(LocalWolfensteinSharewareData)' != '' or '@(ExtractedWolfensteinSharewareData)' != '')" />
+    <Copy SourceFiles="@(LocalWolfensteinFullData)"
           DestinationFolder="$(TargetDir)GameData"
-          SkipUnchangedFiles="true" />
+          SkipUnchangedFiles="true"
+          Condition="'@(LocalWolfensteinFullData)' != ''" />
+    <Copy SourceFiles="@(LocalWolfensteinSharewareData)"
+          DestinationFolder="$(TargetDir)GameData"
+          SkipUnchangedFiles="true"
+          Condition="'@(LocalWolfensteinFullData)' == '' and '@(LocalWolfensteinSharewareData)' != ''" />
+    <Copy SourceFiles="@(ExtractedWolfensteinSharewareData)"
+          DestinationFolder="$(TargetDir)GameData"
+          SkipUnchangedFiles="true"
+          Condition="'@(LocalWolfensteinFullData)' == '' and '@(LocalWolfensteinSharewareData)' == '' and '@(ExtractedWolfensteinSharewareData)' != ''" />
   </Target>
 </Project>

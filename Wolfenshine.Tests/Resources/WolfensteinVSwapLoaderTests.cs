@@ -36,6 +36,22 @@ public sealed class WolfensteinVSwapLoaderTests
     }
 
     [Test]
+    public void GivenSparseWallPagesCheckAbsentUnusedPageDoesNotPreventLoading()
+    {
+        using var tempDirectory = CreateResources(omittedPage: 1);
+
+        var textures = WolfensteinVSwapLoader.LoadWallTextures(WolfensteinResources.Load(tempDirectory));
+
+        var exception = Assert.Throws<InvalidDataException>(() =>
+            textures.GetTexture(new Wolfenshine.Rendering.WallColumn(
+                1.0,
+                0.0,
+                1,
+                Wolfenshine.Rendering.WallSide.Vertical)));
+        Assert.That(exception.Message, Does.Contain("absent from this game-data edition"));
+    }
+
+    [Test]
     public void GivenCompiledSpriteCheckOpaquePostIsDecoded()
     {
         using var tempDirectory = CreateSpriteResources();
@@ -65,7 +81,21 @@ public sealed class WolfensteinVSwapLoaderTests
         });
     }
 
-    private static TempDirectory CreateResources()
+    [Test]
+    public void GivenSparseSpriteRegionCheckAbsentUnusedSpriteDoesNotPreventLoading()
+    {
+        using var tempDirectory = CreateSpriteResources(omittedSpriteNumber: 0);
+
+        var sprites = WolfensteinVSwapLoader.LoadSprites(WolfensteinResources.Load(tempDirectory));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sprites.PistolReady, Is.Not.Null);
+            Assert.Throws<InvalidDataException>(() => sprites.Get(0));
+        });
+    }
+
+    private static TempDirectory CreateResources(int omittedPage = -1)
     {
         var tempDirectory = new TempDirectory();
         DirectoryInfo directory = tempDirectory;
@@ -90,15 +120,23 @@ public sealed class WolfensteinVSwapLoaderTests
         writer.Write((ushort)pageCount);
         writer.Write((ushort)pageCount);
         for (var page = 0; page < pages.Length; page++)
-            writer.Write((uint)(dataOffset + (page * WolfensteinWallTexture.DataLength)));
-        foreach (var _ in pages)
-            writer.Write((ushort)WolfensteinWallTexture.DataLength);
+        {
+            writer.Write(page == omittedPage
+                ? 0U
+                : (uint)(dataOffset + (page * WolfensteinWallTexture.DataLength)));
+        }
+        for (var page = 0; page < pages.Length; page++)
+        {
+            writer.Write(page == omittedPage
+                ? (ushort)0
+                : (ushort)WolfensteinWallTexture.DataLength);
+        }
         foreach (var page in pages)
             writer.Write(page);
         return tempDirectory;
     }
 
-    private static TempDirectory CreateSpriteResources()
+    private static TempDirectory CreateSpriteResources(int omittedSpriteNumber = -1)
     {
         var tempDirectory = new TempDirectory();
         DirectoryInfo directory = tempDirectory;
@@ -117,12 +155,16 @@ public sealed class WolfensteinVSwapLoaderTests
         writer.Write((ushort)soundStart);
         for (var page = 0; page < pageCount; page++)
         {
-            writer.Write(page >= spriteStart
+            writer.Write(page >= spriteStart && page - spriteStart != omittedSpriteNumber
                 ? (uint)(dataOffset + ((page - spriteStart) * sprite.Length))
                 : 0U);
         }
         for (var page = 0; page < pageCount; page++)
-            writer.Write(page >= spriteStart ? (ushort)sprite.Length : (ushort)0);
+        {
+            writer.Write(page >= spriteStart && page - spriteStart != omittedSpriteNumber
+                ? (ushort)sprite.Length
+                : (ushort)0);
+        }
         for (var page = spriteStart; page < soundStart; page++)
             writer.Write(sprite);
         return tempDirectory;

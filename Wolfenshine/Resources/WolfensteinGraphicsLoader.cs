@@ -35,9 +35,13 @@ public static class WolfensteinGraphicsLoader
     private const int FirstFacePictureOffset = 23;
     private const int FacePictureCount = 23;
     private const int IntermissionGuyOffset = -43;
-    private const int DifficultyCursorChunk = 22;
-    private const int DifficultyMouseLegendChunk = 29;
-    private const int FirstDifficultyFaceChunk = 30;
+    private const int DifficultyCursorWidth = 24;
+    private const int DifficultyCursorHeight = 16;
+    private const int DifficultyMouseLegendWidth = 104;
+    private const int DifficultyMouseLegendHeight = 16;
+    private const int DifficultyFaceWidth = 24;
+    private const int DifficultyFaceHeight = 32;
+    private const int DifficultyFaceCount = 4;
     private const int MenuFontChunk = 2;
     private const int PausePictureOffset = 47;
 
@@ -81,7 +85,7 @@ public static class WolfensteinGraphicsLoader
                 statusBar, weaponIcons, noKey, goldKey, silverKey, blankDigit, digits, faces);
         }
 
-        throw new InvalidDataException("VGAGRAPH.WL6 does not contain a 320 x 40 status-bar picture.");
+        throw new InvalidDataException("The graphics data does not contain a 320 x 40 status-bar picture.");
     }
 
     public static WolfensteinIntermissionGraphics LoadIntermissionGraphics(WolfensteinResources resources)
@@ -122,9 +126,19 @@ public static class WolfensteinGraphicsLoader
         using var reader = new BinaryReader(resources.OpenRead(WolfensteinResourceKind.GraphicsData));
         var pictureTableData = ReadChunk(reader, offsets, 0, dictionary);
         var pictures = ReadPictureTable(pictureTableData);
-        var cursor = ReadPicture(reader, offsets, dictionary, pictures, DifficultyCursorChunk);
-        var mouseLegend = ReadPicture(reader, offsets, dictionary, pictures, DifficultyMouseLegendChunk);
-        var faces = Enumerable.Range(FirstDifficultyFaceChunk, 4)
+        var cursorChunk = FindPictureChunk(pictures, DifficultyCursorWidth, DifficultyCursorHeight);
+        var mouseLegendChunk = FindPictureChunk(
+            pictures,
+            DifficultyMouseLegendWidth,
+            DifficultyMouseLegendHeight);
+        var firstFaceChunk = FindConsecutivePictureChunks(
+            pictures,
+            DifficultyFaceWidth,
+            DifficultyFaceHeight,
+            DifficultyFaceCount);
+        var cursor = ReadPicture(reader, offsets, dictionary, pictures, cursorChunk);
+        var mouseLegend = ReadPicture(reader, offsets, dictionary, pictures, mouseLegendChunk);
+        var faces = Enumerable.Range(firstFaceChunk, DifficultyFaceCount)
             .Select(chunk => ReadPicture(reader, offsets, dictionary, pictures, chunk))
             .ToArray();
         var font = ReadFont(ReadChunk(reader, offsets, MenuFontChunk, dictionary));
@@ -206,7 +220,7 @@ public static class WolfensteinGraphicsLoader
     {
         using var reader = new BinaryReader(resources.OpenRead(WolfensteinResourceKind.GraphicsDictionary));
         if (reader.BaseStream.Length < HuffmanNodeCount * 2 * sizeof(ushort))
-            throw new InvalidDataException("VGADICT.WL6 does not contain all 255 Huffman nodes.");
+            throw new InvalidDataException("The graphics dictionary does not contain all 255 Huffman nodes.");
         return Enumerable.Range(0, HuffmanNodeCount)
             .Select(_ => (reader.ReadUInt16(), reader.ReadUInt16()))
             .ToArray();
@@ -216,7 +230,7 @@ public static class WolfensteinGraphicsLoader
     {
         using var reader = new BinaryReader(resources.OpenRead(WolfensteinResourceKind.GraphicsHeader));
         if (reader.BaseStream.Length < 6 || (reader.BaseStream.Length % 3) != 0)
-            throw new InvalidDataException("VGAHEAD.WL6 does not contain a valid table of 24-bit offsets.");
+            throw new InvalidDataException("The graphics header does not contain a valid table of 24-bit offsets.");
         var offsets = new int[reader.BaseStream.Length / 3];
         for (var i = 0; i < offsets.Length; i++)
         {
@@ -291,7 +305,31 @@ public static class WolfensteinGraphicsLoader
             if (pictures[picture].Width == width && pictures[picture].Height == height)
                 return FirstPictureChunk + picture;
         }
-        throw new InvalidDataException($"VGAGRAPH.WL6 does not contain a {width} x {height} picture.");
+        throw new InvalidDataException($"The graphics data does not contain a {width} x {height} picture.");
+    }
+
+    private static int FindConsecutivePictureChunks(
+        IReadOnlyList<(int Width, int Height)> pictures,
+        int width,
+        int height,
+        int count)
+    {
+        for (var firstPicture = 0; firstPicture <= pictures.Count - count; firstPicture++)
+        {
+            var matches = true;
+            for (var offset = 0; offset < count; offset++)
+            {
+                var picture = pictures[firstPicture + offset];
+                if (picture.Width == width && picture.Height == height)
+                    continue;
+                matches = false;
+                break;
+            }
+            if (matches)
+                return FirstPictureChunk + firstPicture;
+        }
+        throw new InvalidDataException(
+            $"VGAGRAPH does not contain {count} consecutive {width} x {height} pictures.");
     }
 
     private static WolfensteinGraphic ReadPicture(
