@@ -11,6 +11,7 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <AssemblyName>Wolfenshine</AssemblyName>
     <RootNamespace>Wolfenshine</RootNamespace>
+    <ApplicationIcon>Assets/Wolfenshine.ico</ApplicationIcon>
     <Authors>Dean Edis</Authors>
     <Company>Dean Edis (DeanTheCoder)</Company>
     <Copyright>Copyright (c) 2026 Dean Edis</Copyright>

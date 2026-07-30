@@ -1,3 +1,5 @@
+[![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/deanthecoder.svg?style=social&label=Follow%20%40deanthecoder)](https://twitter.com/deanthecoder) [![GitHub Repo stars](https://img.shields.io/github/stars/deanthecoder/Wolfenshine?style=social&label=Star)](https://github.com/deanthecoder/Wolfenshine/stargazers)
+
 # Wolfenshine
 
 **Wolfenstein 3D rebuilt in modern C#—faithful when you want it, shiny when you don't.**
@@ -7,8 +9,6 @@ Wolfenshine is a playable, cross-platform reimplementation of the 1992 classic. 
 At its heart is an authentic 320×200 software-rendered experience. Press F2 and that same game becomes something new: colored lights spill across rooms, muzzle flashes illuminate enemies, fog gathers in the distance, and bright doorways cast descending shafts into the darkness.
 
 ![Wolfenshine's authentic software-rendered mode](img/gameplay.png)
-
-[![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/deanthecoder.svg?style=social&label=Follow%20%40deanthecoder)](https://twitter.com/deanthecoder) [![GitHub Repo stars](https://img.shields.io/github/stars/deanthecoder/Wolfenshine?style=social&label=Star)](https://github.com/deanthecoder/Wolfenshine/stargazers)
 
 ## Then press F2
 
