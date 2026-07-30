@@ -72,6 +72,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly float[] m_cameraPlane = new float[2];
     private readonly FixedRenderTarget m_renderTarget = new(InternalRenderWidth, InternalRenderHeight);
     private readonly byte[] m_weaponPixels = new byte[EnhancedViewportWidth * ViewportHeight * 4];
+    private readonly byte[] m_weaponOutlineSource = new byte[EnhancedViewportWidth * PlayViewHeight * 4];
     private readonly byte[] m_bloomPixels = new byte[EnhancedViewportWidth * ViewportHeight * 4];
     private byte[] m_areaAmbientPixels = [];
     private byte[] m_areaAmbientBasePixels = [];
@@ -1090,13 +1091,23 @@ public sealed class EnhancedViewport : SoftwareViewport
         }
         if (WeaponSprite != null)
         {
+            var weaponPixels = m_weaponPixels.AsSpan(0, EnhancedViewportWidth * PlayViewHeight * 4);
             SoftwareRaycastRenderer.DrawSprite(
                 WeaponSprite,
                 Palette,
                 EnhancedViewportWidth / 2,
                 PlayViewHeight,
                 PlayViewHeight + 1,
-                m_weaponPixels.AsSpan(0, EnhancedViewportWidth * PlayViewHeight * 4),
+                weaponPixels,
+                EnhancedViewportWidth,
+                PlayViewHeight);
+
+            // Preserve the original hard-edged pixels as the source so generated coverage cannot
+            // spread across subsequent pixels. This treatment belongs only to enhanced rendering.
+            weaponPixels.CopyTo(m_weaponOutlineSource);
+            SpriteOutlineSmoother.AddCornerCoverage(
+                m_weaponOutlineSource,
+                weaponPixels,
                 EnhancedViewportWidth,
                 PlayViewHeight);
         }
