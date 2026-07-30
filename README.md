@@ -148,6 +148,7 @@ dotnet run --project Wolfenshine/Wolfenshine.csproj
 | Pause or resume | P |
 | Toggle authentic/enhanced rendering | F2 |
 | Toggle FPS counter | F3 |
+| Toggle fullscreen | Alt/Option+Enter; F11 on Windows/Linux; Escape leaves fullscreen |
 | Show navigation guide | Hold Tab |
 
 ## Why build Wolfenstein 3D again?

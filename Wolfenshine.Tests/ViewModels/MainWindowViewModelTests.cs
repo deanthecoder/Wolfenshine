@@ -202,6 +202,16 @@ public sealed class MainWindowViewModelTests
     }
 
     [Test]
+    public void GivenFullScreenStateChangedCheckItIsPublished()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.SetFullScreen(true);
+
+        Assert.That(viewModel.IsFullScreen, Is.True);
+    }
+
+    [Test]
     public void GivenHardDifficultySelectedCheckHardActorsArePlaced()
     {
         const int size = 5;

@@ -9,14 +9,15 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using System.Diagnostics;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Wolfenshine.Game;
 using Wolfenshine.ViewModels;
 #if DEBUG
 using System.Runtime.InteropServices;
-using Avalonia;
 using Avalonia.VisualTree;
 using DTC.Core;
 using SkiaSharp;
@@ -50,6 +51,8 @@ public sealed partial class MainWindow : Window
     private bool m_pauseKeyDown;
     private bool m_rendererKeyDown;
     private bool m_fpsKeyDown;
+    private bool m_fullScreenKeyDown;
+    private WindowState m_windowedState = WindowState.Normal;
     private double m_viewBobOffset;
     private double m_viewBobPhase;
     private double m_weaponSwayOffset;
@@ -78,6 +81,16 @@ public sealed partial class MainWindow : Window
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+        {
+            if (!m_fullScreenKeyDown)
+                ToggleFullScreen();
+            m_fullScreenKeyDown = true;
+            m_strafe = false;
+            m_use = false;
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.P)
         {
             if (!m_pauseKeyDown && DataContext is MainWindowViewModel viewModel)
@@ -99,6 +112,20 @@ public sealed partial class MainWindow : Window
             if (!m_fpsKeyDown && DataContext is MainWindowViewModel viewModel)
                 viewModel.ToggleFramesPerSecond();
             m_fpsKeyDown = true;
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.F11 && !OperatingSystem.IsMacOS())
+        {
+            if (!m_fullScreenKeyDown)
+                ToggleFullScreen();
+            m_fullScreenKeyDown = true;
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Escape && WindowState == WindowState.FullScreen)
+        {
+            ExitFullScreen();
             e.Handled = true;
             return;
         }
@@ -184,6 +211,15 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             return;
         }
+        if (e.Key is Key.F11 or Key.Enter)
+        {
+            m_fullScreenKeyDown = false;
+            if (e.Key == Key.F11 && !OperatingSystem.IsMacOS())
+            {
+                e.Handled = true;
+                return;
+            }
+        }
 #if DEBUG
         m_debugKeysDown.Remove(e.Key);
 #endif
@@ -192,6 +228,8 @@ public sealed partial class MainWindow : Window
 
     private void OnOpened(object sender, EventArgs e)
     {
+        if (DataContext is MainWindowViewModel { IsFullScreen: true })
+            EnterFullScreen();
         m_gameClock.Restart();
         m_fpsClock.Restart();
         m_gameTimer.Start();
@@ -426,6 +464,13 @@ public sealed partial class MainWindow : Window
         m_gameClock.Restart();
     }
 
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == WindowStateProperty && GameFrame != null)
+            UpdateFullScreenPresentation(WindowState == WindowState.FullScreen);
+    }
+
     private void OnGameTick(object sender, EventArgs e)
     {
         // Clamp long UI stalls so a delayed tick cannot jump the player through the level.
@@ -464,6 +509,36 @@ public sealed partial class MainWindow : Window
         var renderedFrames = Interlocked.Exchange(ref m_renderedFrameCount, 0);
         m_fpsClock.Restart();
         viewModel.SetFramesPerSecond(renderedFrames / elapsedSeconds);
+    }
+
+    private void ToggleFullScreen()
+    {
+        if (WindowState == WindowState.FullScreen)
+            ExitFullScreen();
+        else
+            EnterFullScreen();
+    }
+
+    private void EnterFullScreen()
+    {
+        m_windowedState = WindowState is WindowState.Normal or WindowState.Maximized
+            ? WindowState
+            : WindowState.Normal;
+        WindowState = WindowState.FullScreen;
+    }
+
+    private void ExitFullScreen() => WindowState = m_windowedState;
+
+    private void UpdateFullScreenPresentation(bool isFullScreen)
+    {
+        GameFrame.Margin = isFullScreen ? new Thickness(0) : new Thickness(24);
+        GameFrame.BorderThickness = isFullScreen ? new Thickness(0) : new Thickness(1);
+        DesktopStatusBar.IsVisible = !isFullScreen;
+        RootLayout.Background = isFullScreen
+            ? Brushes.Black
+            : new SolidColorBrush(Color.FromRgb(0x11, 0x13, 0x18));
+        if (DataContext is MainWindowViewModel viewModel)
+            viewModel.SetFullScreen(isFullScreen);
     }
 
     private void UpdateViewBob(double elapsedSeconds, MainWindowViewModel viewModel)
@@ -580,6 +655,7 @@ public sealed partial class MainWindow : Window
         m_pauseKeyDown = false;
         m_rendererKeyDown = false;
         m_fpsKeyDown = false;
+        m_fullScreenKeyDown = false;
         m_weaponSelection = null;
     }
 }

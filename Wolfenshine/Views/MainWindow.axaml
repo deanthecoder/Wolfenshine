@@ -15,8 +15,13 @@
         MinWidth="640"
         MinHeight="480"
         WindowStartupLocation="CenterScreen">
-  <Grid RowDefinitions="*,Auto" Background="#111318">
-    <Border Grid.Row="0" Margin="24" Background="#08090B" BorderBrush="#343942" BorderThickness="1">
+  <Grid x:Name="RootLayout" RowDefinitions="*,Auto" Background="#111318">
+    <Border x:Name="GameFrame"
+            Grid.Row="0"
+            Margin="24"
+            Background="#08090B"
+            BorderBrush="#343942"
+            BorderThickness="1">
       <Viewbox Stretch="Uniform">
         <Border x:Name="GameViewport"
                 Width="{Binding PresentationViewportWidth}"
@@ -125,7 +130,12 @@
       </Viewbox>
     </Border>
 
-    <Border Grid.Row="1" Background="#1A1E24" BorderBrush="#343942" BorderThickness="0,1,0,0" Padding="12,7">
+    <Border x:Name="DesktopStatusBar"
+            Grid.Row="1"
+            Background="#1A1E24"
+            BorderBrush="#343942"
+            BorderThickness="0,1,0,0"
+            Padding="12,7">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#AEB4BC" />
         <TextBlock Grid.Column="1"

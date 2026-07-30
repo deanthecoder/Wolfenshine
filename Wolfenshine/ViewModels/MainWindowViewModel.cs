@@ -79,6 +79,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool m_isPaused;
     private bool m_isEnhancedRendering;
     private bool m_showFramesPerSecond;
+    private bool m_isFullScreen;
     private int m_framesPerSecond;
     private bool m_isDisposed;
 
@@ -114,6 +115,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_settings = settings;
         m_isEnhancedRendering = settings?.UseEnhancedRenderer == true;
         m_showFramesPerSecond = settings?.ShowFramesPerSecond == true;
+        m_isFullScreen = settings?.UseFullScreen == true;
         IntermissionGraphics = intermissionGraphics;
         DifficultyGraphics = difficultyGraphics;
         m_weaponSprite = weaponSprite;
@@ -192,6 +194,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public string RenderModeText => m_isEnhancedRendering ? "RENDERER: ENHANCED" : "RENDERER: AUTHENTIC";
     public bool ShowFramesPerSecond => m_showFramesPerSecond;
     public string FramesPerSecondText => $"{m_framesPerSecond} FPS";
+    public bool IsFullScreen => m_isFullScreen;
     public int SelectedDifficultyIndex => m_selectedDifficultyIndex;
     public GameDifficulty Difficulty => m_difficulty;
     public WolfensteinLevelStats LevelStats => m_levelStats;
@@ -356,6 +359,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         m_framesPerSecond = roundedFramesPerSecond;
         OnPropertyChanged(nameof(FramesPerSecondText));
+    }
+
+    /// <summary>
+    /// Persists whether the game occupies a true fullscreen window.
+    /// </summary>
+    public void SetFullScreen(bool isFullScreen)
+    {
+        SetField(ref m_isFullScreen, isFullScreen, nameof(IsFullScreen));
+        if (m_settings != null)
+            m_settings.UseFullScreen = m_isFullScreen;
     }
 
     private void UpdateDifficultySelection(PlayerInput input)
