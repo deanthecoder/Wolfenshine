@@ -29,6 +29,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private const int AuthenticViewportWidth = 320;
     private const int EnhancedViewportWidth = 384;
+    private const double GetPsychedFillDuration = 1.4;
+    private const double GetPsychedHoldDuration = 0.8;
     private GameSession m_gameSession;
     private WolfensteinAudioPlayer m_audioPlayer;
     private readonly WolfenshineSettings m_settings;
@@ -78,6 +80,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool m_difficultyInputReleased = true;
     private int m_selectedDifficultyIndex = 2;
     private GameDifficulty m_difficulty = GameDifficulty.Normal;
+    private bool m_isGettingPsyched;
+    private double m_getPsychedTime;
+    private double m_getPsychedProgress;
     private bool m_isPaused;
     private bool m_isEnhancedRendering;
     private bool m_showFramesPerSecond;
@@ -164,6 +169,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public WolfensteinIntermissionGraphics IntermissionGraphics { get; }
     public WolfensteinDifficultyGraphics DifficultyGraphics { get; }
     public WolfensteinGraphic PauseGraphic => DifficultyGraphics?.Pause;
+    public WolfensteinGraphic GetPsychedGraphic => DifficultyGraphics?.GetPsyched;
     public IReadOnlyList<WorldSprite> StaticObjects { get; private set; }
     public IReadOnlyList<WolfensteinActor> Actors { get; private set; }
     public IReadOnlyList<WorldSprite> WorldObjects => m_worldObjects;
@@ -188,6 +194,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public double PlayerSpeed => m_playerSpeed;
     public bool IsShowingLevelStats => m_isShowingLevelStats;
     public bool IsSelectingDifficulty => m_isSelectingDifficulty;
+    public bool IsGettingPsyched => m_isGettingPsyched;
+    public double GetPsychedProgress => m_getPsychedProgress;
     public bool IsPaused => m_isPaused;
     public bool HasGoldKey => m_gameSession?.HasGoldKey == true;
     public bool HasSilverKey => m_gameSession?.HasSilverKey == true;
@@ -204,7 +212,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public int NativeViewportWidth => AuthenticViewportWidth;
     public int NativeViewportHeight => 200;
     public int PresentationViewportWidth =>
-        m_isEnhancedRendering && !m_isSelectingDifficulty && !m_isShowingLevelStats
+        m_isEnhancedRendering && !m_isSelectingDifficulty && !m_isShowingLevelStats && !m_isGettingPsyched
             ? EnhancedViewportWidth
             : AuthenticViewportWidth;
     public int PresentationViewportHeight => 240;
@@ -216,6 +224,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (m_isSelectingDifficulty)
         {
             UpdateDifficultySelection(input);
+            return;
+        }
+        if (m_isGettingPsyched)
+        {
+            UpdateGetPsyched(elapsedSeconds);
             return;
         }
         if (m_isShowingLevelStats)
@@ -299,7 +312,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void TogglePause()
     {
-        if (m_gameSession == null || m_isSelectingDifficulty || m_isShowingLevelStats || m_gameSession.IsDying)
+        if (m_gameSession == null || m_isSelectingDifficulty || m_isShowingLevelStats ||
+            m_isGettingPsyched || m_gameSession.IsDying)
             return;
         SetField(ref m_isPaused, !m_isPaused, nameof(IsPaused));
         m_audioPlayer?.SetPaused(m_isPaused);
@@ -326,12 +340,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (m_isSelectingDifficulty)
             m_audioPlayer.PlayMusicTrack(14);
         else if (SelectedMap != null)
+        {
             m_audioPlayer.PlayMusic(SelectedMap.Slot);
+            if (m_isGettingPsyched)
+                m_audioPlayer.SetMusicFade(1.0);
+        }
     }
 
     public void ToggleRenderer()
     {
-        if (m_gameSession == null || m_isSelectingDifficulty || m_isShowingLevelStats)
+        if (m_gameSession == null || m_isSelectingDifficulty || m_isShowingLevelStats || m_isGettingPsyched)
             return;
         SetField(ref m_isEnhancedRendering, !m_isEnhancedRendering, nameof(IsEnhancedRendering));
         if (m_settings != null)
@@ -450,6 +468,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_levelFade, 0.0, nameof(LevelFade));
         SetField(ref m_playerSpeed, 0.0, nameof(PlayerSpeed));
         SetField(ref m_isGameOver, false, nameof(IsGameOver));
+        SetField(ref m_isGettingPsyched, false, nameof(IsGettingPsyched));
+        SetField(ref m_getPsychedProgress, 0.0, nameof(GetPsychedProgress));
+        m_getPsychedTime = 0.0;
         SetField(ref m_isSelectingDifficulty, true, nameof(IsSelectingDifficulty));
         OnPropertyChanged(nameof(PresentationViewportWidth));
         m_difficultyInputReleased = false;
@@ -649,6 +670,35 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         StatusText = $"{map.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
                      "1–4 select weapons · Space opens doors";
         UpdateHud();
+        if (startFaded)
+            BeginGetPsyched();
+    }
+
+    private void BeginGetPsyched()
+    {
+        m_getPsychedTime = 0.0;
+        SetField(ref m_getPsychedProgress, 0.0, nameof(GetPsychedProgress));
+        SetField(ref m_isGettingPsyched, true, nameof(IsGettingPsyched));
+        OnPropertyChanged(nameof(PresentationViewportWidth));
+        StatusText = $"Get Psyched! · preparing {SelectedMap.Name}";
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void UpdateGetPsyched(double elapsedSeconds)
+    {
+        m_getPsychedTime += Math.Max(0.0, elapsedSeconds);
+        SetField(
+            ref m_getPsychedProgress,
+            Math.Min(1.0, m_getPsychedTime / GetPsychedFillDuration),
+            nameof(GetPsychedProgress));
+        if (m_getPsychedTime < GetPsychedFillDuration + GetPsychedHoldDuration)
+            return;
+
+        SetField(ref m_isGettingPsyched, false, nameof(IsGettingPsyched));
+        OnPropertyChanged(nameof(PresentationViewportWidth));
+        StatusText = $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
+                     "1–4 select weapons · Space opens doors";
+        OnPropertyChanged(nameof(StatusText));
     }
 
     private void RefreshAccessibleLights(bool force = false)

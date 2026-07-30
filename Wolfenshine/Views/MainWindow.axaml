@@ -91,6 +91,13 @@
                                       Selection="{Binding SelectedDifficultyIndex}"
                                       RenderOptions.BitmapInterpolationMode="LowQuality" />
 
+            <local:GetPsychedViewport IsVisible="{Binding IsGettingPsyched}"
+                                      Graphic="{Binding GetPsychedGraphic}"
+                                      StatusBar="{Binding StatusBar}"
+                                      Palette="{Binding Palette}"
+                                      Progress="{Binding GetPsychedProgress}"
+                                      RenderOptions.BitmapInterpolationMode="LowQuality" />
+
             <local:PauseViewport IsVisible="{Binding IsPaused}"
                                  Width="320"
                                  Height="240"

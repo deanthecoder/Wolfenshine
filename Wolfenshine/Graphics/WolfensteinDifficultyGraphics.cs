@@ -18,4 +18,5 @@ public sealed record WolfensteinDifficultyGraphics(
     WolfensteinGraphic MouseLegend,
     IReadOnlyList<WolfensteinGraphic> Faces,
     WolfensteinFont Font,
-    WolfensteinGraphic Pause);
+    WolfensteinGraphic Pause,
+    WolfensteinGraphic GetPsyched);

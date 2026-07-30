@@ -242,6 +242,40 @@ public sealed class MainWindowViewModelTests
     }
 
     [Test]
+    public void GivenDifficultySelectedCheckGetPsychedScreenFillsThenFinishes()
+    {
+        var map = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+
+        viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsGettingPsyched, Is.True);
+            Assert.That(viewModel.GetPsychedProgress, Is.Zero);
+            Assert.That(viewModel.StatusText, Does.Contain("Get Psyched"));
+        });
+
+        viewModel.UpdateGame(0.7, default);
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsGettingPsyched, Is.True);
+            Assert.That(viewModel.GetPsychedProgress, Is.EqualTo(0.5).Within(0.001));
+        });
+
+        viewModel.UpdateGame(1.6, default);
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsGettingPsyched, Is.False);
+            Assert.That(viewModel.GetPsychedProgress, Is.EqualTo(1.0));
+        });
+    }
+
+    [Test]
     public void GivenElevatorCompletionCheckNextMapLoadsAndFinalMapWrapsToFirst()
     {
         var firstMap = CreateElevatorMap(0, "E1M1");
@@ -333,6 +367,7 @@ public sealed class MainWindowViewModelTests
     private static void StartNormalGame(MainWindowViewModel viewModel)
     {
         viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
+        viewModel.UpdateGame(2.3, default);
         viewModel.UpdateGame(0.5, default);
     }
 
@@ -342,5 +377,7 @@ public sealed class MainWindowViewModelTests
         viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Attack: true));
         viewModel.UpdateGame(0.0, default);
         viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Attack: true));
+        viewModel.UpdateGame(2.3, default);
+        viewModel.UpdateGame(0.5, default);
     }
 }

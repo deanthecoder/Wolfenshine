@@ -42,6 +42,8 @@ public static class WolfensteinGraphicsLoader
     private const int DifficultyFaceWidth = 24;
     private const int DifficultyFaceHeight = 32;
     private const int DifficultyFaceCount = 4;
+    private const int GetPsychedWidth = 224;
+    private const int GetPsychedHeight = 48;
     private const int MenuFontChunk = 2;
     private const int PausePictureOffset = 47;
 
@@ -144,9 +146,11 @@ public static class WolfensteinGraphicsLoader
         var font = ReadFont(ReadChunk(reader, offsets, MenuFontChunk, dictionary));
         var statusChunk = FindPictureChunk(pictures, StatusBarWidth, StatusBarHeight);
         var pause = ReadPicture(reader, offsets, dictionary, pictures, statusChunk + PausePictureOffset);
+        var getPsychedChunk = FindPictureChunk(pictures, GetPsychedWidth, GetPsychedHeight);
+        var getPsyched = ReadPicture(reader, offsets, dictionary, pictures, getPsychedChunk);
         Logger.Instance.Info(
-            "Loaded the original cursor, mouse legend, portraits, font, and pause graphic from VGAGRAPH.");
-        return new WolfensteinDifficultyGraphics(cursor, mouseLegend, faces, font, pause);
+            "Loaded the original menu, pause, and Get Psyched graphics from VGAGRAPH.");
+        return new WolfensteinDifficultyGraphics(cursor, mouseLegend, faces, font, pause, getPsyched);
     }
 
     private static WolfensteinFont ReadFont(ReadOnlySpan<byte> data)
