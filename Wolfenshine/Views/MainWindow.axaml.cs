@@ -71,7 +71,6 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         m_gameTimer = new DispatcherTimer { Interval = s_gameInterval };
         m_gameTimer.Tick += OnGameTick;
-        SoftwareViewport.FrameRendered += OnFrameRendered;
         EnhancedViewport.FrameRendered += OnFrameRendered;
         Opened += OnOpened;
         Closed += OnClosed;
@@ -478,6 +477,8 @@ public sealed partial class MainWindow : Window
         m_gameClock.Restart();
         if (DataContext is not MainWindowViewModel viewModel)
             return;
+        if (!viewModel.IsEnhancedRendering)
+            Interlocked.Increment(ref m_renderedFrameCount);
         UpdateFramesPerSecond(viewModel);
         viewModel.UpdateGame(
             elapsedSeconds,

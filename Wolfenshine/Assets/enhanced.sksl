@@ -9,12 +9,12 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 // Wolfenshine's enhanced renderer keeps map traversal on the CPU and sends one
-// compact raycast result for each of the 320 native screen columns. This shader
+// compact raycast result for each of the 384 enhanced screen columns. This shader
 // projects and textures those walls, applies distance illumination, and finally
 // composites the software-rendered sprites and HUD. Sprites deliberately remain
 // outside the wall-lighting calculation until they receive their own depth data.
 
-uniform float2 outputResolution; // Actual control size; normally 320 x 240 after 4:3 correction.
+uniform float2 outputResolution; // Fixed 768 x 480 enhanced render target.
 uniform float viewBob;            // Vertical camera displacement in native 320 x 200 pixels.
 uniform float weaponSway;         // Horizontal weapon displacement in native pixels.
 uniform float damageFlash;        // 0..1 red flash applied to the completed frame.
@@ -36,7 +36,7 @@ uniform float4 deathColor;        // Original palette red used by the death tran
 //   W = packed wall flags: bit 0 horizontal orientation, bit 1 concave
 //       corner at texture U=0, bit 2 concave corner at texture U=1,
 //       bit 3 door panel
-uniform float4 wallColumns[320];
+uniform float4 wallColumns[384];
 
 // The thirty-two nearest light-emitting map objects:
 //   X/Y = position in map tiles
@@ -105,7 +105,7 @@ uniform shader areaAmbientMap;
 // this into curved arrows.
 uniform shader navigationRouteMap;
 
-// A transparent 320 x 200 image containing world sprites, enemies, and the HUD.
+// A transparent 384 x 200 image containing world sprites, enemies, and the centered HUD.
 // Software projection is retained for now, then composited after wall light
 // so an enemy is not accidentally shaded using the wall behind it.
 uniform shader softwareSpriteOverlay;
@@ -750,7 +750,7 @@ float3 navigationGuideIllumination(float2 worldPosition, float4 route)
 
 float4 main(float2 fragment)
 {
-    const float nativeWidth = 320.0;
+    const float nativeWidth = 384.0;
     const float nativeHeight = 200.0;
     const float nativePlayHeight = 160.0;
     const float textureSize = 64.0;
@@ -766,7 +766,7 @@ float4 main(float2 fragment)
     if (isPlayView)
         scenePosition.y = clamp(scenePosition.y - viewBob, 0.5, nativePlayHeight - 0.5);
 
-    int columnIndex = clamp(int(scenePosition.x), 0, 319);
+    int columnIndex = clamp(int(scenePosition.x), 0, 383);
     float cameraX = (2.0 * (scenePosition.x + 0.5) / nativeWidth) - 1.0;
     float2 rayDirection = cameraDirection + (cameraPlane * cameraX);
     float4 column = wallColumns[columnIndex];

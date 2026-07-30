@@ -48,6 +48,7 @@ Wolfenshine keeps the original-style renderer and enhanced renderer side by side
 
 ### Enhanced mode
 
+- True 16:10 gameplay expands the horizontal view without stretching the original artwork; wider monitors use black side bars.
 - Colored, directional ceiling lights, chandeliers, lamps, treasure glow, and muzzle flashes.
 - Atmospheric doorway shafts that descend from bright rooms into darker ones, illuminate objects, and fade naturally with the viewing direction.
 - Focused overhead spotlights draw attention to uncollected weapons, keys, and full-heal pickups.

@@ -176,6 +176,7 @@ public sealed class MainWindowViewModelTests
         {
             Assert.That(viewModel.IsEnhancedRendering, Is.True);
             Assert.That(viewModel.RenderModeText, Is.EqualTo("RENDERER: ENHANCED"));
+            Assert.That(viewModel.PresentationViewportWidth, Is.EqualTo(384));
         });
 
         viewModel.ToggleRenderer();
@@ -183,6 +184,7 @@ public sealed class MainWindowViewModelTests
         {
             Assert.That(viewModel.IsEnhancedRendering, Is.False);
             Assert.That(viewModel.RenderModeText, Is.EqualTo("RENDERER: AUTHENTIC"));
+            Assert.That(viewModel.PresentationViewportWidth, Is.EqualTo(320));
         });
     }
 

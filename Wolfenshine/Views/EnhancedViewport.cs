@@ -30,7 +30,9 @@ namespace Wolfenshine.Views;
 /// </remarks>
 public sealed class EnhancedViewport : SoftwareViewport
 {
-    private const int InternalRenderWidth = 640;
+    private const int EnhancedViewportWidth = 384;
+    private const int OriginalViewportWidth = 320;
+    private const int InternalRenderWidth = 768;
     private const int InternalRenderHeight = 480;
     private const byte CeilingPaletteIndex = 0x1D;
     private const byte FloorPaletteIndex = 0x19;
@@ -50,7 +52,9 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const float FogEndDistance = 18.0f;
     private const float MaximumFogAmount = 0.30f;
     private static readonly RgbaColor FogColor = new(18, 24, 34);
-    private readonly float[] m_wallColumns = new float[ViewportWidth * ColumnChannelCount];
+    private readonly WallColumn[] m_enhancedColumns = new WallColumn[EnhancedViewportWidth];
+    private readonly byte[] m_enhancedPixels = new byte[EnhancedViewportWidth * ViewportHeight * 4];
+    private readonly float[] m_wallColumns = new float[EnhancedViewportWidth * ColumnChannelCount];
     private readonly float[] m_sceneLights = new float[LightCount * LightChannelCount];
     private readonly float[] m_sceneLightRadii = new float[LightCount * LightRadiusChannelCount];
     private readonly float[] m_sceneLightUpColors = new float[LightCount * LightColorChannelCount];
@@ -67,25 +71,25 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly float[] m_cameraDirection = new float[2];
     private readonly float[] m_cameraPlane = new float[2];
     private readonly FixedRenderTarget m_renderTarget = new(InternalRenderWidth, InternalRenderHeight);
-    private readonly byte[] m_weaponPixels = new byte[ViewportWidth * ViewportHeight * 4];
-    private readonly byte[] m_bloomPixels = new byte[ViewportWidth * ViewportHeight * 4];
+    private readonly byte[] m_weaponPixels = new byte[EnhancedViewportWidth * ViewportHeight * 4];
+    private readonly byte[] m_bloomPixels = new byte[EnhancedViewportWidth * ViewportHeight * 4];
     private byte[] m_areaAmbientPixels = [];
     private byte[] m_areaAmbientBasePixels = [];
     private byte[] m_navigationRoutePixels = [];
     private bool m_areaAmbientBitmapDirty;
     private WorldSprite[] m_litWorldSprites = [];
     private readonly SKBitmap m_overlayBitmap = new(new SKImageInfo(
-        ViewportWidth,
+        EnhancedViewportWidth,
         ViewportHeight,
         SKColorType.Rgba8888,
         SKAlphaType.Unpremul));
     private readonly SKBitmap m_weaponOverlayBitmap = new(new SKImageInfo(
-        ViewportWidth,
+        EnhancedViewportWidth,
         ViewportHeight,
         SKColorType.Rgba8888,
         SKAlphaType.Unpremul));
     private readonly SKBitmap m_bloomOverlayBitmap = new(new SKImageInfo(
-        ViewportWidth,
+        EnhancedViewportWidth,
         ViewportHeight,
         SKColorType.Rgba8888,
         SKAlphaType.Opaque));
@@ -279,19 +283,20 @@ public sealed class EnhancedViewport : SoftwareViewport
         EnsureAreaAmbientMap();
         UpdateAreaAmbientBitmap();
         EnsureNavigationRouteMap();
+        var renderCamera = CreateRenderCamera();
         var playerAmbientScale = (float)m_areaAmbientMap.GetAmbientScale(Camera.X, Camera.Y, Doors);
-        BuildColumnBuffer();
+        BuildColumnBuffer(renderCamera);
         BuildLightBuffer();
         BuildDoorwaySpillBuffer();
         BuildPickupSpotlightBuffer();
         BuildWaterCausticBuffer();
-        BuildSoftwareOverlays();
+        BuildSoftwareOverlays(renderCamera);
         m_playerPosition[0] = (float)Camera.X;
         m_playerPosition[1] = (float)Camera.Y;
         m_cameraDirection[0] = (float)Camera.DirectionX;
         m_cameraDirection[1] = (float)Camera.DirectionY;
-        m_cameraPlane[0] = (float)Camera.PlaneX;
-        m_cameraPlane[1] = (float)Camera.PlaneY;
+        m_cameraPlane[0] = (float)renderCamera.PlaneX;
+        m_cameraPlane[1] = (float)renderCamera.PlaneY;
         context.Custom(new ShaderDrawOperation(
             new Rect(Bounds.Size),
             m_effect,
@@ -712,21 +717,33 @@ public sealed class EnhancedViewport : SoftwareViewport
             _ => 0
         };
 
-    private void BuildColumnBuffer()
+    private RaycastCamera CreateRenderCamera()
     {
-        Raycaster.Cast(Map, Doors, PushWalls, ElevatorSwitch, Camera, m_columns);
-        for (var column = 0; column < m_columns.Length; column++)
+        const double horizontalScale = (double)EnhancedViewportWidth / OriginalViewportWidth;
+        return new RaycastCamera(
+            Camera.X,
+            Camera.Y,
+            Camera.DirectionX,
+            Camera.DirectionY,
+            Camera.PlaneX * horizontalScale,
+            Camera.PlaneY * horizontalScale);
+    }
+
+    private void BuildColumnBuffer(RaycastCamera renderCamera)
+    {
+        Raycaster.Cast(Map, Doors, PushWalls, ElevatorSwitch, renderCamera, m_enhancedColumns);
+        for (var column = 0; column < m_enhancedColumns.Length; column++)
         {
             var target = column * ColumnChannelCount;
-            m_wallColumns[target] = (float)m_columns[column].Distance;
-            m_wallColumns[target + 1] = (float)m_columns[column].TextureU;
-            m_wallColumns[target + 2] = WallTextures.GetPageIndex(m_columns[column]);
-            var flags = m_columns[column].Side == WallSide.Horizontal ? 1 : 0;
-            if (m_columns[column].HasConcaveTextureStart)
+            m_wallColumns[target] = (float)m_enhancedColumns[column].Distance;
+            m_wallColumns[target + 1] = (float)m_enhancedColumns[column].TextureU;
+            m_wallColumns[target + 2] = WallTextures.GetPageIndex(m_enhancedColumns[column]);
+            var flags = m_enhancedColumns[column].Side == WallSide.Horizontal ? 1 : 0;
+            if (m_enhancedColumns[column].HasConcaveTextureStart)
                 flags |= 2;
-            if (m_columns[column].HasConcaveTextureEnd)
+            if (m_enhancedColumns[column].HasConcaveTextureEnd)
                 flags |= 4;
-            if (m_columns[column].Tile is >= 90 and <= 101)
+            if (m_enhancedColumns[column].Tile is >= 90 and <= 101)
                 flags |= 8;
             m_wallColumns[target + 3] = flags;
         }
@@ -1014,12 +1031,12 @@ public sealed class EnhancedViewport : SoftwareViewport
         colors[target + 3] = 1.0f;
     }
 
-    private void BuildSoftwareOverlays()
+    private void BuildSoftwareOverlays(RaycastCamera renderCamera)
     {
-        Array.Clear(m_pixels);
+        Array.Clear(m_enhancedPixels);
         Array.Clear(m_weaponPixels);
         Array.Clear(m_bloomPixels);
-        var playViewPixels = m_pixels.AsSpan(0, ViewportWidth * PlayViewHeight * 4);
+        var playViewPixels = m_enhancedPixels.AsSpan(0, EnhancedViewportWidth * PlayViewHeight * 4);
         if (Sprites != null && StaticObjects != null)
         {
             if (m_litWorldSprites.Length != StaticObjects.Count)
@@ -1041,8 +1058,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 m_projectedSprites = new ProjectedWorldSprite[StaticObjects.Count];
             var visibleSpriteCount = WorldSpriteProjector.Project(
                 m_litWorldSprites,
-                Camera,
-                ViewportWidth,
+                renderCamera,
+                EnhancedViewportWidth,
                 PlayViewHeight,
                 ViewportHeight,
                 m_projectedSprites);
@@ -1064,9 +1081,9 @@ public sealed class EnhancedViewport : SoftwareViewport
                 m_projectedSprites.AsSpan(0, visibleSpriteCount),
                 Sprites,
                 Palette,
-                m_columns,
+                m_enhancedColumns,
                 playViewPixels,
-                ViewportWidth,
+                EnhancedViewportWidth,
                 PlayViewHeight,
                 FogColor,
                 drawGroundShadows: true);
@@ -1076,27 +1093,44 @@ public sealed class EnhancedViewport : SoftwareViewport
             SoftwareRaycastRenderer.DrawSprite(
                 WeaponSprite,
                 Palette,
-                ViewportWidth / 2,
+                EnhancedViewportWidth / 2,
                 PlayViewHeight,
                 PlayViewHeight + 1,
-                m_weaponPixels.AsSpan(0, ViewportWidth * PlayViewHeight * 4),
-                ViewportWidth,
+                m_weaponPixels.AsSpan(0, EnhancedViewportWidth * PlayViewHeight * 4),
+                EnhancedViewportWidth,
                 PlayViewHeight);
         }
         if (StatusBar != null)
         {
+            FillHudExtensions();
             SoftwareRaycastRenderer.DrawGraphic(
                 StatusBar,
                 Palette,
-                0,
+                (EnhancedViewportWidth - StatusBar.Width) / 2,
                 PlayViewHeight,
-                m_pixels,
-                ViewportWidth,
+                m_enhancedPixels,
+                EnhancedViewportWidth,
                 ViewportHeight);
         }
-        CopyPixelsToBitmap(m_pixels, m_overlayBitmap);
+        CopyPixelsToBitmap(m_enhancedPixels, m_overlayBitmap);
         CopyPixelsToBitmap(m_weaponPixels, m_weaponOverlayBitmap);
         CopyPixelsToBitmap(m_bloomPixels, m_bloomOverlayBitmap);
+    }
+
+    private void FillHudExtensions()
+    {
+        var color = Palette.GetColor(StatusBar.GetIndex(0, 0));
+        for (var y = PlayViewHeight; y < ViewportHeight; y++)
+        {
+            for (var x = 0; x < EnhancedViewportWidth; x++)
+            {
+                var target = ((y * EnhancedViewportWidth) + x) * 4;
+                m_enhancedPixels[target] = color.Red;
+                m_enhancedPixels[target + 1] = color.Green;
+                m_enhancedPixels[target + 2] = color.Blue;
+                m_enhancedPixels[target + 3] = byte.MaxValue;
+            }
+        }
     }
 
     private void EnsureBloomProfiles()
@@ -1164,13 +1198,13 @@ public sealed class EnhancedViewport : SoftwareViewport
         var radiusX = Math.Max(2.0, projected.RenderedSize * profile.RadiusScale);
         var radiusY = Math.Max(2.0, radiusX * 0.82);
         var firstX = Math.Max(0, (int)Math.Floor(centerX - radiusX));
-        var lastX = Math.Min(ViewportWidth - 1, (int)Math.Ceiling(centerX + radiusX));
+        var lastX = Math.Min(EnhancedViewportWidth - 1, (int)Math.Ceiling(centerX + radiusX));
         var firstY = Math.Max(0, (int)Math.Floor(centerY - radiusY));
         var lastY = Math.Min(PlayViewHeight - 1, (int)Math.Ceiling(centerY + radiusY));
         var fogScale = 1.0 - CalculateFogAmount(projected.Depth);
         for (var x = firstX; x <= lastX; x++)
         {
-            if (projected.Depth >= m_columns[x].Distance)
+            if (projected.Depth >= m_enhancedColumns[x].Distance)
                 continue;
             var normalizedX = (x + 0.5 - centerX) / radiusX;
             for (var y = firstY; y <= lastY; y++)
@@ -1188,7 +1222,7 @@ public sealed class EnhancedViewport : SoftwareViewport
 
     private void AddBloomPixel(int x, int y, RgbaColor color, double intensity)
     {
-        var target = ((y * ViewportWidth) + x) * 4;
+        var target = ((y * EnhancedViewportWidth) + x) * 4;
         m_bloomPixels[target] = (byte)Math.Min(
             byte.MaxValue,
             m_bloomPixels[target] + (color.Red * intensity));

@@ -27,6 +27,8 @@ namespace Wolfenshine.ViewModels;
 /// </remarks>
 public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
+    private const int AuthenticViewportWidth = 320;
+    private const int EnhancedViewportWidth = 384;
     private GameSession m_gameSession;
     private WolfensteinAudioPlayer m_audioPlayer;
     private readonly WolfenshineSettings m_settings;
@@ -199,9 +201,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public GameDifficulty Difficulty => m_difficulty;
     public WolfensteinLevelStats LevelStats => m_levelStats;
     public int BjFrame => m_bjFrame;
-    public int NativeViewportWidth => 320;
+    public int NativeViewportWidth => AuthenticViewportWidth;
     public int NativeViewportHeight => 200;
-    public int PresentationViewportWidth => 320;
+    public int PresentationViewportWidth =>
+        m_isEnhancedRendering && !m_isSelectingDifficulty && !m_isShowingLevelStats
+            ? EnhancedViewportWidth
+            : AuthenticViewportWidth;
     public int PresentationViewportHeight => 240;
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
@@ -333,6 +338,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             m_settings.UseEnhancedRenderer = m_isEnhancedRendering;
         OnPropertyChanged(nameof(IsAuthenticRendering));
         OnPropertyChanged(nameof(RenderModeText));
+        OnPropertyChanged(nameof(PresentationViewportWidth));
         StatusText = m_isEnhancedRendering
             ? "Enhanced shader renderer · F2 returns to authentic rendering"
             : "Authentic software renderer · F2 enables enhanced rendering";
@@ -407,6 +413,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_difficulty = (GameDifficulty)m_selectedDifficultyIndex;
         PlayMenuSound(WolfensteinSoundEffect.MenuSelect);
         SetField(ref m_isSelectingDifficulty, false, nameof(IsSelectingDifficulty));
+        OnPropertyChanged(nameof(PresentationViewportWidth));
         StartMap(SelectedMap, null, startFaded: true);
         NotifyMapChanged();
     }
@@ -444,6 +451,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_playerSpeed, 0.0, nameof(PlayerSpeed));
         SetField(ref m_isGameOver, false, nameof(IsGameOver));
         SetField(ref m_isSelectingDifficulty, true, nameof(IsSelectingDifficulty));
+        OnPropertyChanged(nameof(PresentationViewportWidth));
         m_difficultyInputReleased = false;
         m_audioPlayer?.PlayMusicTrack(14);
         m_audioPlayer?.SetMusicFade(0.0);
@@ -488,6 +496,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             stats with { KillRatio = 0, SecretRatio = 0, TreasureRatio = 0, Bonus = 0 },
             nameof(LevelStats));
         SetField(ref m_isShowingLevelStats, true, nameof(IsShowingLevelStats));
+        OnPropertyChanged(nameof(PresentationViewportWidth));
         SetField(ref m_levelFade, 0.0, nameof(LevelFade));
         m_bjAnimationTime = 0.0;
         m_bjHasBreathed = false;
@@ -606,6 +615,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         RaycastCamera camera = null)
     {
         SetField(ref m_isShowingLevelStats, false, nameof(IsShowingLevelStats));
+        OnPropertyChanged(nameof(PresentationViewportWidth));
         SetField(ref m_levelStats, null, nameof(LevelStats));
         SelectedMap = map;
         Actors = WolfensteinActors.FromMap(map, m_difficulty);

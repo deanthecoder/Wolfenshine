@@ -92,6 +92,9 @@
                                       RenderOptions.BitmapInterpolationMode="LowQuality" />
 
             <local:PauseViewport IsVisible="{Binding IsPaused}"
+                                 Width="320"
+                                 Height="240"
+                                 HorizontalAlignment="Center"
                                  Graphic="{Binding PauseGraphic}"
                                  Palette="{Binding Palette}"
                                  RenderOptions.BitmapInterpolationMode="LowQuality" />
