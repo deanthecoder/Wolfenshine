@@ -175,6 +175,8 @@ public class SoftwareViewport : Control
 
     public override void Render(DrawingContext context)
     {
+        if (!IsEffectivelyVisible)
+            return;
         base.Render(context);
         if (Map == null || Doors == null || Camera == null)
             return;

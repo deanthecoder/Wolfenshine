@@ -267,6 +267,8 @@ public sealed class EnhancedViewport : SoftwareViewport
 
     public override void Render(DrawingContext context)
     {
+        if (!IsEffectivelyVisible)
+            return;
         if (Map == null || Doors == null || Camera == null || WallTextures == null || Palette == null)
             return;
 
