@@ -221,6 +221,36 @@ public sealed class SoftwareRaycastRendererTests
     }
 
     [Test]
+    public void GivenActorCenterPassesCameraCheckGroundShadowDoesNotCoverTheViewport()
+    {
+        var sprite = new WolfensteinSprite(
+            new byte[WolfensteinSprite.PixelCount],
+            new bool[WolfensteinSprite.PixelCount]);
+        var sprites = new WolfensteinSpriteSet(Enumerable.Repeat(sprite, 20).ToArray());
+        var palette = WolfensteinPalette.FromVgaDac(new byte[WolfensteinPalette.VgaDataLength]);
+        var walls = Enumerable
+            .Repeat(new WallColumn(3.0, 0.0, 1, WallSide.Horizontal), 5)
+            .ToArray();
+        var pixels = new byte[5 * 4 * 4];
+        ProjectedWorldSprite[] projected =
+        [
+            new(0, 0.05, 2, 4000, CastsGroundShadow: true)
+        ];
+
+        SoftwareRaycastRenderer.DrawWorldSprites(
+            projected,
+            sprites,
+            palette,
+            walls,
+            pixels,
+            5,
+            4,
+            drawGroundShadows: true);
+
+        Assert.That(pixels, Is.All.Zero);
+    }
+
+    [Test]
     public void GivenIndexedGraphicCheckItIsCompositedAtRequestedPosition()
     {
         var graphic = new WolfensteinGraphic(2, 1, new byte[] { 7, 8 });

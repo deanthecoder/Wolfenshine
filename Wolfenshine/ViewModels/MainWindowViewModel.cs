@@ -31,6 +31,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private WolfensteinAudioPlayer m_audioPlayer;
     private readonly WolfenshineSettings m_settings;
     private readonly WolfensteinHudGraphics m_hudGraphics;
+    private readonly AccessibleLightCache m_accessibleLightCache = new();
     private double m_bjAnimationTime;
     private int m_bjFrame;
     private bool m_bjHasBreathed;
@@ -68,6 +69,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private double m_statsCountTime;
     private WolfensteinElevatorSwitch m_elevatorSwitch;
     private IReadOnlyList<WorldSprite> m_worldObjects = [];
+    private IReadOnlyList<WorldSprite> m_accessibleLightObjects = [];
     private IReadOnlyList<WorldLight> m_enemyMuzzleFlashes = [];
     private bool m_isSelectingDifficulty;
     private bool m_difficultyInputReleased = true;
@@ -157,6 +159,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<WorldSprite> StaticObjects { get; private set; }
     public IReadOnlyList<WolfensteinActor> Actors { get; private set; }
     public IReadOnlyList<WorldSprite> WorldObjects => m_worldObjects;
+    public IReadOnlyList<WorldSprite> AccessibleLightObjects => m_accessibleLightObjects;
     public IReadOnlyList<WorldLight> EnemyMuzzleFlashes => m_enemyMuzzleFlashes;
     public string StatusText { get; private set; }
     public string DataErrorMessage { get; }
@@ -217,6 +220,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
         if (m_gameSession?.Update(elapsedSeconds, input, m_isEnhancedRendering) != true)
             return;
+        RefreshAccessibleLights();
         foreach (var soundEvent in m_gameSession.DrainSoundEvents())
             m_audioPlayer?.Play(soundEvent, m_gameSession.Camera);
         if (m_gameSession.IsGameOver)
@@ -380,6 +384,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         Actors = [];
         StaticObjects = [];
         SetField(ref m_worldObjects, [], nameof(WorldObjects));
+        SetField(ref m_accessibleLightObjects, [], nameof(AccessibleLightObjects));
         SetField(ref m_camera, null, nameof(Camera));
         SetField(ref m_elevatorSwitch, null, nameof(ElevatorSwitch));
         SetField(ref m_deathFade, 0.0, nameof(DeathFade));
@@ -537,6 +542,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(Actors));
         OnPropertyChanged(nameof(StaticObjects));
         OnPropertyChanged(nameof(WorldObjects));
+        OnPropertyChanged(nameof(AccessibleLightObjects));
         OnPropertyChanged(nameof(WeaponSprite));
         OnPropertyChanged(nameof(StatusBar));
         OnPropertyChanged(nameof(Doors));
@@ -565,6 +571,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             startFaded);
         m_elevatorSwitch = m_gameSession.ElevatorSwitch;
         StaticObjects = m_gameSession.StaticObjects;
+        RefreshAccessibleLights(force: true);
         m_actorRevision = m_gameSession.ActorRevision;
         m_restartRevision = m_gameSession.RestartRevision;
         m_audioPlayer?.PlayMusic(map.Slot);
@@ -584,6 +591,26 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         StatusText = $"{map.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
                      "1–4 select weapons · Space opens doors";
         UpdateHud();
+    }
+
+    private void RefreshAccessibleLights(bool force = false)
+    {
+        if (m_gameSession == null ||
+            !m_accessibleLightCache.Refresh(
+                SelectedMap,
+                m_gameSession.Doors,
+                m_gameSession.PushWalls,
+                m_gameSession.Camera,
+                StaticObjects,
+                force))
+        {
+            return;
+        }
+
+        SetField(
+            ref m_accessibleLightObjects,
+            m_accessibleLightCache.Lights,
+            nameof(AccessibleLightObjects));
     }
 
 #if DEBUG

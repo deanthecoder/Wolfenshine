@@ -33,7 +33,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private const byte CeilingPaletteIndex = 0x1D;
     private const byte FloorPaletteIndex = 0x19;
     private const int ColumnChannelCount = 4;
-    private const int LightCount = 32;
+    private const int LightCount = AccessibleLightCache.ShaderLightCapacity;
     private const int LightChannelCount = 4;
     private const int LightRadiusChannelCount = 2;
     private const int LightColorChannelCount = 4;

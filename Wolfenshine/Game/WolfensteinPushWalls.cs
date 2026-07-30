@@ -32,6 +32,7 @@ public sealed class WolfensteinPushWalls
         m_map = map;
     }
 
+    public WolfensteinMap Map => m_map;
     public IReadOnlyList<WolfensteinPushWall> Items => m_items;
     public WolfensteinPushWall MovingWall => m_items.FirstOrDefault(item => item.IsMoving);
 

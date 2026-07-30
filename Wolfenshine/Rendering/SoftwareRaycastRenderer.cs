@@ -219,8 +219,20 @@ public static class SoftwareRaycastRenderer
         int width,
         int height)
     {
-        var radiusX = Math.Max(1.0, projected.RenderedSize * 0.22);
-        var radiusY = Math.Max(1.0, projected.RenderedSize * 0.055);
+        const double proximityFadeStart = 0.125;
+        const double proximityFadeEnd = 0.75;
+        var proximityPosition = Math.Clamp(
+            (projected.Depth - proximityFadeStart) / (proximityFadeEnd - proximityFadeStart),
+            0.0,
+            1.0);
+        var proximityOpacity = proximityPosition * proximityPosition * (3.0 - (2.0 * proximityPosition));
+        if (proximityOpacity <= 0.0)
+            return;
+
+        // A sprite can become thousands of pixels tall as the camera crosses its center. Its painted shadow should
+        // disappear beneath the player rather than expanding into a screen-sized dark overlay.
+        var radiusX = Math.Clamp(projected.RenderedSize * 0.22, 1.0, Math.Max(1.0, width * 0.25));
+        var radiusY = Math.Clamp(projected.RenderedSize * 0.055, 1.0, Math.Max(1.0, height * 0.10));
         var centerY = Math.Min(
             height - 1.0,
             ((height + projected.RenderedSize) * 0.5) - Math.Max(1.0, projected.RenderedSize * 0.035));
@@ -242,7 +254,7 @@ public static class SoftwareRaycastRenderer
                 var edge = Math.Clamp((Math.Sqrt(distanceSquared) - 0.15) / 0.85, 0.0, 1.0);
                 var smoothEdge = edge * edge * (3.0 - (2.0 * edge));
                 var opacity = (byte)Math.Round(
-                    72.0 * (1.0 - smoothEdge) * (1.0 - projected.FogAmount));
+                    72.0 * proximityOpacity * (1.0 - smoothEdge) * (1.0 - projected.FogAmount));
                 BlendPixel(pixels, width, x, y, new RgbaColor(0, 0, 0, opacity));
             }
         }
