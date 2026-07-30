@@ -14,45 +14,35 @@ using Wolfenshine.Graphics;
 namespace Wolfenshine.Resources;
 
 /// <summary>
-/// Extracts the original VGA game palette from id Software's released GAMEPAL object file.
+/// Provides the original fixed Wolfenstein 3D VGA game palette.
 /// </summary>
 /// <remarks>
-/// The source object remains local and ignored while Wolfenshine consumes its standard 16-bit OMF data record.
+/// Keeping these 768 VGA-DAC values with the compatible engine avoids requiring a compiler object
+/// file that was never part of the retail or shareware game-data packages.
 /// </remarks>
 public static class WolfensteinPaletteLoader
 {
-    private const byte LeDataRecord = 0xA0;
-    private const int LeDataHeaderLength = 3;
+    private const string PaletteDataBase64 =
+        """
+            AAAAAAAqACoAACoqKgAAKgAqKhUAKioqFRUVFRU/FT8VFT8/PxUVPxU/Pz8VPz8/Ozs7Nzc3NDQ0MDAwLS0tKioqJiYmIyMj
+            Hx8fHBwcGRkZFRUVEhISDg4OCwsLCAgIPwAAOwAAOAAANQAAMgAALwAALAAAKQAAJgAAIgAAHwAAHAAAGQAAFgAAEwAAEAAA
+            PzY2Py4uPycnPx8fPxcXPxAQPwgIPwAAPyoXPyYQPyIIPx4AORsAMxgALRUAJxMAPz82Pz8uPz8nPz8fPz4XPz0QPz0IPz0A
+            OTYAMzEALSsAJycAISEAHBsAFhUAEBAAND8XMT8QLT8IKD8AJDkAIDMAHS0AGCcANj82Lz8uJz8nID8fGD8XED8QCD8IAD8A
+            AD8AADsAADgAADUAATIAAS8AASwAASkAASYAASIAAR8AARwAARkAARYAARMAARAANj8/Lj8/Jz8/Hz8+Fz8/ED8/CD8/AD8/
+            ADk5ADMzAC0tACcnACEhABwcABYWABAQFy8/ECw/CCo/ACc/ACM5AB8zABstABcnNjY/Li8/Jyc/HyA/Fxg/EBA/CAk/AAE/
+            AAA/AAA7AAA4AAA1AAAyAAAvAAAsAAApAAAmAAAiAAAfAAAcAAAZAAAWAAATAAAQCgoKPzgNPzUJPzMGPzACPy0ALQg/KgA/
+            JgA5IAAzHQAtGAAnFAAhEQAcDQAWCgAQPzY/Py4/Pyc/Px8/Pxc/PxA/Pwg/PwA/OAA5MgAzLQAtJwAnIQAhGwAcFgAWEAAQ
+            Pzo3Pzg0PzYxPzUvPzMsPzEpPy8nPy4kPywgPykcPycYPCUXOiMWNyIVNCAUMh8TLx4SLRwRKhoQKBkPJxgOJBcNIhYMIBQL
+            HRMKGxIJFxAIFQ8HEg4GEAwGDgsFCggDGAAZABkZABgYAAAHAAALDAkEEgASFAAUAAANBwcHExMTFxcXEBAQDAwMDQ0NNj09
+            Ljo6Jzc3HTIyEjAwCC0tCCwsACkpACYmACMjACEhAB8fAB4eAB0dABwcABsbJgAi
+        """;
 
-    public static WolfensteinPalette Load(WolfensteinResources resources)
+    public static WolfensteinPalette Load()
     {
-        ArgumentNullException.ThrowIfNull(resources);
-        var file = resources.GetFile(WolfensteinResourceKind.PaletteSource);
-        Logger.Instance.Info($"Loading Wolfenstein 3D palette from {file.Name}.");
-
-        using var reader = new BinaryReader(file.OpenRead());
-        while (reader.BaseStream.Position < reader.BaseStream.Length)
-        {
-            if (reader.BaseStream.Length - reader.BaseStream.Position < 3)
-                throw new InvalidDataException("GAMEPAL.OBJ ends inside an OMF record header.");
-            var recordType = reader.ReadByte();
-            var recordLength = reader.ReadUInt16();
-            if (recordLength == 0 || reader.BaseStream.Position + recordLength > reader.BaseStream.Length)
-                throw new InvalidDataException("GAMEPAL.OBJ contains an invalid OMF record length.");
-
-            var payloadLength = recordLength - 1;
-            var payload = reader.ReadBytes(payloadLength);
-            reader.ReadByte(); // OMF record checksum.
-            if (recordType != LeDataRecord || payload.Length < LeDataHeaderLength + WolfensteinPalette.VgaDataLength)
-                continue;
-
-            var paletteData = payload.AsSpan(LeDataHeaderLength, WolfensteinPalette.VgaDataLength);
-            if (paletteData.ContainsAnyExceptInRange((byte)0, (byte)63))
-                continue;
-            Logger.Instance.Info("Loaded 256 colors from the original VGA game palette.");
-            return WolfensteinPalette.FromVgaDac(paletteData);
-        }
-
-        throw new InvalidDataException("GAMEPAL.OBJ does not contain a 256-color VGA palette record.");
+        var paletteData = Convert.FromBase64String(PaletteDataBase64);
+        if (paletteData.Length != WolfensteinPalette.VgaDataLength)
+            throw new InvalidDataException("The embedded Wolfenstein 3D palette has an invalid length.");
+        Logger.Instance.Info("Loaded 256 colors from the embedded original VGA game palette.");
+        return WolfensteinPalette.FromVgaDac(paletteData);
     }
 }

@@ -47,7 +47,7 @@ public sealed class App : Application
                 var maps = WolfensteinMapLoader.Load(resources);
                 var wallTextures = WolfensteinVSwapLoader.LoadWallTextures(resources);
                 var sprites = WolfensteinVSwapLoader.LoadSprites(resources);
-                var palette = WolfensteinPaletteLoader.Load(resources);
+                var palette = WolfensteinPaletteLoader.Load();
                 var hudGraphics = WolfensteinGraphicsLoader.LoadHudGraphics(resources);
                 var intermissionGraphics = WolfensteinGraphicsLoader.LoadIntermissionGraphics(resources);
                 var difficultyGraphics = WolfensteinGraphicsLoader.LoadDifficultyGraphics(resources);

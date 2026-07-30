@@ -118,13 +118,7 @@ VGAHEAD.WL6
 VSWAP.WL6
 ```
 
-Download [GAMEPAL.OBJ](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/OBJ/GAMEPAL.OBJ) from id Software's official source release and place it beside those files:
-
-```text
-GAMEPAL.OBJ
-```
-
-`GAMEPAL.OBJ` supplies the original VGA palette. You do not need the original C source or a source checkout. When the private files are present, the build copies them into Wolfenshine's output directory automatically. If anything is missing, the app opens with a clear list of the files it still needs.
+The original VGA palette is built into Wolfenshine, so no palette or executable file is required. When the private data files are present, the build copies them into Wolfenshine's output directory automatically. If anything is missing, the app opens with a clear list of the files it still needs.
 
 Wolfenshine currently reads the full `.WL6` data set.
 
@@ -197,7 +191,6 @@ The `.WL6` suffix identifies data for the full six-episode edition. The sharewar
 | `VGAHEAD.WL6` | A table of 24-bit offsets locating graphics chunks within `VGAGRAPH.WL6`. |
 | `VGAGRAPH.WL6` | Huffman-compressed UI artwork, fonts, tiles, and other screen graphics. Chunk identifiers vary between game versions. |
 | `VSWAP.WL6` | A page-oriented container holding wall textures, sprites, and digitized sound samples. |
-| `GAMEPAL.OBJ` | A 16-bit OMF object containing the original 256-color VGA palette. |
 
 `CONFIG.WL6` is generated configuration state rather than a required asset. `WOLF3D.EXE` is useful as a behavioral reference but is not loaded by Wolfenshine.
 
@@ -224,9 +217,9 @@ The game loads plane 0 (walls and areas) and plane 1 (actors, objects, and level
 
 Each ordinary wall tile selects a pair of pages: one for east/west-facing walls and one for north/south-facing walls. Door textures occupy the final eight pages of the wall region and similarly use orientation-specific pairs. Wall faces immediately inside a doorway use the dedicated `DOORWALL + 2/+3` jamb textures from that region.
 
-Wolfenshine retains the textures as 8-bit palette indices. `GAMEPAL.OBJ` contains 256 RGB triplets using the VGA DAC's 0–63 channel range; these are expanded to 8-bit RGB values when the palette loads. The software renderer resolves each texture index through that palette while writing its reusable RGBA framebuffer. Keeping indexed textures as the canonical representation preserves the original data and leaves palette swaps or a future GPU palette lookup straightforward.
+Wolfenshine retains the textures as 8-bit palette indices. The original 256 RGB triplets are embedded in the engine using the VGA DAC's 0–63 channel range and expanded to 8-bit RGB values when the palette loads. The software renderer resolves each texture index through that palette while writing its reusable RGBA framebuffer. Keeping indexed textures as the canonical representation preserves the original data and leaves palette swaps or a future GPU palette lookup straightforward.
 
-The E1M1 ceiling uses palette index `0x1D`; the original VGA clear routine uses `0x19` for the floor. Wolfenshine resolves both through the same loaded palette rather than approximating their RGB colors.
+The E1M1 ceiling uses palette index `0x1D`; the original VGA clear routine uses `0x19` for the floor. Wolfenshine resolves both through the same embedded palette rather than approximating their RGB colors.
 
 `VGADICT.WL6` contains the Huffman tree used to expand `VGAGRAPH.WL6`, while `VGAHEAD.WL6` supplies its 24-bit chunk offsets. Picture chunk zero expands to a width/height table. Wolfenshine identifies the 320×40 status bar from those dimensions instead of relying on a generated chunk number: it is chunk 95 in the current v1.1 data but chunk 86 in the later GOODTIMES source configuration. Pictures are stored in four VGA planes and converted to row-major palette indices after expansion.
 

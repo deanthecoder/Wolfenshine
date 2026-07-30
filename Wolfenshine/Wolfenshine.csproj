@@ -40,8 +40,6 @@
 
   <ItemGroup>
     <LocalWolfensteinData Include="$(MSBuildProjectDirectory)/../local/game-data/*.WL6" />
-    <LocalWolfensteinPalette Include="$(MSBuildProjectDirectory)/../local/game-data/GAMEPAL.OBJ"
-                             Condition="Exists('$(MSBuildProjectDirectory)/../local/game-data/GAMEPAL.OBJ')" />
   </ItemGroup>
 
   <Target Name="CopyLocalWolfensteinData" AfterTargets="Build" Condition="'@(LocalWolfensteinData)' != ''">
@@ -49,9 +47,5 @@
     <Copy SourceFiles="@(LocalWolfensteinData)"
           DestinationFolder="$(TargetDir)GameData"
           SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(LocalWolfensteinPalette)"
-          DestinationFolder="$(TargetDir)GameData"
-          SkipUnchangedFiles="true"
-          Condition="'@(LocalWolfensteinPalette)' != ''" />
   </Target>
 </Project>

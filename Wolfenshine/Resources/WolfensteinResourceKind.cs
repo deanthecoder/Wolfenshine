@@ -22,6 +22,5 @@ public enum WolfensteinResourceKind
     GraphicsDictionary,
     GraphicsHeader,
     GraphicsData,
-    SwapData,
-    PaletteSource
+    SwapData
 }
