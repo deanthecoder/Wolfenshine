@@ -43,11 +43,15 @@ public sealed partial class MainWindow : Window
     private bool m_run;
     private bool m_attack;
     private bool m_strafe;
+    private bool m_showNavigationGuide;
     private bool m_pauseKeyDown;
     private bool m_rendererKeyDown;
     private double m_viewBobOffset;
     private double m_viewBobPhase;
     private double m_weaponSwayOffset;
+    private double m_navigationGuideVisibility;
+    private double m_navigationGuideTime;
+    private double m_navigationGuideMinimumTime;
     private PlayerWeapon? m_weaponSelection;
 #if DEBUG
     private MapWindow m_mapWindow;
@@ -420,6 +424,7 @@ public sealed partial class MainWindow : Window
                 m_weaponSelection,
                 m_strafe));
         UpdateViewBob(elapsedSeconds, viewModel);
+        UpdateNavigationGuide(elapsedSeconds, viewModel);
         m_weaponSelection = null;
         if (viewModel.IsGameOver)
             Close();
@@ -446,6 +451,25 @@ public sealed partial class MainWindow : Window
             m_weaponSwayOffset = 0.0;
         EnhancedViewport.ViewBob = m_viewBobOffset;
         EnhancedViewport.WeaponSway = m_weaponSwayOffset;
+    }
+
+    private void UpdateNavigationGuide(double elapsedSeconds, MainWindowViewModel viewModel)
+    {
+        const double fadeInSpeed = 4.0;
+        const double fadeOutSpeed = 2.0;
+        m_navigationGuideMinimumTime = Math.Max(0.0, m_navigationGuideMinimumTime - elapsedSeconds);
+        var target = (m_showNavigationGuide || m_navigationGuideMinimumTime > 0.0) &&
+                     viewModel.IsEnhancedRendering && !viewModel.IsPaused
+            ? 1.0
+            : 0.0;
+        var speed = target > m_navigationGuideVisibility ? fadeInSpeed : fadeOutSpeed;
+        m_navigationGuideVisibility = Math.Clamp(
+            m_navigationGuideVisibility + (Math.Sign(target - m_navigationGuideVisibility) * speed * elapsedSeconds),
+            0.0,
+            1.0);
+        m_navigationGuideTime += elapsedSeconds;
+        EnhancedViewport.NavigationGuideVisibility = m_navigationGuideVisibility;
+        EnhancedViewport.NavigationGuideTime = m_navigationGuideTime;
     }
 
     private bool SetKeyState(Key key, bool isDown)
@@ -484,6 +508,11 @@ public sealed partial class MainWindow : Window
             case Key.RightAlt:
                 m_strafe = isDown;
                 return true;
+            case Key.Tab:
+                if (isDown && !m_showNavigationGuide)
+                    m_navigationGuideMinimumTime = 4.0;
+                m_showNavigationGuide = isDown;
+                return true;
             case Key.D1 when isDown:
                 m_weaponSelection = PlayerWeapon.Knife;
                 return true;
@@ -511,6 +540,7 @@ public sealed partial class MainWindow : Window
         m_run = false;
         m_attack = false;
         m_strafe = false;
+        m_showNavigationGuide = false;
         m_pauseKeyDown = false;
         m_rendererKeyDown = false;
         m_weaponSelection = null;

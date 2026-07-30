@@ -68,6 +68,8 @@ uniform float2 cameraDirection;
 uniform float2 cameraPlane;
 uniform float muzzleFlash; // Brief 0..1 player weapon flash.
 uniform float weaponFlash; // 1 while the current weapon artwork visibly contains a muzzle flash.
+uniform float navigationGuideVisibility; // Held-Tab route fade, 0 hidden to 1 fully visible.
+uniform float navigationGuideTime; // Animation time for light flowing toward the objective.
 uniform float playerAmbientScale; // Player ambience, smoothly blended while crossing open doors.
 uniform float areaAmbientMaximum; // Decodes the normalized per-tile ambient map.
 uniform float areaAmbientPixelsPerTile; // Sub-tile resolution used for smooth doorway blending.
@@ -89,6 +91,12 @@ uniform shader wallMaterialMap;
 // Sampling it at each surface position lets a bright room remain visible through
 // a doorway without also raising the ambient light around the player.
 uniform shader areaAmbientMap;
+
+// One RGBA texel per map tile describes the current key-first route. Red and
+// green encode incoming/outgoing cardinal directions, blue stores route order,
+// and a zero incoming direction marks an unused tile. The floor shader turns
+// this into curved arrows.
+uniform shader navigationRouteMap;
 
 // A transparent 320 x 200 image containing world sprites, enemies, and the HUD.
 // Software projection is retained for now, then composited after wall light
@@ -601,6 +609,80 @@ float3 pickupSpotlightScattering(
     return float3(1.0, 0.92, 0.72) * scattering;
 }
 
+float2 navigationDirection(float encodedDirection)
+{
+    float direction = floor((encodedDirection * 255.0) + 0.5);
+    if (direction < 1.5)
+        return float2(1.0, 0.0);
+    if (direction < 2.5)
+        return float2(0.0, 1.0);
+    if (direction < 3.5)
+        return float2(-1.0, 0.0);
+    return float2(0.0, -1.0);
+}
+
+float distanceToNavigationSegment(float2 point, float2 start, float2 end)
+{
+    float2 segment = end - start;
+    float position = clamp(
+        dot(point - start, segment) / max(dot(segment, segment), 0.0001),
+        0.0,
+        1.0);
+    return length(point - (start + (segment * position)));
+}
+
+float navigationChevronDistance(float2 point, float2 tip, float2 direction)
+{
+    float2 perpendicular = float2(-direction.y, direction.x);
+    float2 back = tip - (direction * 0.18);
+    float2 left = back + (perpendicular * 0.13);
+    float2 right = back - (perpendicular * 0.13);
+    return min(
+        distanceToNavigationSegment(point, tip, left),
+        distanceToNavigationSegment(point, tip, right));
+}
+
+float3 navigationGuideIllumination(float2 worldPosition, float4 route)
+{
+    if (navigationGuideVisibility <= 0.0001)
+        return float3(0.0);
+    if ((route.r * 255.0) < 0.5)
+        return float3(0.0);
+
+    float2 incoming = navigationDirection(route.r);
+    float2 outgoing = navigationDirection(route.g);
+    float2 entry = incoming * -0.5;
+    float2 exit = outgoing * 0.5;
+    float2 localPosition = fract(worldPosition) - 0.5;
+    float routeIndex = floor((route.b * 255.0) + 0.5);
+    float illumination = 0.0;
+    for (int chevronIndex = 0; chevronIndex < 3; chevronIndex++)
+    {
+        float progress = (float(chevronIndex) + 1.0) / 4.0;
+        float2 tip;
+        float2 direction;
+        if (dot(incoming, outgoing) > 0.5)
+        {
+            tip = mix(entry, exit, progress);
+            direction = outgoing;
+        }
+        else
+        {
+            float inverse = 1.0 - progress;
+            tip = (entry * inverse * inverse) + (exit * progress * progress);
+            direction = normalize(
+                (entry * (-2.0 * inverse)) + (exit * (2.0 * progress)));
+        }
+        float distance = navigationChevronDistance(localPosition, tip, direction);
+        float crisp = 1.0 - smoothRamp((distance - 0.012) / 0.040);
+        float glow = (1.0 - smoothRamp(distance / 0.105)) * 0.34;
+        float sequence = routeIndex + progress;
+        float pulse = 0.64 + (sin((sequence * 2.5) - (navigationGuideTime * 5.0)) * 0.36);
+        illumination = max(illumination, max(crisp, glow) * pulse);
+    }
+    return float3(0.20, 1.00, 0.78) * illumination * navigationGuideVisibility * 0.82;
+}
+
 float4 main(float2 fragment)
 {
     const float nativeWidth = 320.0;
@@ -667,6 +749,10 @@ float4 main(float2 fragment)
         color.rgb *= surfaceContactAmbientOcclusion(
             scenePosition.y - (wallTop + projectedHeight),
             projectedHeight);
+        float4 navigationRoute = sample(navigationRouteMap, floor(floorPosition) + 0.5);
+        color.rgb = min(
+            color.rgb + navigationGuideIllumination(floorPosition, navigationRoute),
+            float3(1.0));
     }
     else
     {

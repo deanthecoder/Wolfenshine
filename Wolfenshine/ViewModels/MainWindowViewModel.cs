@@ -180,6 +180,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool IsShowingLevelStats => m_isShowingLevelStats;
     public bool IsSelectingDifficulty => m_isSelectingDifficulty;
     public bool IsPaused => m_isPaused;
+    public bool HasGoldKey => m_gameSession?.HasGoldKey == true;
+    public bool HasSilverKey => m_gameSession?.HasSilverKey == true;
     public bool IsEnhancedRendering => m_isEnhancedRendering;
     public bool IsAuthenticRendering => HasGameData && !m_isEnhancedRendering;
     public string RenderModeText => m_isEnhancedRendering ? "RENDERER: ENHANCED" : "RENDERER: AUTHENTIC";
@@ -548,6 +550,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(Doors));
         OnPropertyChanged(nameof(PushWalls));
         OnPropertyChanged(nameof(ElevatorSwitch));
+        OnPropertyChanged(nameof(HasGoldKey));
+        OnPropertyChanged(nameof(HasSilverKey));
         OnPropertyChanged(nameof(StatusText));
     }
 
@@ -768,8 +772,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_hudHealth = m_gameSession.Health;
         m_hudFace = m_gameSession.FacePictureIndex;
         m_hudLives = m_gameSession.Lives;
+        var goldKeyChanged = m_hudGoldKey != m_gameSession.HasGoldKey;
+        var silverKeyChanged = m_hudSilverKey != m_gameSession.HasSilverKey;
         m_hudGoldKey = m_gameSession.HasGoldKey;
         m_hudSilverKey = m_gameSession.HasSilverKey;
+        if (goldKeyChanged)
+            OnPropertyChanged(nameof(HasGoldKey));
+        if (silverKeyChanged)
+            OnPropertyChanged(nameof(HasSilverKey));
         SetField(
             ref m_statusBar,
             m_hudGraphics.Render(

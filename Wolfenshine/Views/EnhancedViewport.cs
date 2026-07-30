@@ -64,6 +64,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private readonly byte[] m_bloomPixels = new byte[ViewportWidth * ViewportHeight * 4];
     private byte[] m_areaAmbientPixels = [];
     private byte[] m_areaAmbientBasePixels = [];
+    private byte[] m_navigationRoutePixels = [];
     private bool m_areaAmbientBitmapDirty;
     private WorldSprite[] m_litWorldSprites = [];
     private readonly SKBitmap m_overlayBitmap = new(new SKImageInfo(
@@ -86,10 +87,18 @@ public sealed class EnhancedViewport : SoftwareViewport
     private SKBitmap m_wallHeightAtlas;
     private SKBitmap m_wallMaterialMap;
     private SKBitmap m_areaAmbientBitmap;
+    private SKBitmap m_navigationRouteBitmap;
     private WolfensteinWallTextures m_atlasWallTextures;
     private WolfensteinPalette m_atlasPalette;
     private WolfensteinMap m_areaAmbientSourceMap;
     private AreaAmbientMap m_areaAmbientMap;
+    private WolfensteinMap m_navigationRouteSourceMap;
+    private int m_navigationRoutePlayerX = int.MinValue;
+    private int m_navigationRoutePlayerY = int.MinValue;
+    private int m_navigationRouteStaticObjectCount = -1;
+    private int m_navigationRoutePushWallState;
+    private bool m_navigationRouteHasGoldKey;
+    private bool m_navigationRouteHasSilverKey;
     private WolfensteinSpriteSet m_bloomSpriteSet;
     private WolfensteinPalette m_bloomPalette;
     private readonly Dictionary<int, BloomProfile> m_bloomProfiles = [];
@@ -116,6 +125,14 @@ public sealed class EnhancedViewport : SoftwareViewport
         AvaloniaProperty.Register<EnhancedViewport, IReadOnlyList<WorldSprite>>(nameof(LightObjects));
     public static readonly StyledProperty<IReadOnlyList<WorldLight>> DynamicLightsProperty =
         AvaloniaProperty.Register<EnhancedViewport, IReadOnlyList<WorldLight>>(nameof(DynamicLights));
+    public static readonly StyledProperty<bool> HasGoldKeyProperty =
+        AvaloniaProperty.Register<EnhancedViewport, bool>(nameof(HasGoldKey));
+    public static readonly StyledProperty<bool> HasSilverKeyProperty =
+        AvaloniaProperty.Register<EnhancedViewport, bool>(nameof(HasSilverKey));
+    public static readonly StyledProperty<double> NavigationGuideVisibilityProperty =
+        AvaloniaProperty.Register<EnhancedViewport, double>(nameof(NavigationGuideVisibility));
+    public static readonly StyledProperty<double> NavigationGuideTimeProperty =
+        AvaloniaProperty.Register<EnhancedViewport, double>(nameof(NavigationGuideTime));
 
     static EnhancedViewport() => AffectsRender<EnhancedViewport>(
         ViewBobProperty,
@@ -128,7 +145,11 @@ public sealed class EnhancedViewport : SoftwareViewport
         BloodAmountProperty,
         IsWeaponFlashFrameProperty,
         LightObjectsProperty,
-        DynamicLightsProperty);
+        DynamicLightsProperty,
+        HasGoldKeyProperty,
+        HasSilverKeyProperty,
+        NavigationGuideVisibilityProperty,
+        NavigationGuideTimeProperty);
 
     public EnhancedViewport()
     {
@@ -205,6 +226,30 @@ public sealed class EnhancedViewport : SoftwareViewport
         set => SetValue(DynamicLightsProperty, value);
     }
 
+    public bool HasGoldKey
+    {
+        get => GetValue(HasGoldKeyProperty);
+        set => SetValue(HasGoldKeyProperty, value);
+    }
+
+    public bool HasSilverKey
+    {
+        get => GetValue(HasSilverKeyProperty);
+        set => SetValue(HasSilverKeyProperty, value);
+    }
+
+    public double NavigationGuideVisibility
+    {
+        get => GetValue(NavigationGuideVisibilityProperty);
+        set => SetValue(NavigationGuideVisibilityProperty, value);
+    }
+
+    public double NavigationGuideTime
+    {
+        get => GetValue(NavigationGuideTimeProperty);
+        set => SetValue(NavigationGuideTimeProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         if (Map == null || Doors == null || Camera == null || WallTextures == null || Palette == null)
@@ -213,6 +258,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         EnsureWallAtlas();
         EnsureAreaAmbientMap();
         UpdateAreaAmbientBitmap();
+        EnsureNavigationRouteMap();
         var playerAmbientScale = (float)m_areaAmbientMap.GetAmbientScale(Camera.X, Camera.Y, Doors);
         BuildColumnBuffer();
         BuildLightBuffer();
@@ -232,6 +278,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_wallHeightAtlas,
             m_wallMaterialMap,
             m_areaAmbientBitmap,
+            m_navigationRouteBitmap,
             m_overlayBitmap,
             m_weaponOverlayBitmap,
             m_bloomOverlayBitmap,
@@ -248,6 +295,8 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_cameraPlane,
             (float)MuzzleFlash,
             IsWeaponFlashFrame ? 1.0f : 0.0f,
+            (float)NavigationGuideVisibility,
+            (float)NavigationGuideTime,
             playerAmbientScale,
             (float)AreaAmbientMap.MaximumAmbientScale,
             AmbientMapPixelsPerTile,
@@ -278,6 +327,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         m_wallHeightAtlas?.Dispose();
         m_wallMaterialMap?.Dispose();
         m_areaAmbientBitmap?.Dispose();
+        m_navigationRouteBitmap?.Dispose();
         m_effect.Dispose();
     }
 
@@ -510,6 +560,111 @@ public sealed class EnhancedViewport : SoftwareViewport
         pixels[target + 2] = ambient;
         pixels[target + 3] = byte.MaxValue;
     }
+
+    private void EnsureNavigationRouteMap()
+    {
+        if (!ReferenceEquals(m_navigationRouteSourceMap, Map))
+        {
+            m_navigationRouteSourceMap = Map;
+            m_navigationRouteBitmap?.Dispose();
+            m_navigationRouteBitmap = new SKBitmap(new SKImageInfo(
+                Map.Width,
+                Map.Height,
+                SKColorType.Rgba8888,
+                SKAlphaType.Opaque));
+            m_navigationRoutePixels = new byte[Map.Width * Map.Height * 4];
+            InvalidateNavigationRoute();
+        }
+
+        var playerX = (int)Math.Floor(Camera.X);
+        var playerY = (int)Math.Floor(Camera.Y);
+        var pushWallState = GetPushWallState();
+        var staticObjectCount = StaticObjects?.Count ?? 0;
+        if (m_navigationRoutePlayerX == playerX &&
+            m_navigationRoutePlayerY == playerY &&
+            m_navigationRouteStaticObjectCount == staticObjectCount &&
+            m_navigationRoutePushWallState == pushWallState &&
+            m_navigationRouteHasGoldKey == HasGoldKey &&
+            m_navigationRouteHasSilverKey == HasSilverKey)
+        {
+            return;
+        }
+
+        m_navigationRoutePlayerX = playerX;
+        m_navigationRoutePlayerY = playerY;
+        m_navigationRouteStaticObjectCount = staticObjectCount;
+        m_navigationRoutePushWallState = pushWallState;
+        m_navigationRouteHasGoldKey = HasGoldKey;
+        m_navigationRouteHasSilverKey = HasSilverKey;
+        var route = NavigationRoutePlanner.Find(
+            Map,
+            Doors,
+            PushWalls,
+            playerX,
+            playerY,
+            StaticObjects ?? [],
+            HasGoldKey,
+            HasSilverKey);
+        BuildNavigationRoutePixels(route);
+    }
+
+    private void BuildNavigationRoutePixels(NavigationRoute route)
+    {
+        Array.Clear(m_navigationRoutePixels);
+        if (route.Points.Count > 1)
+        {
+            for (var index = 0; index < route.Points.Count; index++)
+            {
+                var current = route.Points[index];
+                var incoming = index > 0
+                    ? GetDirectionCode(route.Points[index - 1], current)
+                    : GetDirectionCode(current, route.Points[index + 1]);
+                var outgoing = index < route.Points.Count - 1
+                    ? GetDirectionCode(current, route.Points[index + 1])
+                    : incoming;
+                var target = ((current.Y * Map.Width) + current.X) * 4;
+                m_navigationRoutePixels[target] = incoming;
+                m_navigationRoutePixels[target + 1] = outgoing;
+                m_navigationRoutePixels[target + 2] = (byte)(index % byte.MaxValue);
+                m_navigationRoutePixels[target + 3] = byte.MaxValue;
+            }
+        }
+        CopyPixelsToBitmap(m_navigationRoutePixels, m_navigationRouteBitmap);
+    }
+
+    private void InvalidateNavigationRoute()
+    {
+        m_navigationRoutePlayerX = int.MinValue;
+        m_navigationRoutePlayerY = int.MinValue;
+        m_navigationRouteStaticObjectCount = -1;
+        m_navigationRoutePushWallState = 0;
+        m_navigationRouteHasGoldKey = false;
+        m_navigationRouteHasSilverKey = false;
+    }
+
+    private int GetPushWallState()
+    {
+        var hash = new HashCode();
+        hash.Add(PushWalls);
+        foreach (var wall in PushWalls.Items)
+        {
+            hash.Add(wall.OriginX);
+            hash.Add(wall.OriginY);
+            hash.Add((int)Math.Floor(wall.Distance));
+            hash.Add(wall.IsMoving);
+        }
+        return hash.ToHashCode();
+    }
+
+    private static byte GetDirectionCode(NavigationRoutePoint from, NavigationRoutePoint to) =>
+        (to.X - from.X, to.Y - from.Y) switch
+        {
+            (1, 0) => 1,
+            (0, 1) => 2,
+            (-1, 0) => 3,
+            (0, -1) => 4,
+            _ => 0
+        };
 
     private void BuildColumnBuffer()
     {
@@ -1098,6 +1253,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         SKBitmap wallHeights,
         SKBitmap wallMaterials,
         SKBitmap areaAmbientMap,
+        SKBitmap navigationRouteMap,
         SKBitmap spriteOverlay,
         SKBitmap weaponOverlay,
         SKBitmap bloomOverlay,
@@ -1114,6 +1270,8 @@ public sealed class EnhancedViewport : SoftwareViewport
         float[] cameraPlane,
         float muzzleFlash,
         float weaponFlash,
+        float navigationGuideVisibility,
+        float navigationGuideTime,
         float playerAmbientScale,
         float areaAmbientMaximum,
         float areaAmbientPixelsPerTile,
@@ -1155,6 +1313,9 @@ public sealed class EnhancedViewport : SoftwareViewport
             using var areaAmbientShader = areaAmbientMap.ToShader(
                 SKShaderTileMode.Clamp,
                 SKShaderTileMode.Clamp);
+            using var navigationRouteShader = navigationRouteMap.ToShader(
+                SKShaderTileMode.Clamp,
+                SKShaderTileMode.Clamp);
             using var overlayShader = spriteOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             using var weaponShader = weaponOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             using var bloomShader = bloomOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
@@ -1174,6 +1335,8 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["cameraPlane"] = cameraPlane,
                 ["muzzleFlash"] = muzzleFlash,
                 ["weaponFlash"] = weaponFlash,
+                ["navigationGuideVisibility"] = navigationGuideVisibility,
+                ["navigationGuideTime"] = navigationGuideTime,
                 ["playerAmbientScale"] = playerAmbientScale,
                 ["areaAmbientMaximum"] = areaAmbientMaximum,
                 ["areaAmbientPixelsPerTile"] = areaAmbientPixelsPerTile,
@@ -1199,6 +1362,7 @@ public sealed class EnhancedViewport : SoftwareViewport
                 ["wallHeightAtlas"] = heightShader,
                 ["wallMaterialMap"] = materialShader,
                 ["areaAmbientMap"] = areaAmbientShader,
+                ["navigationRouteMap"] = navigationRouteShader,
                 ["softwareSpriteOverlay"] = overlayShader,
                 ["softwareWeaponOverlay"] = weaponShader,
                 ["softwareBloomOverlay"] = bloomShader

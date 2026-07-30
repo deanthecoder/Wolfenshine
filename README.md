@@ -59,6 +59,16 @@ The original pixel art remains at the center of the presentation. Enhanced effec
 
 ![A guard moving through ceiling light and being illuminated by muzzle flashes](img/enemy-lighting.webp)
 
+## A path through the castle
+
+Hold `Tab` in enhanced mode and Wolfenshine projects a flowing trail directly onto the floor. Three luminous chevrons cross each tile, bend smoothly around corners, and fade away when the key is released.
+
+![The enhanced navigation guide flowing across the floor toward the next objective](img/enhanced-navigation-guide.png)
+
+The guide follows gameplay rules rather than drawing a straight line through the map. It first leads to the nearest obtainable gold or silver key, allowing ordinary doors while respecting locks. Once no reachable key remains, it continues to the elevator. Unopened secret walls remain secret; moving one can reveal a newly valid route.
+
+Because the trail is part of the rendered world, walls and doors hide what lies beyond them naturally. The route updates as the player moves, collects keys, opens passages, or shifts secret walls.
+
 ## More than a rendering demo
 
 Wolfenshine includes the game systems that make the renderer worth exploring:
@@ -135,6 +145,7 @@ dotnet run --project Wolfenshine/Wolfenshine.csproj
 | Select an owned weapon | 1–4 |
 | Pause or resume | P |
 | Toggle authentic/enhanced rendering | F2 |
+| Show navigation guide | Hold Tab |
 
 ## Why build Wolfenstein 3D again?
 
