@@ -95,6 +95,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     private WolfensteinMap m_navigationRouteSourceMap;
     private int m_navigationRoutePlayerX = int.MinValue;
     private int m_navigationRoutePlayerY = int.MinValue;
+    private int m_navigationRoutePreferredDirectionX;
+    private int m_navigationRoutePreferredDirectionY;
     private int m_navigationRouteStaticObjectCount = -1;
     private int m_navigationRoutePushWallState;
     private bool m_navigationRouteHasGoldKey;
@@ -578,10 +580,18 @@ public sealed class EnhancedViewport : SoftwareViewport
 
         var playerX = (int)Math.Floor(Camera.X);
         var playerY = (int)Math.Floor(Camera.Y);
+        var preferredDirectionX = Math.Abs(Camera.DirectionX) > Math.Abs(Camera.DirectionY)
+            ? Math.Sign(Camera.DirectionX)
+            : 0;
+        var preferredDirectionY = preferredDirectionX == 0
+            ? Math.Sign(Camera.DirectionY)
+            : 0;
         var pushWallState = GetPushWallState();
         var staticObjectCount = StaticObjects?.Count ?? 0;
         if (m_navigationRoutePlayerX == playerX &&
             m_navigationRoutePlayerY == playerY &&
+            m_navigationRoutePreferredDirectionX == preferredDirectionX &&
+            m_navigationRoutePreferredDirectionY == preferredDirectionY &&
             m_navigationRouteStaticObjectCount == staticObjectCount &&
             m_navigationRoutePushWallState == pushWallState &&
             m_navigationRouteHasGoldKey == HasGoldKey &&
@@ -592,6 +602,8 @@ public sealed class EnhancedViewport : SoftwareViewport
 
         m_navigationRoutePlayerX = playerX;
         m_navigationRoutePlayerY = playerY;
+        m_navigationRoutePreferredDirectionX = preferredDirectionX;
+        m_navigationRoutePreferredDirectionY = preferredDirectionY;
         m_navigationRouteStaticObjectCount = staticObjectCount;
         m_navigationRoutePushWallState = pushWallState;
         m_navigationRouteHasGoldKey = HasGoldKey;
@@ -604,7 +616,9 @@ public sealed class EnhancedViewport : SoftwareViewport
             playerY,
             StaticObjects ?? [],
             HasGoldKey,
-            HasSilverKey);
+            HasSilverKey,
+            preferredDirectionX,
+            preferredDirectionY);
         BuildNavigationRoutePixels(route);
     }
 
@@ -616,13 +630,17 @@ public sealed class EnhancedViewport : SoftwareViewport
             for (var index = 0; index < route.Points.Count; index++)
             {
                 var current = route.Points[index];
+                var target = ((current.Y * Map.Width) + current.X) * 4;
+                if (m_navigationRoutePixels[target + 3] != 0)
+                    continue;
                 var incoming = index > 0
                     ? GetDirectionCode(route.Points[index - 1], current)
-                    : GetDirectionCode(current, route.Points[index + 1]);
+                    : route.InitialDirectionX != 0 || route.InitialDirectionY != 0
+                        ? GetDirectionCode(route.InitialDirectionX, route.InitialDirectionY)
+                        : GetDirectionCode(current, route.Points[index + 1]);
                 var outgoing = index < route.Points.Count - 1
                     ? GetDirectionCode(current, route.Points[index + 1])
                     : incoming;
-                var target = ((current.Y * Map.Width) + current.X) * 4;
                 m_navigationRoutePixels[target] = incoming;
                 m_navigationRoutePixels[target + 1] = outgoing;
                 m_navigationRoutePixels[target + 2] = (byte)(index % byte.MaxValue);
@@ -636,6 +654,8 @@ public sealed class EnhancedViewport : SoftwareViewport
     {
         m_navigationRoutePlayerX = int.MinValue;
         m_navigationRoutePlayerY = int.MinValue;
+        m_navigationRoutePreferredDirectionX = 0;
+        m_navigationRoutePreferredDirectionY = 0;
         m_navigationRouteStaticObjectCount = -1;
         m_navigationRoutePushWallState = 0;
         m_navigationRouteHasGoldKey = false;
@@ -657,7 +677,10 @@ public sealed class EnhancedViewport : SoftwareViewport
     }
 
     private static byte GetDirectionCode(NavigationRoutePoint from, NavigationRoutePoint to) =>
-        (to.X - from.X, to.Y - from.Y) switch
+        GetDirectionCode(to.X - from.X, to.Y - from.Y);
+
+    private static byte GetDirectionCode(int directionX, int directionY) =>
+        (directionX, directionY) switch
         {
             (1, 0) => 1,
             (0, 1) => 2,

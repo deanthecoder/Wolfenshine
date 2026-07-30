@@ -31,7 +31,9 @@ public static class NavigationRoutePlanner
         int startY,
         IReadOnlyList<WorldSprite> staticObjects,
         bool hasGoldKey,
-        bool hasSilverKey)
+        bool hasSilverKey,
+        int preferredDirectionX = 0,
+        int preferredDirectionY = 0)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(doors);
@@ -47,13 +49,67 @@ public static class NavigationRoutePlanner
         BuildSearch(map, doors, pushWalls, startX, startY, hasGoldKey, hasSilverKey, parents, distances);
 
         var keyTarget = FindNearestKey(map, staticObjects, distances);
-        if (keyTarget is { } key)
-            return BuildRoute(map, parents, startX, startY, key.X, key.Y, key.TargetType);
+        var target = keyTarget ?? FindNearestExit(map, distances);
+        if (target == null)
+            return NavigationRoute.Empty;
 
-        var exitTarget = FindNearestExit(map, distances);
-        return exitTarget is { } exit
-            ? BuildRoute(map, parents, startX, startY, exit.X, exit.Y, NavigationTargetType.Exit)
-            : NavigationRoute.Empty;
+        if (Math.Abs(preferredDirectionX) + Math.Abs(preferredDirectionY) == 1)
+        {
+            var launchPoints = new List<NavigationRoutePoint>(2);
+            for (var distance = 1; distance <= 2; distance++)
+            {
+                var preferredX = startX + (preferredDirectionX * distance);
+                var preferredY = startY + (preferredDirectionY * distance);
+                if (!IsOpenSpace(
+                        map,
+                        doors,
+                        pushWalls,
+                        preferredX,
+                        preferredY,
+                        hasGoldKey,
+                        hasSilverKey))
+                {
+                    break;
+                }
+                launchPoints.Add(new NavigationRoutePoint(preferredX, preferredY));
+            }
+            if (launchPoints.Count > 0)
+            {
+                var launchPoint = launchPoints[^1];
+                var preferredParents = Enumerable.Repeat(-1, parents.Length).ToArray();
+                var preferredDistances = Enumerable.Repeat(-1, distances.Length).ToArray();
+                BuildSearch(
+                    map,
+                    doors,
+                    pushWalls,
+                    launchPoint.X,
+                    launchPoint.Y,
+                    hasGoldKey,
+                    hasSilverKey,
+                    preferredParents,
+                    preferredDistances);
+                if (preferredDistances[ToIndex(map, target.Value.X, target.Value.Y)] >= 0)
+                {
+                    var route = BuildRoute(
+                        map,
+                        preferredParents,
+                        launchPoint.X,
+                        launchPoint.Y,
+                        target.Value,
+                        preferredDirectionX,
+                        preferredDirectionY);
+                    if (launchPoints.Count == 1)
+                        return route;
+                    return new NavigationRoute(
+                        launchPoints.Take(launchPoints.Count - 1).Concat(route.Points).ToArray(),
+                        route.TargetType,
+                        route.InitialDirectionX,
+                        route.InitialDirectionY);
+                }
+            }
+        }
+
+        return BuildRoute(map, parents, startX, startY, target.Value);
     }
 
     private static void BuildSearch(
@@ -94,13 +150,13 @@ public static class NavigationRoutePlanner
         }
     }
 
-    private static (int X, int Y, NavigationTargetType TargetType)? FindNearestKey(
+    private static RouteTarget? FindNearestKey(
         WolfensteinMap map,
         IReadOnlyList<WorldSprite> staticObjects,
         int[] distances)
     {
         var bestDistance = int.MaxValue;
-        (int X, int Y, NavigationTargetType TargetType)? best = null;
+        RouteTarget? best = null;
         foreach (var sprite in staticObjects)
         {
             var targetType = WolfensteinStaticObjects.GetPickupType(sprite.SpriteNumber) switch
@@ -119,15 +175,15 @@ public static class NavigationRoutePlanner
             if (distance < 0 || distance >= bestDistance)
                 continue;
             bestDistance = distance;
-            best = (x, y, targetType);
+            best = new RouteTarget(x, y, targetType);
         }
         return best;
     }
 
-    private static (int X, int Y)? FindNearestExit(WolfensteinMap map, int[] distances)
+    private static RouteTarget? FindNearestExit(WolfensteinMap map, int[] distances)
     {
         var bestDistance = int.MaxValue;
-        (int X, int Y)? best = null;
+        RouteTarget? best = null;
         for (var y = 0; y < map.Height; y++)
         {
             for (var x = 0; x < map.Width; x++)
@@ -148,7 +204,7 @@ public static class NavigationRoutePlanner
             if (distance < 0 || distance >= bestDistance)
                 return;
             bestDistance = distance;
-            best = (x, y);
+            best = new RouteTarget(x, y, NavigationTargetType.Exit);
         }
     }
 
@@ -157,12 +213,12 @@ public static class NavigationRoutePlanner
         int[] parents,
         int startX,
         int startY,
-        int targetX,
-        int targetY,
-        NavigationTargetType targetType)
+        RouteTarget target,
+        int initialDirectionX = 0,
+        int initialDirectionY = 0)
     {
         var start = ToIndex(map, startX, startY);
-        var current = ToIndex(map, targetX, targetY);
+        var current = ToIndex(map, target.X, target.Y);
         var reversed = new List<NavigationRoutePoint>();
         while (true)
         {
@@ -174,7 +230,21 @@ public static class NavigationRoutePlanner
                 return NavigationRoute.Empty;
         }
         reversed.Reverse();
-        return new NavigationRoute(reversed, targetType);
+        return new NavigationRoute(reversed, target.TargetType, initialDirectionX, initialDirectionY);
+    }
+
+    private static bool IsOpenSpace(
+        WolfensteinMap map,
+        WolfensteinDoors doors,
+        WolfensteinPushWalls pushWalls,
+        int x,
+        int y,
+        bool hasGoldKey,
+        bool hasSilverKey)
+    {
+        var door = doors.Get(x, y);
+        return (door == null || door.IsFullyOpen) &&
+               IsPassable(map, doors, pushWalls, x, y, hasGoldKey, hasSilverKey);
     }
 
     private static bool IsPassable(
@@ -205,4 +275,6 @@ public static class NavigationRoutePlanner
         x >= 0 && x < map.Width && y >= 0 && y < map.Height;
 
     private static int ToIndex(WolfensteinMap map, int x, int y) => (y * map.Width) + x;
+
+    private readonly record struct RouteTarget(int X, int Y, NavigationTargetType TargetType);
 }

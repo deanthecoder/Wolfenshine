@@ -79,21 +79,85 @@ public sealed class NavigationRoutePlannerTests
         });
     }
 
+    [Test]
+    public void GivenTwoOpenTilesAheadCheckRouteLaunchesThroughBothWithoutChangingTarget()
+    {
+        var map = CreateOpenCorridorMap();
+        var route = Find(
+            map,
+            [new WorldSprite(2.5, 2.5, 22), new WorldSprite(7.5, 2.5, 23)],
+            startX: 4,
+            preferredDirectionX: 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(route.TargetType, Is.EqualTo(NavigationTargetType.GoldKey));
+            Assert.That(route.Points[0], Is.EqualTo(new NavigationRoutePoint(5, 2)));
+            Assert.That(route.Points[1], Is.EqualTo(new NavigationRoutePoint(6, 2)));
+            Assert.That(route.Points[2], Is.EqualTo(new NavigationRoutePoint(5, 2)));
+            Assert.That(route.InitialDirectionX, Is.EqualTo(1));
+            Assert.That(route.InitialDirectionY, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void GivenOnlyOneOpenTileAheadCheckRouteStillLaunchesForward()
+    {
+        var map = CreateOpenCorridorMap(blockedX: 6);
+        var route = Find(
+            map,
+            [new WorldSprite(2.5, 2.5, 22)],
+            startX: 4,
+            preferredDirectionX: 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(route.Points[0], Is.EqualTo(new NavigationRoutePoint(5, 2)));
+            Assert.That(route.Points[1], Is.EqualTo(new NavigationRoutePoint(4, 2)));
+            Assert.That(route.InitialDirectionX, Is.EqualTo(1));
+            Assert.That(route.InitialDirectionY, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void GivenWallAheadCheckRouteStartsAtPlayerInstead()
+    {
+        var map = CreateOpenCorridorMap(blockedX: 5);
+        var route = Find(
+            map,
+            [new WorldSprite(2.5, 2.5, 22)],
+            startX: 4,
+            preferredDirectionX: 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(route.Points[0], Is.EqualTo(new NavigationRoutePoint(4, 2)));
+            Assert.That(route.InitialDirectionX, Is.Zero);
+            Assert.That(route.InitialDirectionY, Is.Zero);
+        });
+    }
+
     private static NavigationRoute Find(
         WolfensteinMap map,
         IReadOnlyList<WorldSprite> objects,
         bool hasGoldKey = false,
         bool hasSilverKey = false,
-        WolfensteinPushWalls pushWalls = null) =>
+        WolfensteinPushWalls pushWalls = null,
+        int startX = 2,
+        int startY = 2,
+        int preferredDirectionX = 0,
+        int preferredDirectionY = 0) =>
         NavigationRoutePlanner.Find(
             map,
             WolfensteinDoors.FromMap(map),
             pushWalls ?? new WolfensteinPushWalls(map),
-            2,
-            2,
+            startX,
+            startY,
             objects,
             hasGoldKey,
-            hasSilverKey);
+            hasSilverKey,
+            preferredDirectionX,
+            preferredDirectionY);
 
     private static WolfensteinMap CreateCorridorMap(ushort doorTile)
     {
@@ -125,5 +189,18 @@ public sealed class NavigationRoutePlannerTests
         objects[(2 * width) + 4] = 98;
         var map = new WolfensteinMap(0, "Navigation Secret", width, height, walls, objects);
         return (map, new WolfensteinPushWalls(map));
+    }
+
+    private static WolfensteinMap CreateOpenCorridorMap(int blockedX = -1)
+    {
+        const int width = 11;
+        const int height = 5;
+        var walls = Enumerable.Repeat((ushort)1, width * height).ToArray();
+        for (var x = 1; x <= 9; x++)
+            walls[(2 * width) + x] = 107;
+        if (blockedX >= 0)
+            walls[(2 * width) + blockedX] = 1;
+        walls[(2 * width) + 10] = 21;
+        return new WolfensteinMap(0, "Open Navigation Corridor", width, height, walls, new ushort[width * height]);
     }
 }

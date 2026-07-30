@@ -655,13 +655,35 @@ float3 navigationGuideIllumination(float2 worldPosition, float4 route)
     float2 exit = outgoing * 0.5;
     float2 localPosition = fract(worldPosition) - 0.5;
     float routeIndex = floor((route.b * 255.0) + 0.5);
+    float directionAlignment = dot(incoming, outgoing);
     float illumination = 0.0;
     for (int chevronIndex = 0; chevronIndex < 3; chevronIndex++)
     {
         float progress = (float(chevronIndex) + 1.0) / 4.0;
         float2 tip;
         float2 direction;
-        if (dot(incoming, outgoing) > 0.5)
+        if (directionAlignment < -0.5)
+        {
+            // A forward-launched route can immediately double back when the
+            // destination is behind the player. Give that reversal a broad,
+            // readable U-turn instead of folding both route ends together.
+            float2 perpendicular = float2(-incoming.y, incoming.x);
+            float2 start = entry - (perpendicular * 0.18);
+            float2 end = entry + (perpendicular * 0.18);
+            float2 firstControl = start + (incoming * 0.58);
+            float2 secondControl = end + (incoming * 0.58);
+            float inverse = 1.0 - progress;
+            tip =
+                (start * inverse * inverse * inverse) +
+                (firstControl * 3.0 * inverse * inverse * progress) +
+                (secondControl * 3.0 * inverse * progress * progress) +
+                (end * progress * progress * progress);
+            direction = normalize(
+                ((firstControl - start) * 3.0 * inverse * inverse) +
+                ((secondControl - firstControl) * 6.0 * inverse * progress) +
+                ((end - secondControl) * 3.0 * progress * progress));
+        }
+        else if (directionAlignment > 0.5)
         {
             tip = mix(entry, exit, progress);
             direction = outgoing;

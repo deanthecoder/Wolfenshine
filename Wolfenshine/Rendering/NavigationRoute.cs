@@ -18,7 +18,9 @@ namespace Wolfenshine.Rendering;
 /// </remarks>
 public sealed record NavigationRoute(
     IReadOnlyList<NavigationRoutePoint> Points,
-    NavigationTargetType TargetType)
+    NavigationTargetType TargetType,
+    int InitialDirectionX = 0,
+    int InitialDirectionY = 0)
 {
     public static NavigationRoute Empty { get; } = new([], NavigationTargetType.None);
 }
