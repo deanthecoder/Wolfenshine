@@ -133,6 +133,14 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             return;
         }
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) &&
+            e.Key is Key.OemComma or Key.OemPeriod)
+        {
+            if (DataContext is MainWindowViewModel viewModel)
+                viewModel.SkipDebugLevel(e.Key == Key.OemComma ? -1 : 1);
+            e.Handled = true;
+            return;
+        }
 #endif
         e.Handled = SetKeyState(e.Key, true) || e.Handled;
     }

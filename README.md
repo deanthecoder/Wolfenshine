@@ -157,6 +157,7 @@ Debug builds provide a few development conveniences that are omitted from Releas
 | `M` | Toggle the textured map overview. |
 | `S` | Save the current level, position, and direction as a quick test location. |
 | `L` | Restart at the saved test location. |
+| `<` / `>` | Restart at the previous or next level, wrapping at either end of the available maps. |
 
 The Shift+C comparison capture keeps its clean source images in the Git-ignored `local/screenshots/` directory and overwrites the tracked README comparison image only after both renderer captures succeed.
 

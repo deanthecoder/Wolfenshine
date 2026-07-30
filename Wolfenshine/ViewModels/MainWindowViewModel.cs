@@ -587,6 +587,32 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
 #if DEBUG
+    /// <summary>
+    /// Restarts play at the beginning of a nearby map while retaining the player's portable state.
+    /// </summary>
+    public void SkipDebugLevel(int offset)
+    {
+        if (m_gameSession == null || Maps.Maps.Count == 0 || offset == 0)
+            return;
+        var currentIndex = 0;
+        for (var index = 0; index < Maps.Maps.Count; index++)
+        {
+            if (!ReferenceEquals(Maps.Maps[index], SelectedMap))
+                continue;
+            currentIndex = index;
+            break;
+        }
+        var targetIndex = (currentIndex + offset) % Maps.Maps.Count;
+        if (targetIndex < 0)
+            targetIndex += Maps.Maps.Count;
+        var targetMap = Maps.Maps[targetIndex];
+        var playerState = m_gameSession.CapturePlayerState();
+        StartMap(targetMap, playerState, startFaded: false);
+        NotifyMapChanged();
+        Logger.Instance.Info(
+            $"Skipped to map {targetMap.Slot} ({targetMap.Name}) with the debug level shortcut.");
+    }
+
     public void SaveDebugPosition()
     {
         if (m_gameSession == null || m_settings == null)

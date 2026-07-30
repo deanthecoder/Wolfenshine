@@ -76,6 +76,37 @@ public sealed class MainWindowViewModelTests
         Assert.That(viewModel.StatusText, Does.Contain("Select difficulty"));
     }
 
+#if DEBUG
+    [TestCase(1, 1)]
+    [TestCase(-1, 2)]
+    public void GivenDebugLevelSkipCheckMapSelectionWraps(int offset, int expectedMapIndex)
+    {
+        var maps = new[]
+        {
+            CreateElevatorMap(0, "E1M1"),
+            CreateElevatorMap(1, "E1M2"),
+            CreateElevatorMap(2, "E1M3")
+        };
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(
+            WolfensteinResources.Load(directory),
+            new WolfensteinMapSet(0xABCD, maps));
+        StartNormalGame(viewModel);
+
+        viewModel.SkipDebugLevel(offset);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.SelectedMap, Is.SameAs(maps[expectedMapIndex]));
+            Assert.That(viewModel.Camera, Is.Not.Null);
+            Assert.That(viewModel.IsSelectingDifficulty, Is.False);
+        });
+    }
+#endif
+
     [Test]
     public void GivenGameUpdateCheckCameraChangeIsPublished()
     {
