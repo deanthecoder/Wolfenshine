@@ -23,9 +23,11 @@ The enhanced renderer builds on that classic foundation without replacing its pi
     <td><img src="img/enhanced-treasure-lighting.png" alt="Treasure casting warm light around a hidden room"></td>
     <td><img src="img/enhanced-damage-feedback.png" alt="Directional blood and damage feedback during combat"></td>
   </tr>
+  <tr>
+    <td><img src="img/enhanced-exit-room-god-rays.png" alt="An illuminated exit room casting god rays into a dark corridor"></td>
+    <td><img src="img/enhanced-low-health.png" alt="Low-health damage effects beneath enhanced chandelier lighting"></td>
+  </tr>
 </table>
-
-![Low-health damage effects beneath enhanced chandelier lighting](img/enhanced-low-health.png)
 
 ## Classic underneath. Modern light on top.
 
