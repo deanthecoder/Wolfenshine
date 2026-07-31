@@ -42,7 +42,7 @@ Wolfenshine keeps the original-style renderer and enhanced renderer side by side
 ### Authentic mode
 
 - Original 320×200 composition presented at the correct 4:3 aspect ratio.
-- Indexed VGA artwork and palette-driven wall textures.
+- Original artwork, wall textures, sprites, and screen composition.
 - Familiar movement, weapon animation, HUD, menus, pause plaque, and intermission screen.
 - A reusable C# software framebuffer with the classic raycast presentation intact.
 
@@ -99,28 +99,30 @@ cd Wolfenshine
 
 ### Quick setup with the free shareware episode
 
-The repository contains a ready-made, Git-ignored location for your private game data:
+1. Run Wolfenshine without game data. Its setup screen will appear automatically.
+2. Click **Download Free Shareware**.
+3. When `w3d-box.zip` finishes downloading, drag the unopened ZIP onto the Wolfenshine window.
+4. Wolfenshine installs the shareware data and starts immediately.
+
+The shareware edition contains the complete first episode: eight regular levels, its boss level, and its secret level.
+
+When running from a source checkout, you can instead place the unopened ZIP in the repository's Git-ignored data folder before building:
 
 ```text
 local/game-data/
 ```
 
-1. [Download `w3d-box.zip` from DOS Games Archive](https://www.dosgamesarchive.com/file/wolfenstein-3d/w3d-box) by clicking **Start download of 'w3d-box.zip'** on that page.
-2. Keep the archive intact: do not rename or extract it.
-3. Copy `w3d-box.zip` into `local/game-data/`.
-4. From the repository root, run:
+You can also [download `w3d-box.zip` from DOS Games Archive](https://www.dosgamesarchive.com/file/wolfenstein-3d/w3d-box) yourself. Keep its original filename and do not extract it. From the repository root, run:
 
 ```bash
 dotnet run --project Wolfenshine/Wolfenshine.csproj
 ```
 
-The build finds the archive and extracts the eight required `.WL1` files automatically. There is no installer and no asset-conversion step.
-
-The shareware edition contains the complete first episode: eight regular levels, its boss level, and its secret level. Nothing from the ZIP is committed to this repository.
+The build finds the archive automatically. Private game data is never committed to this repository.
 
 ### Use the full six-episode game
 
-To play all six episodes, copy these eight files from an installed full game into `local/game-data/`:
+To play all six episodes, copy these eight files from a legitimate full-game installation into Wolfenshine's per-user `GameData` folder:
 
 ```text
 AUDIOHED.WL6
@@ -133,7 +135,13 @@ VGAHEAD.WL6
 VSWAP.WL6
 ```
 
-The original VGA palette is built into Wolfenshine, so no palette or executable file is required. Loose `.WL1` shareware files are also accepted if you already have them extracted. When both complete editions are present, Wolfenshine prefers the full `.WL6` data set. If anything is missing, the app opens with a clear list of the files it still needs.
+| Platform | Per-user data folder |
+|---|---|
+| Windows | `%APPDATA%\Wolfenshine\GameData` |
+| macOS | `~/Library/Application Support/Wolfenshine/GameData` |
+| Linux | `~/.config/Wolfenshine/GameData` |
+
+Restart Wolfenshine after copying the files. When running from a source checkout, you may instead place them in `local/game-data/` before building. When both complete editions are available, Wolfenshine prefers the full `.WL6` data set.
 
 Wolfenshine supports the original `.WL1` shareware and `.WL6` full-game data sets.
 
@@ -142,6 +150,14 @@ Wolfenshine supports the original `.WL1` shareware and `.WL6` full-game data set
 ```shell
 dotnet run --project Wolfenshine/Wolfenshine.csproj
 ```
+
+To clear saved preferences and remove game data installed through Wolfenshine, start it with `--reset`:
+
+```shell
+dotnet run --project Wolfenshine/Wolfenshine.csproj -- --reset
+```
+
+Packaged builds use `Wolfenshine --reset`. The option deliberately removes the current user's Wolfenshine settings and installed `GameData`; a packaged app then opens its normal setup screen. It does not touch repository-local development files or the development-build fallback.
 
 ![Starting an episode](img/episode-start.png)
 
@@ -191,54 +207,6 @@ Debug builds provide a few development conveniences that are omitted from Releas
 | `<` / `>` | Restart at the previous or next level, wrapping at either end of the available maps. |
 
 The Shift+C comparison capture keeps its clean source images in the Git-ignored `local/screenshots/` directory and overwrites the tracked README comparison image only after both renderer captures succeed.
-
-### Wolfenstein 3D data files
-
-The `.WL6` suffix identifies data for the full six-episode edition. The shareware episode uses `.WL1`; other releases use related suffixes and may arrange individual resources differently. Wolfenshine detects a complete WL6 or WL1 set and prefers WL6 when both are available. Multi-byte values in the original data are little-endian.
-
-| File | Purpose |
-|---|---|
-| `AUDIOHED.WL6` | An offset table locating audio chunks within `AUDIOT.WL6`. |
-| `AUDIOT.WL6` | PC-speaker effects, AdLib effects, and music data. Digitized sound samples are stored in `VSWAP.WL6`. |
-| `MAPHEAD.WL6` | Contains the RLEW compression tag and a table reserving 100 level-header offsets within `GAMEMAPS.WL6`. Wolfenstein 3D uses the first 60 slots; unused slots within that range contain `0xFFFFFFFF`. |
-| `GAMEMAPS.WL6` | Contains the level headers and compressed map planes describing walls, objects, actors, and areas. Map planes use Carmack compression followed by RLEW compression. |
-| `VGADICT.WL6` | The Huffman dictionary used to decompress chunks from `VGAGRAPH.WL6`. |
-| `VGAHEAD.WL6` | A table of 24-bit offsets locating graphics chunks within `VGAGRAPH.WL6`. |
-| `VGAGRAPH.WL6` | Huffman-compressed UI artwork, fonts, tiles, and other screen graphics. Chunk identifiers vary between game versions. |
-| `VSWAP.WL6` | A page-oriented container holding wall textures, sprites, and digitized sound samples. |
-
-`CONFIG.WL6` is generated configuration state rather than a required asset. `WOLF3D.EXE` is useful as a behavioral reference but is not loaded by Wolfenshine.
-
-The current private development data is the full six-episode June 1992 v1.1 release. The released source tree defaults to the later `GOODTIMES` v1.4 configuration, so resource readers must avoid assuming that version-specific chunk identifiers are universal.
-
-#### Map container layout
-
-`MAPHEAD.WL6` begins with a 16-bit RLEW tag followed by 100 little-endian 32-bit offsets. The full edition reads the first 60 map slots, while shareware reserves only its first 10; `0xFFFFFFFF` marks a sparse slot within the active range.
-
-Each offset locates a 38-byte map header in `GAMEMAPS.WL6`:
-
-| Field | Size | Notes |
-|---|---:|---|
-| Plane offsets | 3 × 4 bytes | Absolute offsets within `GAMEMAPS.WL6`. |
-| Plane lengths | 3 × 2 bytes | Compressed byte lengths. |
-| Width and height | 2 × 2 bytes | The original Wolfenstein 3D maps are 64 × 64 tiles. |
-| Name | 16 bytes | Null-terminated DOS ASCII. |
-
-The game loads plane 0 (walls and areas) and plane 1 (actors, objects, and level information). Each plane starts with its Carmack-expanded byte length. Carmack expansion produces an RLEW stream whose first word is its final expanded byte length; expanding that stream produces `width × height` 16-bit tile values in row-major order.
-
-#### Wall textures and palette
-
-`VSWAP.WL6` and `VSWAP.WL1` begin with three 16-bit values: the total page count, the first sprite page, and the first digitized-sound page. These are followed by one 32-bit offset and one 16-bit length for every page. Shareware retains the full page numbering but leaves unused later-game pages empty, so Wolfenshine decodes sparse pages only when present. Pages before the sprite boundary are 64 × 64 wall textures stored as palette indices in column-major order.
-
-Each ordinary wall tile selects a pair of pages: one for east/west-facing walls and one for north/south-facing walls. Door textures occupy the final eight pages of the wall region and similarly use orientation-specific pairs. Wall faces immediately inside a doorway use the dedicated `DOORWALL + 2/+3` jamb textures from that region.
-
-Wolfenshine retains the textures as 8-bit palette indices. The original 256 RGB triplets are embedded in the engine using the VGA DAC's 0–63 channel range and expanded to 8-bit RGB values when the palette loads. The software renderer resolves each texture index through that palette while writing its reusable RGBA framebuffer. Keeping indexed textures as the canonical representation preserves the original data and leaves palette swaps or a future GPU palette lookup straightforward.
-
-The E1M1 ceiling uses palette index `0x1D`; the original VGA clear routine uses `0x19` for the floor. Wolfenshine resolves both through the same embedded palette rather than approximating their RGB colors.
-
-`VGADICT.WL6` contains the Huffman tree used to expand `VGAGRAPH.WL6`, while `VGAHEAD.WL6` supplies its 24-bit chunk offsets. Picture chunk zero expands to a width/height table. Wolfenshine identifies the 320×40 status bar from those dimensions instead of relying on a generated chunk number: it is chunk 95 in the current v1.1 data but chunk 86 in the later GOODTIMES source configuration. Pictures are stored in four VGA planes and converted to row-major palette indices after expansion.
-
-Sprite pages use a column/post format. Each column lists its opaque vertical runs and their palette-index data, so transparency is structural rather than represented by a reserved color. The final 20 sprite pages before the sound boundary contain the four weapons' five animation frames; this allows weapon frames to be located without hard-coding version-specific absolute sprite numbers.
 
 ## License
 

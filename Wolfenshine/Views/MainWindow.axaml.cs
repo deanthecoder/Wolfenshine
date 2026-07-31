@@ -12,14 +12,17 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using DTC.Core;
 using Wolfenshine.Game;
+using Wolfenshine.Resources;
 using Wolfenshine.ViewModels;
 #if DEBUG
 using System.Runtime.InteropServices;
 using Avalonia.VisualTree;
-using DTC.Core;
 using SkiaSharp;
 #endif
 
@@ -77,6 +80,8 @@ public sealed partial class MainWindow : Window
         Opened += OnOpened;
         Closed += OnClosed;
         Deactivated += OnDeactivated;
+        DataSetupPanel.AddHandler(DragDrop.DragOverEvent, OnGameDataDragOver, RoutingStrategies.Bubble);
+        DataSetupPanel.AddHandler(DragDrop.DropEvent, OnGameDataDrop, RoutingStrategies.Bubble);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -238,7 +243,87 @@ public sealed partial class MainWindow : Window
         m_gameClock.Restart();
         m_fpsClock.Restart();
         m_gameTimer.Start();
-        Focus();
+        GameViewport.Focus();
+    }
+
+    private void OnDownloadSharewareClick(object sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        OpenWithShell(WolfensteinDataInstaller.SharewareDownloadUrl);
+
+    private void OnGameDataDragOver(object sender, DragEventArgs e)
+    {
+        e.DragEffects = DataContext is MainWindowViewModel { HasGameData: false } &&
+                        TryGetDroppedZip(e, out _)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnGameDataDrop(object sender, DragEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel { HasGameData: false } viewModel)
+            return;
+        if (!TryGetDroppedZip(e, out var archive))
+        {
+            viewModel.ReportDataError($"Drop the {WolfensteinDataInstaller.SharewareArchiveFileName} ZIP here.");
+            return;
+        }
+
+        try
+        {
+            var targetDirectory = WolfensteinResourceLocator.GetDefaultDirectory();
+            WolfensteinDataInstaller.InstallSharewareArchive(archive, targetDirectory);
+            RetryGameData();
+        }
+        catch (Exception exception)
+        {
+            Logger.Instance.Error($"Shareware installation failed: {exception}");
+            viewModel.ReportDataError($"That ZIP could not be installed.\n\n{exception.Message}");
+        }
+        e.Handled = true;
+    }
+
+    private void RetryGameData()
+    {
+        if (Application.Current is not App app)
+            return;
+        var previousViewModel = DataContext as MainWindowViewModel;
+        var viewModel = app.CreateMainWindowViewModel();
+        DataContext = viewModel;
+        previousViewModel?.Dispose();
+        ClearInput();
+        GameViewport.Focus();
+    }
+
+    private static bool TryGetDroppedZip(DragEventArgs e, out FileInfo archive)
+    {
+        archive = null;
+        var files = e.Data.GetFiles();
+        if (files == null)
+            return false;
+        foreach (var storageItem in files)
+        {
+            var path = storageItem.TryGetLocalPath();
+            if (string.IsNullOrWhiteSpace(path))
+                continue;
+            var file = new FileInfo(path);
+            if (!file.Exists || !file.Extension.Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                continue;
+            archive = file;
+            return true;
+        }
+        return false;
+    }
+
+    private static void OpenWithShell(string target)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            Logger.Instance.Error($"Could not open {target}: {exception}");
+        }
     }
 
     private void OnClosed(object sender, EventArgs e)

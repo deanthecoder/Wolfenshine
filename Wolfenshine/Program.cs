@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using Avalonia;
+using DTC.Core;
 
 namespace Wolfenshine;
 
@@ -21,8 +22,22 @@ namespace Wolfenshine;
 internal static class Program
 {
     [STAThread]
-    public static void Main(string[] args) =>
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        var resetRequested = args.Any(argument =>
+            argument.Equals("--reset", StringComparison.OrdinalIgnoreCase));
+        if (resetRequested)
+        {
+            var userDataDirectory = WolfenshineUserData.GetDirectory();
+            WolfenshineUserData.Reset(userDataDirectory);
+            Logger.Instance.Info("Reset saved Wolfenshine preferences and installed game data.");
+        }
+
+        var avaloniaArguments = args
+            .Where(argument => !argument.Equals("--reset", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(avaloniaArguments);
+    }
 
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()

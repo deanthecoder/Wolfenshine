@@ -17,7 +17,7 @@ namespace Wolfenshine;
 /// </summary>
 public sealed class WolfenshineSettings : UserSettingsBase
 {
-    protected override string SettingsFileName => "wolfenshine-settings.json";
+    protected override string SettingsFileName => WolfenshineUserData.SettingsFileName;
 
     public int SavedMapSlot { get => Get<int>(); set => Set(value); }
     public double SavedX { get => Get<double>(); set => Set(value); }
@@ -31,7 +31,7 @@ public sealed class WolfenshineSettings : UserSettingsBase
     protected override void ApplyDefaults()
     {
         SavedMapSlot = -1;
-        UseEnhancedRenderer = false;
+        UseEnhancedRenderer = true;
         ShowFramesPerSecond = false;
         UseFullScreen = false;
     }

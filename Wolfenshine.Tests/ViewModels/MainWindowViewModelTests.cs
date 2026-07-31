@@ -52,9 +52,16 @@ public sealed class MainWindowViewModelTests
 
         var viewModel = new MainWindowViewModel(exception);
 
-        Assert.That(viewModel.HasGameData, Is.False);
-        Assert.That(viewModel.StatusText, Does.Contain("not found"));
-        Assert.That(viewModel.DataErrorMessage, Does.Contain("VSWAP.WL6"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.HasGameData, Is.False);
+            Assert.That(viewModel.StatusText, Does.Contain("not found"));
+            Assert.That(viewModel.DataErrorMessage, Does.Contain("w3d-box.zip"));
+            Assert.That(viewModel.DataErrorMessage, Does.Contain("WL1"));
+            Assert.That(viewModel.DataErrorMessage, Does.Contain("WL6"));
+            Assert.That(viewModel.DataErrorMessage, Does.Not.Contain("palette files"));
+            Assert.That(viewModel.DataDirectory, Is.EqualTo(directory));
+        });
     }
 
     [Test]

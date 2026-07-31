@@ -37,58 +37,61 @@ public sealed class App : Application
         {
             Logger.Instance.SysInfo();
             Logger.Instance.Info("Starting Wolfenshine.");
-            MainWindowViewModel viewModel;
-            WolfensteinResources audioResources = null;
-            IReadOnlyList<WolfensteinMusicTrack> musicTracks = null;
-            var settings = new WolfenshineSettings();
-            try
-            {
-                var resources = WolfensteinResourceLocator.LoadDefault();
-                var maps = WolfensteinMapLoader.Load(resources);
-                var wallTextures = WolfensteinVSwapLoader.LoadWallTextures(resources);
-                var sprites = WolfensteinVSwapLoader.LoadSprites(resources);
-                var palette = WolfensteinPaletteLoader.Load();
-                var hudGraphics = WolfensteinGraphicsLoader.LoadHudGraphics(resources);
-                var intermissionGraphics = WolfensteinGraphicsLoader.LoadIntermissionGraphics(resources);
-                var difficultyGraphics = WolfensteinGraphicsLoader.LoadDifficultyGraphics(resources);
-                try
-                {
-                    musicTracks = WolfensteinMusicLoader.Load(resources);
-                    audioResources = resources;
-                }
-                catch (Exception exception)
-                {
-                    Logger.Instance.Warn($"Music loading failed; continuing without audio: {exception.Message}");
-                }
-                viewModel = new MainWindowViewModel(
-                    resources,
-                    maps,
-                    wallTextures,
-                    palette,
-                    sprites.PistolReady,
-                    sprites,
-                    hudGraphics,
-                    null,
-                    settings,
-                    intermissionGraphics,
-                    difficultyGraphics);
-                Logger.Instance.Info("Waiting for the player to select a difficulty.");
-            }
-            catch (WolfensteinDataNotFoundException exception)
-            {
-                settings.Dispose();
-                viewModel = new MainWindowViewModel(exception);
-            }
-
             desktop.MainWindow = new MainWindow
             {
-                DataContext = viewModel
+                DataContext = CreateMainWindowViewModel()
             };
-            if (audioResources != null)
-                _ = InitializeAudioAsync(viewModel, audioResources, musicTracks);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Loads the game-data-backed view model, allowing the missing-data screen to retry without restarting.
+    /// </summary>
+    internal MainWindowViewModel CreateMainWindowViewModel()
+    {
+        var settings = new WolfenshineSettings();
+        try
+        {
+            var resources = WolfensteinResourceLocator.LoadDefault();
+            var maps = WolfensteinMapLoader.Load(resources);
+            var wallTextures = WolfensteinVSwapLoader.LoadWallTextures(resources);
+            var sprites = WolfensteinVSwapLoader.LoadSprites(resources);
+            var palette = WolfensteinPaletteLoader.Load();
+            var hudGraphics = WolfensteinGraphicsLoader.LoadHudGraphics(resources);
+            var intermissionGraphics = WolfensteinGraphicsLoader.LoadIntermissionGraphics(resources);
+            var difficultyGraphics = WolfensteinGraphicsLoader.LoadDifficultyGraphics(resources);
+            IReadOnlyList<WolfensteinMusicTrack> musicTracks = null;
+            try
+            {
+                musicTracks = WolfensteinMusicLoader.Load(resources);
+            }
+            catch (Exception exception)
+            {
+                Logger.Instance.Warn($"Music loading failed; continuing without audio: {exception.Message}");
+            }
+            var viewModel = new MainWindowViewModel(
+                resources,
+                maps,
+                wallTextures,
+                palette,
+                sprites.PistolReady,
+                sprites,
+                hudGraphics,
+                null,
+                settings,
+                intermissionGraphics,
+                difficultyGraphics);
+            Logger.Instance.Info("Waiting for the player to select a difficulty.");
+            _ = InitializeAudioAsync(viewModel, resources, musicTracks);
+            return viewModel;
+        }
+        catch (WolfensteinDataNotFoundException exception)
+        {
+            settings.Dispose();
+            return new MainWindowViewModel(exception);
+        }
     }
 
     private static async Task InitializeAudioAsync(

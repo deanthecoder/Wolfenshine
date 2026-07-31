@@ -88,6 +88,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool m_showFramesPerSecond;
     private bool m_isFullScreen;
     private int m_framesPerSecond;
+    private string m_dataErrorMessage;
     private bool m_isDisposed;
 
     public MainWindowViewModel()
@@ -148,13 +149,17 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         ArgumentNullException.ThrowIfNull(exception);
         StatusText = "Wolfenstein 3D data files were not found";
-        DataErrorMessage =
-            $"Copy the required original game and palette files into:\n{exception.Directory.FullName}\n\n" +
-            $"Missing: {string.Join(", ", exception.MissingFileNames)}";
+        DataDirectory = exception.Directory;
+        m_dataErrorMessage =
+            "Wolfenshine needs either the free WL1 shareware episode or a complete WL6 data set.\n\n" +
+            $"Download the free shareware below, then drop {WolfensteinDataInstaller.SharewareArchiveFileName} " +
+            "onto this window. Wolfenshine will install it automatically.\n\n" +
+            "For full WL6 setup, see the README. The original palette is already built in.";
     }
 
     public string Title => "Wolfenshine";
     public WolfensteinResources Resources { get; }
+    public DirectoryInfo DataDirectory { get; }
     public WolfensteinMapSet Maps { get; }
     public WolfensteinMap SelectedMap { get; private set; }
     public RaycastCamera Camera => m_camera;
@@ -177,7 +182,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<WorldSprite> AccessibleEnvironmentalEffects => m_accessibleEnvironmentalEffects;
     public IReadOnlyList<WorldLight> EnemyMuzzleFlashes => m_enemyMuzzleFlashes;
     public string StatusText { get; private set; }
-    public string DataErrorMessage { get; }
+    public string DataErrorMessage => m_dataErrorMessage;
     public bool HasGameData => Resources != null;
     public bool IsGameOver => m_isGameOver;
     public double DeathFade => m_deathFade;
@@ -216,6 +221,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             ? EnhancedViewportWidth
             : AuthenticViewportWidth;
     public int PresentationViewportHeight => 240;
+
+    /// <summary>
+    /// Reports a setup failure while keeping the missing-data actions available.
+    /// </summary>
+    public void ReportDataError(string message)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        SetField(ref m_dataErrorMessage, message, nameof(DataErrorMessage));
+    }
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {

@@ -26,6 +26,8 @@
         <Border x:Name="GameViewport"
                 Width="{Binding PresentationViewportWidth}"
                 Height="{Binding PresentationViewportHeight}"
+                Focusable="True"
+                IsTabStop="False"
                 Background="#20242B">
           <Grid>
             <local:SoftwareViewport x:Name="SoftwareViewport"
@@ -119,12 +121,14 @@
                          Foreground="#FFFFFF" />
             </Border>
 
-            <StackPanel IsVisible="{Binding !HasGameData}"
+            <StackPanel x:Name="DataSetupPanel"
+                        IsVisible="{Binding !HasGameData}"
                         Width="280"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        Spacing="6">
-              <TextBlock Text="GAME DATA NOT FOUND"
+                        Spacing="6"
+                        DragDrop.AllowDrop="True">
+              <TextBlock Text="ORIGINAL GAME DATA REQUIRED"
                          HorizontalAlignment="Center"
                          FontSize="12"
                          FontWeight="Bold"
@@ -134,6 +138,24 @@
                          TextAlignment="Center"
                          TextWrapping="Wrap"
                          Foreground="#D7D9DC" />
+              <Border Padding="8,6"
+                      Background="#20262E"
+                      BorderBrush="#7FC9A5"
+                      BorderThickness="1"
+                      CornerRadius="2">
+                <TextBlock Text="DROP w3d-box.zip HERE"
+                           HorizontalAlignment="Center"
+                           FontSize="7"
+                           FontWeight="Bold"
+                           Foreground="#7FC9A5" />
+              </Border>
+              <Button Content="DOWNLOAD FREE SHAREWARE"
+                      HorizontalAlignment="Center"
+                      HorizontalContentAlignment="Center"
+                      Focusable="False"
+                      IsTabStop="False"
+                      FontSize="7"
+                      Click="OnDownloadSharewareClick" />
             </StackPanel>
           </Grid>
         </Border>
