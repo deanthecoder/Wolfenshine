@@ -29,6 +29,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private const int AuthenticViewportWidth = 320;
     private const int EnhancedViewportWidth = 384;
+    private const double TitleHoldDuration = 2.0;
+    private const double TitleFadeDuration = 0.65;
     private const double GetPsychedFillDuration = 1.4;
     private const double GetPsychedHoldDuration = 0.8;
     private GameSession m_gameSession;
@@ -76,6 +78,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private IReadOnlyList<WorldSprite> m_accessibleLightObjects = [];
     private IReadOnlyList<WorldSprite> m_accessibleEnvironmentalEffects = [];
     private IReadOnlyList<WorldLight> m_enemyMuzzleFlashes = [];
+    private bool m_isShowingTitle;
+    private double m_titleTime;
+    private double m_titleOpacity = 1.0;
+    private bool m_isSelectingEpisode;
+    private bool m_episodeInputReleased;
+    private int m_selectedEpisodeIndex;
     private bool m_isSelectingDifficulty;
     private bool m_difficultyInputReleased = true;
     private int m_selectedDifficultyIndex = 2;
@@ -130,7 +138,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedMap = maps.Maps.FirstOrDefault();
         if (SelectedMap != null)
         {
-            m_isSelectingDifficulty = true;
+            m_isShowingTitle = true;
             Actors = [];
             StaticObjects = [];
             m_audioPlayer?.PlayMusicTrack(14);
@@ -142,7 +150,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
         StatusText = SelectedMap == null
             ? "Wolfenstein 3D data loaded, but it contains no maps"
-            : "Select difficulty · arrows choose · Enter, Space, or Command starts";
+            : "Wolfenstein 3D · press any key to continue";
     }
 
     public MainWindowViewModel(WolfensteinDataNotFoundException exception)
@@ -173,6 +181,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public WolfensteinGraphic StatusBar => m_statusBar;
     public WolfensteinIntermissionGraphics IntermissionGraphics { get; }
     public WolfensteinDifficultyGraphics DifficultyGraphics { get; }
+    public WolfensteinGraphic TitleGraphic => DifficultyGraphics?.Title;
     public WolfensteinGraphic PauseGraphic => DifficultyGraphics?.Pause;
     public WolfensteinGraphic GetPsychedGraphic => DifficultyGraphics?.GetPsyched;
     public IReadOnlyList<WorldSprite> StaticObjects { get; private set; }
@@ -198,6 +207,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public double LevelFade => m_levelFade;
     public double PlayerSpeed => m_playerSpeed;
     public bool IsShowingLevelStats => m_isShowingLevelStats;
+    public bool IsShowingTitle => m_isShowingTitle;
+    public double TitleOpacity => m_titleOpacity;
+    public bool IsSelectingEpisode => m_isSelectingEpisode;
+    public int SelectedEpisodeIndex => m_selectedEpisodeIndex;
+    public int AvailableEpisodeCount => Maps == null
+        ? 0
+        : Math.Clamp(Maps.Maps.Select(map => map.Slot / 10).Distinct().Count(), 0, 6);
     public bool IsSelectingDifficulty => m_isSelectingDifficulty;
     public bool IsGettingPsyched => m_isGettingPsyched;
     public double GetPsychedProgress => m_getPsychedProgress;
@@ -217,7 +233,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public int NativeViewportWidth => AuthenticViewportWidth;
     public int NativeViewportHeight => 200;
     public int PresentationViewportWidth =>
-        m_isEnhancedRendering && !m_isSelectingDifficulty && !m_isShowingLevelStats && !m_isGettingPsyched
+        m_isEnhancedRendering && !m_isShowingTitle && !m_isSelectingEpisode &&
+        !m_isSelectingDifficulty && !m_isShowingLevelStats && !m_isGettingPsyched
             ? EnhancedViewportWidth
             : AuthenticViewportWidth;
     public int PresentationViewportHeight => 240;
@@ -235,6 +252,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (m_isPaused)
             return;
+        if (m_isShowingTitle)
+        {
+            UpdateTitle(elapsedSeconds, input);
+            return;
+        }
+        if (m_isSelectingEpisode)
+        {
+            UpdateEpisodeSelection(input);
+            return;
+        }
         if (m_isSelectingDifficulty)
         {
             UpdateDifficultySelection(input);
@@ -269,7 +296,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             m_audioPlayer?.Play(soundEvent, m_gameSession.Camera);
         if (m_gameSession.IsGameOver)
         {
-            ReturnToDifficultySelection();
+            ReturnToEpisodeSelection();
             return;
         }
         if (m_gameSession.IsReadyForNextLevel)
@@ -326,8 +353,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void TogglePause()
     {
-        if (m_gameSession == null || m_isSelectingDifficulty || m_isShowingLevelStats ||
-            m_isGettingPsyched || m_gameSession.IsDying)
+        if (m_gameSession == null || m_isShowingTitle || m_isSelectingEpisode ||
+            m_isSelectingDifficulty || m_isShowingLevelStats || m_isGettingPsyched || m_gameSession.IsDying)
             return;
         SetField(ref m_isPaused, !m_isPaused, nameof(IsPaused));
         m_audioPlayer?.SetPaused(m_isPaused);
@@ -351,7 +378,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
         m_audioPlayer?.Dispose();
         m_audioPlayer = audioPlayer;
-        if (m_isSelectingDifficulty)
+        if (m_isShowingTitle || m_isSelectingEpisode || m_isSelectingDifficulty)
             m_audioPlayer.PlayMusicTrack(14);
         else if (SelectedMap != null)
         {
@@ -363,7 +390,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void ToggleRenderer()
     {
-        if (m_gameSession == null || m_isSelectingDifficulty || m_isShowingLevelStats || m_isGettingPsyched)
+        if (m_gameSession == null || m_isShowingTitle || m_isSelectingEpisode ||
+            m_isSelectingDifficulty || m_isShowingLevelStats || m_isGettingPsyched)
             return;
         SetField(ref m_isEnhancedRendering, !m_isEnhancedRendering, nameof(IsEnhancedRendering));
         if (m_settings != null)
@@ -407,6 +435,83 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_isFullScreen, isFullScreen, nameof(IsFullScreen));
         if (m_settings != null)
             m_settings.UseFullScreen = m_isFullScreen;
+    }
+
+    /// <summary>
+    /// Begins fading the title screen immediately.
+    /// </summary>
+    public void SkipTitle()
+    {
+        if (m_isShowingTitle && m_titleTime < TitleHoldDuration)
+            m_titleTime = TitleHoldDuration;
+    }
+
+    private void UpdateTitle(double elapsedSeconds, PlayerInput input)
+    {
+        if (HasInput(input) && m_titleTime < TitleHoldDuration)
+            m_titleTime = TitleHoldDuration;
+        m_titleTime += Math.Max(0.0, elapsedSeconds);
+        if (m_titleTime >= TitleHoldDuration && !m_isSelectingEpisode)
+        {
+            SetField(ref m_isSelectingEpisode, true, nameof(IsSelectingEpisode));
+            m_episodeInputReleased = false;
+        }
+        SetField(
+            ref m_titleOpacity,
+            1.0 - Math.Clamp((m_titleTime - TitleHoldDuration) / TitleFadeDuration, 0.0, 1.0),
+            nameof(TitleOpacity));
+        if (m_titleTime < TitleHoldDuration + TitleFadeDuration)
+            return;
+
+        SetField(ref m_isShowingTitle, false, nameof(IsShowingTitle));
+        OnPropertyChanged(nameof(PresentationViewportWidth));
+        StatusText = "Select episode · arrows choose · Enter, Space, or Command continues";
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void UpdateEpisodeSelection(PlayerInput input)
+    {
+        var hasInput = HasInput(input);
+        if (!hasInput)
+        {
+            m_episodeInputReleased = true;
+            return;
+        }
+        if (!m_episodeInputReleased || AvailableEpisodeCount == 0)
+            return;
+        m_episodeInputReleased = false;
+
+        if (input.MoveForward || input.TurnLeft)
+        {
+            SetField(
+                ref m_selectedEpisodeIndex,
+                (m_selectedEpisodeIndex + AvailableEpisodeCount - 1) % AvailableEpisodeCount,
+                nameof(SelectedEpisodeIndex));
+            PlayMenuSound(WolfensteinSoundEffect.MenuMove);
+            return;
+        }
+        if (input.MoveBackward || input.TurnRight)
+        {
+            SetField(
+                ref m_selectedEpisodeIndex,
+                (m_selectedEpisodeIndex + 1) % AvailableEpisodeCount,
+                nameof(SelectedEpisodeIndex));
+            PlayMenuSound(WolfensteinSoundEffect.MenuMove);
+            return;
+        }
+        if (!input.Use && !input.Attack)
+            return;
+
+        var firstSlot = m_selectedEpisodeIndex * 10;
+        SelectedMap = Maps.Maps.FirstOrDefault(map => map.Slot >= firstSlot && map.Slot < firstSlot + 10);
+        if (SelectedMap == null)
+            return;
+        PlayMenuSound(WolfensteinSoundEffect.MenuSelect);
+        SetField(ref m_isSelectingEpisode, false, nameof(IsSelectingEpisode));
+        SetField(ref m_isSelectingDifficulty, true, nameof(IsSelectingDifficulty));
+        m_difficultyInputReleased = false;
+        StatusText = "Select difficulty · arrows choose · Enter, Space, or Command starts";
+        NotifyMapChanged();
     }
 
     private void UpdateDifficultySelection(PlayerInput input)
@@ -457,13 +562,20 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer?.Play(new WolfensteinSoundEvent(effect), RaycastCamera.FromPlayerStart(SelectedMap));
     }
 
-    private void ReturnToDifficultySelection()
+    private void ReturnToEpisodeSelection()
     {
         if (m_isPaused)
             m_audioPlayer?.SetPaused(false);
         m_isPaused = false;
         m_gameSession = null;
-        SelectedMap = Maps.Maps.FirstOrDefault();
+        var availableEpisodeCount = AvailableEpisodeCount;
+        m_selectedEpisodeIndex = Math.Clamp(
+            m_selectedEpisodeIndex,
+            0,
+            Math.Max(0, availableEpisodeCount - 1));
+        var firstSlot = m_selectedEpisodeIndex * 10;
+        SelectedMap = Maps.Maps.FirstOrDefault(
+            map => map.Slot >= firstSlot && map.Slot < firstSlot + 10);
         Actors = [];
         StaticObjects = [];
         SetField(ref m_worldObjects, [], nameof(WorldObjects));
@@ -485,12 +597,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_isGettingPsyched, false, nameof(IsGettingPsyched));
         SetField(ref m_getPsychedProgress, 0.0, nameof(GetPsychedProgress));
         m_getPsychedTime = 0.0;
-        SetField(ref m_isSelectingDifficulty, true, nameof(IsSelectingDifficulty));
+        SetField(ref m_isSelectingDifficulty, false, nameof(IsSelectingDifficulty));
+        SetField(ref m_isSelectingEpisode, true, nameof(IsSelectingEpisode));
         OnPropertyChanged(nameof(PresentationViewportWidth));
-        m_difficultyInputReleased = false;
+        m_episodeInputReleased = false;
         m_audioPlayer?.PlayMusicTrack(14);
         m_audioPlayer?.SetMusicFade(0.0);
-        StatusText = "Select difficulty · arrows choose · Enter, Space, or Command starts";
+        StatusText = "Select episode · arrows choose · Enter, Space, or Command continues";
         NotifyMapChanged();
     }
 
@@ -505,16 +618,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void AdvanceMap()
     {
-        var currentIndex = 0;
-        for (var index = 0; index < Maps.Maps.Count; index++)
-        {
-            if (ReferenceEquals(Maps.Maps[index], SelectedMap))
-            {
-                currentIndex = index;
-                break;
-            }
-        }
-        var nextMap = Maps.Maps[(currentIndex + 1) % Maps.Maps.Count];
+        var firstSlot = m_selectedEpisodeIndex * 10;
+        var episodeMaps = Maps.Maps
+            .Where(map => map.Slot >= firstSlot && map.Slot < firstSlot + 10)
+            .OrderBy(map => map.Slot)
+            .ToArray();
+        if (episodeMaps.Length == 0)
+            return;
+        var currentIndex = Array.FindIndex(episodeMaps, map => ReferenceEquals(map, SelectedMap));
+        var nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % episodeMaps.Length;
+        var nextMap = episodeMaps[nextIndex];
         var playerState = m_gameSession.CapturePlayerState();
         StartMap(nextMap, playerState, startFaded: true);
         NotifyMapChanged();

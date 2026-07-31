@@ -79,8 +79,95 @@ public sealed class MainWindowViewModelTests
 
         Assert.That(viewModel.SelectedMap, Is.SameAs(map));
         Assert.That(viewModel.Camera, Is.Null);
-        Assert.That(viewModel.IsSelectingDifficulty, Is.True);
-        Assert.That(viewModel.StatusText, Does.Contain("Select difficulty"));
+        Assert.That(viewModel.IsShowingTitle, Is.True);
+        Assert.That(viewModel.IsSelectingEpisode, Is.False);
+        Assert.That(viewModel.IsSelectingDifficulty, Is.False);
+        Assert.That(viewModel.StatusText, Does.Contain("press any key"));
+    }
+
+    [Test]
+    public void GivenTitleShownCheckItFadesIntoEpisodeSelection()
+    {
+        var map = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+
+        viewModel.UpdateGame(1.0, default);
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsShowingTitle, Is.True);
+            Assert.That(viewModel.TitleOpacity, Is.EqualTo(1.0));
+            Assert.That(viewModel.IsSelectingEpisode, Is.False);
+        });
+
+        viewModel.SkipTitle();
+        viewModel.UpdateGame(0.325, default);
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsShowingTitle, Is.True);
+            Assert.That(viewModel.TitleOpacity, Is.EqualTo(0.5).Within(0.001));
+            Assert.That(viewModel.IsSelectingEpisode, Is.True);
+        });
+
+        viewModel.UpdateGame(0.326, default);
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsShowingTitle, Is.False);
+            Assert.That(viewModel.IsSelectingEpisode, Is.True);
+        });
+    }
+
+    [Test]
+    public void GivenEpisodeSelectedCheckDifficultySelectionIsShown()
+    {
+        var map = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+
+        AdvanceToDifficultySelection(viewModel);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsSelectingEpisode, Is.False);
+            Assert.That(viewModel.IsSelectingDifficulty, Is.True);
+            Assert.That(viewModel.SelectedMap, Is.SameAs(map));
+        });
+    }
+
+    [Test]
+    public void GivenFullGameCheckAnotherEpisodeCanBeSelected()
+    {
+        var episodeOne = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var episodeTwo = new WolfensteinMap(10, "E2M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { episodeOne, episodeTwo });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+
+        viewModel.SkipTitle();
+        viewModel.UpdateGame(0.7, default);
+        viewModel.UpdateGame(0.0, default);
+        viewModel.UpdateGame(0.0, new PlayerInput(false, true, false, false));
+        viewModel.UpdateGame(0.0, default);
+        viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.AvailableEpisodeCount, Is.EqualTo(2));
+            Assert.That(viewModel.SelectedEpisodeIndex, Is.EqualTo(1));
+            Assert.That(viewModel.SelectedMap, Is.SameAs(episodeTwo));
+            Assert.That(viewModel.IsSelectingDifficulty, Is.True);
+        });
     }
 
 #if DEBUG
@@ -236,6 +323,7 @@ public sealed class MainWindowViewModelTests
             File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
         var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
 
+        AdvanceToDifficultySelection(viewModel);
         viewModel.UpdateGame(0.0, new PlayerInput(false, true, false, false));
         viewModel.UpdateGame(0.0, default);
         viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
@@ -259,6 +347,7 @@ public sealed class MainWindowViewModelTests
             File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
         var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
 
+        AdvanceToDifficultySelection(viewModel);
         viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
         Assert.Multiple(() =>
         {
@@ -307,7 +396,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Test]
-    public void GivenFinalLifeLostCheckDifficultyScreenReturnsAtFirstLevel()
+    public void GivenFinalLifeLostCheckEpisodeScreenReturnsAtFirstLevel()
     {
         var firstMap = CreateDogMap(0, "E1M1");
         var secondMap = CreateElevatorMap(1, "E1M2");
@@ -319,12 +408,13 @@ public sealed class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
         StartNormalGame(viewModel);
 
-        for (var update = 0; update < 500 && !viewModel.IsSelectingDifficulty; update++)
+        for (var update = 0; update < 500 && !viewModel.IsSelectingEpisode; update++)
             viewModel.UpdateGame(1.0, default);
 
         Assert.Multiple(() =>
         {
-            Assert.That(viewModel.IsSelectingDifficulty, Is.True);
+            Assert.That(viewModel.IsSelectingEpisode, Is.True);
+            Assert.That(viewModel.IsSelectingDifficulty, Is.False);
             Assert.That(viewModel.IsGameOver, Is.False);
             Assert.That(viewModel.SelectedMap, Is.SameAs(firstMap));
             Assert.That(viewModel.Camera, Is.Null);
@@ -373,9 +463,19 @@ public sealed class MainWindowViewModelTests
 
     private static void StartNormalGame(MainWindowViewModel viewModel)
     {
+        AdvanceToDifficultySelection(viewModel);
         viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
         viewModel.UpdateGame(2.3, default);
         viewModel.UpdateGame(0.5, default);
+    }
+
+    private static void AdvanceToDifficultySelection(MainWindowViewModel viewModel)
+    {
+        viewModel.SkipTitle();
+        viewModel.UpdateGame(0.7, default);
+        viewModel.UpdateGame(0.0, default);
+        viewModel.UpdateGame(0.0, new PlayerInput(false, false, false, false, Use: true));
+        viewModel.UpdateGame(0.0, default);
     }
 
     private static void ContinueFromStats(MainWindowViewModel viewModel)

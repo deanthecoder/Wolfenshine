@@ -11,11 +11,13 @@
 namespace Wolfenshine.Graphics;
 
 /// <summary>
-/// Groups the original artwork used by the new-game difficulty menu.
+/// Groups the original artwork used by the title and new-game menus.
 /// </summary>
 public sealed record WolfensteinDifficultyGraphics(
+    WolfensteinGraphic Title,
     WolfensteinGraphic Cursor,
     WolfensteinGraphic MouseLegend,
+    IReadOnlyList<WolfensteinGraphic> EpisodePictures,
     IReadOnlyList<WolfensteinGraphic> Faces,
     WolfensteinFont Font,
     WolfensteinGraphic Pause,

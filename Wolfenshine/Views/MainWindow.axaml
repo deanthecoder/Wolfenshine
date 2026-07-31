@@ -87,11 +87,24 @@
                                         BjFrame="{Binding BjFrame}"
                                         RenderOptions.BitmapInterpolationMode="LowQuality" />
 
+            <local:EpisodeViewport IsVisible="{Binding IsSelectingEpisode}"
+                                   Graphics="{Binding DifficultyGraphics}"
+                                   Palette="{Binding Palette}"
+                                   Selection="{Binding SelectedEpisodeIndex}"
+                                   AvailableEpisodes="{Binding AvailableEpisodeCount}"
+                                   RenderOptions.BitmapInterpolationMode="LowQuality" />
+
             <local:DifficultyViewport IsVisible="{Binding IsSelectingDifficulty}"
                                       Graphics="{Binding DifficultyGraphics}"
                                       Palette="{Binding Palette}"
                                       Selection="{Binding SelectedDifficultyIndex}"
                                       RenderOptions.BitmapInterpolationMode="LowQuality" />
+
+            <local:TitleViewport IsVisible="{Binding IsShowingTitle}"
+                                 Graphic="{Binding TitleGraphic}"
+                                 Palette="{Binding Palette}"
+                                 Opacity="{Binding TitleOpacity}"
+                                 RenderOptions.BitmapInterpolationMode="LowQuality" />
 
             <local:GetPsychedViewport IsVisible="{Binding IsGettingPsyched}"
                                       Graphic="{Binding GetPsychedGraphic}"

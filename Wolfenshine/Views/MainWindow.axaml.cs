@@ -87,6 +87,12 @@ public sealed partial class MainWindow : Window
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (DataContext is MainWindowViewModel { IsShowingTitle: true } titleViewModel)
+        {
+            titleViewModel.SkipTitle();
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
         {
             if (!m_fullScreenKeyDown)

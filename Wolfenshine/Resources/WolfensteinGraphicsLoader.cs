@@ -42,6 +42,9 @@ public static class WolfensteinGraphicsLoader
     private const int DifficultyFaceWidth = 24;
     private const int DifficultyFaceHeight = 32;
     private const int DifficultyFaceCount = 4;
+    private const int EpisodePictureWidth = 48;
+    private const int EpisodePictureHeight = 24;
+    private const int EpisodePictureCount = 6;
     private const int GetPsychedWidth = 224;
     private const int GetPsychedHeight = 48;
     private const int MenuFontChunk = 2;
@@ -138,19 +141,36 @@ public static class WolfensteinGraphicsLoader
             DifficultyFaceWidth,
             DifficultyFaceHeight,
             DifficultyFaceCount);
+        var firstEpisodeChunk = FindConsecutivePictureChunks(
+            pictures,
+            EpisodePictureWidth,
+            EpisodePictureHeight,
+            EpisodePictureCount);
         var cursor = ReadPicture(reader, offsets, dictionary, pictures, cursorChunk);
         var mouseLegend = ReadPicture(reader, offsets, dictionary, pictures, mouseLegendChunk);
+        var episodePictures = Enumerable.Range(firstEpisodeChunk, EpisodePictureCount)
+            .Select(chunk => ReadPicture(reader, offsets, dictionary, pictures, chunk))
+            .ToArray();
         var faces = Enumerable.Range(firstFaceChunk, DifficultyFaceCount)
             .Select(chunk => ReadPicture(reader, offsets, dictionary, pictures, chunk))
             .ToArray();
         var font = ReadFont(ReadChunk(reader, offsets, MenuFontChunk, dictionary));
         var statusChunk = FindPictureChunk(pictures, StatusBarWidth, StatusBarHeight);
+        var title = ReadPicture(reader, offsets, dictionary, pictures, statusChunk + 1);
         var pause = ReadPicture(reader, offsets, dictionary, pictures, statusChunk + PausePictureOffset);
         var getPsychedChunk = FindPictureChunk(pictures, GetPsychedWidth, GetPsychedHeight);
         var getPsyched = ReadPicture(reader, offsets, dictionary, pictures, getPsychedChunk);
         Logger.Instance.Info(
-            "Loaded the original menu, pause, and Get Psyched graphics from VGAGRAPH.");
-        return new WolfensteinDifficultyGraphics(cursor, mouseLegend, faces, font, pause, getPsyched);
+            "Loaded the original title, episode, menu, pause, and Get Psyched graphics from VGAGRAPH.");
+        return new WolfensteinDifficultyGraphics(
+            title,
+            cursor,
+            mouseLegend,
+            episodePictures,
+            faces,
+            font,
+            pause,
+            getPsyched);
     }
 
     private static WolfensteinFont ReadFont(ReadOnlySpan<byte> data)

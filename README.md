@@ -82,7 +82,7 @@ Wolfenshine includes the game systems that make the renderer worth exploring:
 - Sliding and locked doors, secret pushwalls, elevators, death, respawning, level progression, and end-of-level statistics.
 - Difficulty-dependent enemy placement, health, behavior, and incoming damage.
 - Spatial digitized and AdLib sound through OpenAL, plus original IMF music rendered through OPL emulation.
-- Original-style difficulty selection, HUD, animated face, pause display, and intermission presentation.
+- Original title, episode and difficulty selection, HUD, animated face, pause display, and intermission presentation.
 
 ![Difficulty selection](img/difficulty-selection.png)
 
