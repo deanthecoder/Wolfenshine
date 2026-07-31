@@ -46,6 +46,27 @@ public sealed class WorldSpriteProjectorTests
     }
 
     [Test]
+    public void GivenPickupAndActorAtSamePositionCheckPickupIsDrawnOverActor()
+    {
+        var camera = new RaycastCamera(2.5, 3.5, 0.0, -1.0, 0.66, 0.0);
+        WorldSprite[] sprites =
+        [
+            new(2.5, 2.5, 28),
+            new(2.5, 2.5, 95, IsActor: true)
+        ];
+        var projected = new ProjectedWorldSprite[sprites.Length];
+
+        var count = WorldSpriteProjector.Project(sprites, camera, 320, 200, projected);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(count, Is.EqualTo(2));
+            Assert.That(projected[0].SpriteNumber, Is.EqualTo(95));
+            Assert.That(projected[1].SpriteNumber, Is.EqualTo(28));
+        });
+    }
+
+    [Test]
     public void GivenClippedViewportCheckIndependentProjectionHeightControlsSpriteScale()
     {
         var camera = new RaycastCamera(2.5, 3.5, 0.0, -1.0, 0.66, 0.0);

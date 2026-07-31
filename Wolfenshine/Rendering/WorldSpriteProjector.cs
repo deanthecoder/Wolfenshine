@@ -78,7 +78,16 @@ public static class WorldSpriteProjector
                 GodRayAmount: sprite.GodRayAmount);
         }
 
-        projectedSprites[..visibleCount].Sort(static (left, right) => right.Depth.CompareTo(left.Depth));
+        projectedSprites[..visibleCount].Sort(static (left, right) =>
+        {
+            var depthComparison = right.Depth.CompareTo(left.Depth);
+            if (depthComparison != 0)
+                return depthComparison;
+
+            // A defeated actor and its drop occupy precisely the same world position. Draw the actor first so the
+            // pickup is consistently visible on top instead of their order changing as the overall depth sort moves.
+            return right.CastsGroundShadow.CompareTo(left.CastsGroundShadow);
+        });
         return visibleCount;
     }
 
