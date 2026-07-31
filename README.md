@@ -89,9 +89,17 @@ Wolfenshine includes the game systems that make the renderer worth exploring:
 
 ## Play Wolfenshine
 
-You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) and either the free Wolfenstein 3D shareware data or a legitimate copy of the full six-episode game. Wolfenshine does not distribute id Software's copyrighted game assets.
+Download the installer for your platform from [GitHub Releases](https://github.com/deanthecoder/Wolfenshine/releases):
 
-Clone the repository and its submodules:
+- Windows: `Wolfenshine-<version>-win-x64.exe`
+- Apple Silicon Mac: `Wolfenshine-<version>-osx-arm64.dmg`
+- Intel Mac: `Wolfenshine-<version>-osx-x64.dmg`
+
+Wolfenshine needs either the free Wolfenstein 3D shareware data or a legitimate copy of the full six-episode game. It does not distribute id Software's copyrighted game assets. Start the installed app and its setup screen will guide you through adding the free shareware episode.
+
+### Build from source
+
+Install the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), then clone the repository and its submodules:
 
 ```shell
 git clone --recurse-submodules https://github.com/deanthecoder/Wolfenshine.git

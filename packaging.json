@@ -1,0 +1,25 @@
+{
+  "ProductName": "Wolfenshine",
+  "CompanyName": "Dean Edis (DeanTheCoder)",
+  "PublisherUrl": "https://github.com/deanthecoder/Wolfenshine",
+  "BundleIdentifier": "com.deanthecoder.wolfenshine",
+  "Executable": "Wolfenshine",
+  "Project": "Wolfenshine/Wolfenshine.csproj",
+  "Version": "0.1",
+  "Win": {
+    "InnoScript": "Installer/templates/inno.iss",
+    "IconIco": "Wolfenshine/Assets/Wolfenshine.ico",
+    "GUID": "{8C451AF4-E8A4-47E1-899A-3AB51C8C5029}",
+    "RuntimeIdentifier": "win-x64",
+    "InstallOpenAL": true,
+    "ShowRunOnStartupTask": false
+  },
+  "Mac": {
+    "RuntimeIdentifiers": [
+      "osx-arm64",
+      "osx-x64"
+    ],
+    "IconIcns": "Wolfenshine/Assets/Wolfenshine.icns",
+    "InfoPlist": "Installer/templates/Info.plist"
+  }
+}

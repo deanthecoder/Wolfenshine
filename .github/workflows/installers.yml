@@ -1,0 +1,36 @@
+name: Installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Installer version, e.g. 0.1"
+        required: true
+        default: "0.1"
+        type: string
+      build_windows:
+        description: "Build the Windows installer."
+        required: true
+        default: true
+        type: boolean
+      build_macos:
+        description: "Build the macOS DMGs."
+        required: true
+        default: true
+        type: boolean
+      create_release:
+        description: "Create a GitHub release with generated notes and installer files."
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  installers:
+    permissions:
+      contents: write
+    uses: deanthecoder/DTC.Installer/.github/workflows/installers.yml@main
+    with:
+      version: ${{ inputs.version }}
+      build_windows: ${{ inputs.build_windows }}
+      build_macos: ${{ inputs.build_macos }}
+      create_release: ${{ inputs.create_release }}
