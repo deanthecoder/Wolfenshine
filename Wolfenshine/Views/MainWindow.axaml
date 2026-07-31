@@ -121,6 +121,15 @@
                                  Palette="{Binding Palette}"
                                  RenderOptions.BitmapInterpolationMode="LowQuality" />
 
+            <local:EndGameConfirmationViewport IsVisible="{Binding IsConfirmingEndGame}"
+                                               Width="320"
+                                               Height="240"
+                                               HorizontalAlignment="Center"
+                                               Graphics="{Binding DifficultyGraphics}"
+                                               Palette="{Binding Palette}"
+                                               ShowCursor="{Binding EndGameConfirmationCursorVisible}"
+                                               RenderOptions.BitmapInterpolationMode="LowQuality" />
+
             <Border IsVisible="{Binding ShowFramesPerSecond}"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Top"

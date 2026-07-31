@@ -83,7 +83,7 @@ public sealed class App : Application
                 settings,
                 intermissionGraphics,
                 difficultyGraphics);
-            Logger.Instance.Info("Waiting for the player to select a difficulty.");
+            Logger.Instance.Info("Showing the Wolfenstein 3D title screen.");
             _ = InitializeAudioAsync(viewModel, resources, musicTracks);
             return viewModel;
         }

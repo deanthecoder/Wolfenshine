@@ -57,6 +57,7 @@ public sealed partial class MainWindow : Window
     private bool m_rendererKeyDown;
     private bool m_fpsKeyDown;
     private bool m_fullScreenKeyDown;
+    private bool m_escapeKeyDown;
     private WindowState m_windowedState = WindowState.Normal;
     private double m_viewBobOffset;
     private double m_viewBobPhase;
@@ -90,6 +91,27 @@ public sealed partial class MainWindow : Window
         if (DataContext is MainWindowViewModel { IsShowingTitle: true } titleViewModel)
         {
             titleViewModel.SkipTitle();
+            e.Handled = true;
+            return;
+        }
+        if (DataContext is MainWindowViewModel { IsConfirmingEndGame: true } confirmationViewModel)
+        {
+            if (e.Key == Key.Y)
+                confirmationViewModel.ConfirmEndGame();
+            else if (e.Key == Key.N)
+                confirmationViewModel.CancelEndGameConfirmation();
+            else if (e.Key == Key.Escape && !m_escapeKeyDown)
+                confirmationViewModel.CancelEndGameConfirmation();
+            if (e.Key == Key.Escape)
+                m_escapeKeyDown = true;
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Escape)
+        {
+            if (!m_escapeKeyDown && DataContext is MainWindowViewModel viewModel)
+                viewModel.ShowEndGameConfirmation();
+            m_escapeKeyDown = true;
             e.Handled = true;
             return;
         }
@@ -136,12 +158,6 @@ public sealed partial class MainWindow : Window
                 m_fullScreenKeyDown = true;
                 ToggleFullScreen();
             }
-            e.Handled = true;
-            return;
-        }
-        if (e.Key == Key.Escape && WindowState == WindowState.FullScreen)
-        {
-            ExitFullScreen();
             e.Handled = true;
             return;
         }
@@ -209,6 +225,12 @@ public sealed partial class MainWindow : Window
     protected override void OnKeyUp(KeyEventArgs e)
     {
         base.OnKeyUp(e);
+        if (e.Key == Key.Escape)
+        {
+            m_escapeKeyDown = false;
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.P)
         {
             m_pauseKeyDown = false;

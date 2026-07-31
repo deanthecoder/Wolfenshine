@@ -91,6 +91,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool m_isGettingPsyched;
     private double m_getPsychedTime;
     private double m_getPsychedProgress;
+    private bool m_isConfirmingEndGame;
+    private double m_endGameConfirmationTime;
+    private bool m_endGameConfirmationCursorVisible = true;
     private bool m_isPaused;
     private bool m_isEnhancedRendering;
     private bool m_showFramesPerSecond;
@@ -217,6 +220,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool IsSelectingDifficulty => m_isSelectingDifficulty;
     public bool IsGettingPsyched => m_isGettingPsyched;
     public double GetPsychedProgress => m_getPsychedProgress;
+    public bool IsConfirmingEndGame => m_isConfirmingEndGame;
+    public bool EndGameConfirmationCursorVisible => m_endGameConfirmationCursorVisible;
     public bool IsPaused => m_isPaused;
     public bool HasGoldKey => m_gameSession?.HasGoldKey == true;
     public bool HasSilverKey => m_gameSession?.HasSilverKey == true;
@@ -250,6 +255,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {
+        if (m_isConfirmingEndGame)
+        {
+            m_endGameConfirmationTime += Math.Max(0.0, elapsedSeconds);
+            SetField(
+                ref m_endGameConfirmationCursorVisible,
+                ((int)(m_endGameConfirmationTime / 0.35) & 1) == 0,
+                nameof(EndGameConfirmationCursorVisible));
+            return;
+        }
         if (m_isPaused)
             return;
         if (m_isShowingTitle)
@@ -353,7 +367,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void TogglePause()
     {
-        if (m_gameSession == null || m_isShowingTitle || m_isSelectingEpisode ||
+        if (m_gameSession == null || m_isConfirmingEndGame || m_isShowingTitle || m_isSelectingEpisode ||
             m_isSelectingDifficulty || m_isShowingLevelStats || m_isGettingPsyched || m_gameSession.IsDying)
             return;
         SetField(ref m_isPaused, !m_isPaused, nameof(IsPaused));
@@ -390,7 +404,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void ToggleRenderer()
     {
-        if (m_gameSession == null || m_isShowingTitle || m_isSelectingEpisode ||
+        if (m_gameSession == null || m_isConfirmingEndGame || m_isShowingTitle || m_isSelectingEpisode ||
             m_isSelectingDifficulty || m_isShowingLevelStats || m_isGettingPsyched)
             return;
         SetField(ref m_isEnhancedRendering, !m_isEnhancedRendering, nameof(IsEnhancedRendering));
@@ -435,6 +449,45 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_isFullScreen, isFullScreen, nameof(IsFullScreen));
         if (m_settings != null)
             m_settings.UseFullScreen = m_isFullScreen;
+    }
+
+    /// <summary>
+    /// Freezes active gameplay and asks whether the current game should end.
+    /// </summary>
+    public bool ShowEndGameConfirmation()
+    {
+        if (m_gameSession == null || m_gameSession.IsDying || m_isPaused || m_isShowingLevelStats ||
+            m_isGettingPsyched || m_isSelectingDifficulty || m_isSelectingEpisode || m_isShowingTitle)
+            return false;
+        m_endGameConfirmationTime = 0.0;
+        SetField(ref m_endGameConfirmationCursorVisible, true, nameof(EndGameConfirmationCursorVisible));
+        SetField(ref m_isConfirmingEndGame, true, nameof(IsConfirmingEndGame));
+        StatusText = "End current game? · Y confirms · N or Escape returns";
+        OnPropertyChanged(nameof(StatusText));
+        return true;
+    }
+
+    /// <summary>
+    /// Closes the end-game question and resumes the current game.
+    /// </summary>
+    public void CancelEndGameConfirmation()
+    {
+        if (!m_isConfirmingEndGame)
+            return;
+        SetField(ref m_isConfirmingEndGame, false, nameof(IsConfirmingEndGame));
+        StatusText = $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
+                     "1–4 select weapons · Space opens doors";
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    /// <summary>
+    /// Ends the current game and restarts the front-end sequence at the title screen.
+    /// </summary>
+    public void ConfirmEndGame()
+    {
+        if (!m_isConfirmingEndGame)
+            return;
+        ReturnToTitleScreen();
     }
 
     /// <summary>
@@ -595,6 +648,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_playerSpeed, 0.0, nameof(PlayerSpeed));
         SetField(ref m_isGameOver, false, nameof(IsGameOver));
         SetField(ref m_isGettingPsyched, false, nameof(IsGettingPsyched));
+        SetField(ref m_isConfirmingEndGame, false, nameof(IsConfirmingEndGame));
         SetField(ref m_getPsychedProgress, 0.0, nameof(GetPsychedProgress));
         m_getPsychedTime = 0.0;
         SetField(ref m_isSelectingDifficulty, false, nameof(IsSelectingDifficulty));
@@ -605,6 +659,17 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer?.SetMusicFade(0.0);
         StatusText = "Select episode · arrows choose · Enter, Space, or Command continues";
         NotifyMapChanged();
+    }
+
+    private void ReturnToTitleScreen()
+    {
+        ReturnToEpisodeSelection();
+        SetField(ref m_isSelectingEpisode, false, nameof(IsSelectingEpisode));
+        m_titleTime = 0.0;
+        SetField(ref m_titleOpacity, 1.0, nameof(TitleOpacity));
+        SetField(ref m_isShowingTitle, true, nameof(IsShowingTitle));
+        StatusText = "Wolfenstein 3D · press any key to continue";
+        OnPropertyChanged(nameof(StatusText));
     }
 
     public void Dispose()

@@ -174,7 +174,8 @@ Packaged builds use `Wolfenshine --reset`. The option deliberately removes the c
 | Pause or resume | P |
 | Toggle authentic/enhanced rendering | F2 |
 | Toggle FPS counter | F3 |
-| Toggle fullscreen | Alt/Option+Enter; F11 on Windows/Linux; Escape leaves fullscreen |
+| Toggle fullscreen | Alt/Option+Enter; F11 on Windows/Linux |
+| End current game | Escape, followed by Y to confirm or N/Escape to return |
 | Show navigation guide | Hold Tab |
 
 ## Why build Wolfenstein 3D again?

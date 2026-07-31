@@ -254,6 +254,64 @@ public sealed class MainWindowViewModelTests
     }
 
     [Test]
+    public void GivenEndGameQuestionCanceledCheckGameplayResumes()
+    {
+        var map = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        StartNormalGame(viewModel);
+        var originalCamera = viewModel.Camera;
+
+        var wasShown = viewModel.ShowEndGameConfirmation();
+        viewModel.UpdateGame(0.1, new PlayerInput(false, false, false, true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(wasShown, Is.True);
+            Assert.That(viewModel.IsConfirmingEndGame, Is.True);
+            Assert.That(viewModel.Camera, Is.SameAs(originalCamera));
+        });
+
+        viewModel.CancelEndGameConfirmation();
+        viewModel.UpdateGame(0.1, new PlayerInput(false, false, false, true));
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsConfirmingEndGame, Is.False);
+            Assert.That(viewModel.Camera, Is.Not.SameAs(originalCamera));
+        });
+    }
+
+    [Test]
+    public void GivenEndGameQuestionConfirmedCheckTitleScreenReturns()
+    {
+        var map = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        StartNormalGame(viewModel);
+
+        viewModel.ShowEndGameConfirmation();
+        viewModel.ConfirmEndGame();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsConfirmingEndGame, Is.False);
+            Assert.That(viewModel.IsShowingTitle, Is.True);
+            Assert.That(viewModel.IsSelectingEpisode, Is.False);
+            Assert.That(viewModel.IsSelectingDifficulty, Is.False);
+            Assert.That(viewModel.TitleOpacity, Is.EqualTo(1.0));
+            Assert.That(viewModel.Camera, Is.Null);
+        });
+    }
+
+    [Test]
     public void GivenRendererToggledCheckEnhancedModeCanReturnToAuthenticMode()
     {
         var map = new WolfensteinMap(0, "E1M1", 1, 1, new ushort[] { 1 }, new ushort[] { 19 });
