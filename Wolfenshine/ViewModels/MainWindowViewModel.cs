@@ -33,6 +33,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private const double TitleFadeDuration = 0.65;
     private const double GetPsychedFillDuration = 1.4;
     private const double GetPsychedHoldDuration = 0.8;
+    private const double AttractModeIdleDuration = 30.0;
     private GameSession m_gameSession;
     private WolfensteinAudioPlayer m_audioPlayer;
     private readonly WolfenshineSettings m_settings;
@@ -83,6 +84,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private double m_titleOpacity = 1.0;
     private bool m_isSelectingEpisode;
     private bool m_episodeInputReleased;
+    private double m_episodeIdleTime;
     private int m_selectedEpisodeIndex;
     private bool m_isSelectingDifficulty;
     private bool m_difficultyInputReleased = true;
@@ -94,6 +96,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool m_isConfirmingEndGame;
     private double m_endGameConfirmationTime;
     private bool m_endGameConfirmationCursorVisible = true;
+    private bool m_isAutoPlaying;
+    private AutoPlayerController m_autoPlayer;
     private bool m_isPaused;
     private bool m_isEnhancedRendering;
     private bool m_showFramesPerSecond;
@@ -222,6 +226,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public double GetPsychedProgress => m_getPsychedProgress;
     public bool IsConfirmingEndGame => m_isConfirmingEndGame;
     public bool EndGameConfirmationCursorVisible => m_endGameConfirmationCursorVisible;
+    public bool IsAutoPlaying => m_isAutoPlaying;
     public bool IsPaused => m_isPaused;
     public bool HasGoldKey => m_gameSession?.HasGoldKey == true;
     public bool HasSilverKey => m_gameSession?.HasSilverKey == true;
@@ -255,6 +260,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {
+        if (m_isAutoPlaying && HasInput(input))
+        {
+            ReturnToTitleScreen();
+            return;
+        }
         if (m_isConfirmingEndGame)
         {
             m_endGameConfirmationTime += Math.Max(0.0, elapsedSeconds);
@@ -273,7 +283,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
         if (m_isSelectingEpisode)
         {
-            UpdateEpisodeSelection(input);
+            UpdateEpisodeSelection(elapsedSeconds, input);
             return;
         }
         if (m_isSelectingDifficulty)
@@ -303,19 +313,32 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             }
             return;
         }
+        if (m_isAutoPlaying)
+            input = m_autoPlayer.Update(m_gameSession, elapsedSeconds);
         if (m_gameSession?.Update(elapsedSeconds, input, m_isEnhancedRendering) != true)
             return;
         RefreshAccessibleLights();
         foreach (var soundEvent in m_gameSession.DrainSoundEvents())
             m_audioPlayer?.Play(soundEvent, m_gameSession.Camera);
+        if (m_isAutoPlaying && m_gameSession.IsDying && m_gameSession.DeathFade >= 1.0)
+        {
+            ReturnToTitleScreen();
+            return;
+        }
         if (m_gameSession.IsGameOver)
         {
-            ReturnToEpisodeSelection();
+            if (m_isAutoPlaying)
+                ReturnToTitleScreen();
+            else
+                ReturnToEpisodeSelection();
             return;
         }
         if (m_gameSession.IsReadyForNextLevel)
         {
-            BeginLevelStats();
+            if (m_isAutoPlaying)
+                ReturnToTitleScreen();
+            else
+                BeginLevelStats();
             return;
         }
         if (m_restartRevision != m_gameSession.RestartRevision)
@@ -491,6 +514,39 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// Starts an autonomous demonstration from the highlighted episode.
+    /// </summary>
+    public bool StartAttractMode()
+    {
+        if (!m_isSelectingEpisode || AvailableEpisodeCount == 0)
+            return false;
+        var firstSlot = m_selectedEpisodeIndex * 10;
+        SelectedMap = Maps.Maps.FirstOrDefault(map => map.Slot >= firstSlot && map.Slot < firstSlot + 10);
+        if (SelectedMap == null)
+            return false;
+        m_difficulty = GameDifficulty.Normal;
+        m_selectedDifficultyIndex = (int)m_difficulty;
+        m_episodeIdleTime = 0.0;
+        m_autoPlayer = new AutoPlayerController();
+        SetField(ref m_isSelectingEpisode, false, nameof(IsSelectingEpisode));
+        SetField(ref m_isAutoPlaying, true, nameof(IsAutoPlaying));
+        OnPropertyChanged(nameof(SelectedDifficultyIndex));
+        OnPropertyChanged(nameof(PresentationViewportWidth));
+        StartMap(SelectedMap, null, startFaded: true);
+        NotifyMapChanged();
+        return true;
+    }
+
+    /// <summary>
+    /// Ends an autonomous demonstration and restores the title screen.
+    /// </summary>
+    public void StopAttractMode()
+    {
+        if (m_isAutoPlaying)
+            ReturnToTitleScreen();
+    }
+
+    /// <summary>
     /// Begins fading the title screen immediately.
     /// </summary>
     public void SkipTitle()
@@ -522,14 +578,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(StatusText));
     }
 
-    private void UpdateEpisodeSelection(PlayerInput input)
+    private void UpdateEpisodeSelection(double elapsedSeconds, PlayerInput input)
     {
         var hasInput = HasInput(input);
         if (!hasInput)
         {
             m_episodeInputReleased = true;
+            m_episodeIdleTime += Math.Max(0.0, elapsedSeconds);
+            if (m_episodeIdleTime >= AttractModeIdleDuration)
+                StartAttractMode();
             return;
         }
+        m_episodeIdleTime = 0.0;
         if (!m_episodeInputReleased || AvailableEpisodeCount == 0)
             return;
         m_episodeInputReleased = false;
@@ -620,6 +680,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (m_isPaused)
             m_audioPlayer?.SetPaused(false);
         m_isPaused = false;
+        m_autoPlayer = null;
+        SetField(ref m_isAutoPlaying, false, nameof(IsAutoPlaying));
         m_gameSession = null;
         var availableEpisodeCount = AvailableEpisodeCount;
         m_selectedEpisodeIndex = Math.Clamp(
@@ -655,6 +717,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_isSelectingEpisode, true, nameof(IsSelectingEpisode));
         OnPropertyChanged(nameof(PresentationViewportWidth));
         m_episodeInputReleased = false;
+        m_episodeIdleTime = 0.0;
         m_audioPlayer?.PlayMusicTrack(14);
         m_audioPlayer?.SetMusicFade(0.0);
         StatusText = "Select episode · arrows choose · Enter, Space, or Command continues";
@@ -888,8 +951,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         SetField(ref m_isGettingPsyched, false, nameof(IsGettingPsyched));
         OnPropertyChanged(nameof(PresentationViewportWidth));
-        StatusText = $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
-                     "1–4 select weapons · Space opens doors";
+        StatusText = m_isAutoPlaying
+            ? $"Attract mode · {SelectedMap.Name} · press any key to return"
+            : $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
+              "1–4 select weapons · Space opens doors";
         OnPropertyChanged(nameof(StatusText));
     }
 

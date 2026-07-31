@@ -199,6 +199,11 @@ public sealed class GameSession
         return events;
     }
 
+    /// <summary>
+    /// Determines whether the player has an unobstructed line to a world position.
+    /// </summary>
+    public bool HasLineOfSightTo(double x, double y) => HasLineOfSight(Camera.X, Camera.Y, x, y);
+
 #if DEBUG
     public bool ReloadDebugState()
     {

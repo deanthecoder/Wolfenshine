@@ -83,6 +83,7 @@ Wolfenshine includes the game systems that make the renderer worth exploring:
 - Difficulty-dependent enemy placement, health, behavior, and incoming damage.
 - Spatial digitized and AdLib sound through OpenAL, plus original IMF music rendered through OPL emulation.
 - Original title, episode and difficulty selection, HUD, animated face, pause display, and intermission presentation.
+- An autonomous attract mode starts after 30 seconds at episode selection and plays through the real input system.
 
 ![Difficulty selection](img/difficulty-selection.png)
 
@@ -206,6 +207,7 @@ Debug builds provide a few development conveniences that are omitted from Releas
 | `S` | Save the current level, position, and direction as a quick test location. |
 | `L` | Restart at the saved test location. |
 | `<` / `>` | Restart at the previous or next level, wrapping at either end of the available maps. |
+| `D` | Start attract mode immediately while on the episode-selection screen. |
 
 The Shift+C comparison capture keeps its clean source images in the Git-ignored `local/screenshots/` directory and overwrites the tracked README comparison image only after both renderer captures succeed.
 

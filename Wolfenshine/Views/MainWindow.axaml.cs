@@ -94,6 +94,13 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             return;
         }
+        if (DataContext is MainWindowViewModel { IsAutoPlaying: true } autoPlayViewModel)
+        {
+            autoPlayViewModel.StopAttractMode();
+            ClearInput();
+            e.Handled = true;
+            return;
+        }
         if (DataContext is MainWindowViewModel { IsConfirmingEndGame: true } confirmationViewModel)
         {
             if (e.Key == Key.Y)
@@ -163,6 +170,12 @@ public sealed partial class MainWindow : Window
         }
 #if DEBUG
         if (!m_debugKeysDown.Add(e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.D && DataContext is MainWindowViewModel attractModeViewModel &&
+            attractModeViewModel.StartAttractMode())
         {
             e.Handled = true;
             return;

@@ -170,6 +170,91 @@ public sealed class MainWindowViewModelTests
         });
     }
 
+    [Test]
+    public void GivenEpisodeSelectionIdleForThirtySecondsCheckAttractModeStarts()
+    {
+        var map = CreateElevatorMap(0, "E1M1");
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        viewModel.SkipTitle();
+        viewModel.UpdateGame(0.7, default);
+
+        viewModel.UpdateGame(29.9, default);
+        Assert.That(viewModel.IsAutoPlaying, Is.False);
+        viewModel.UpdateGame(0.1, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsAutoPlaying, Is.True);
+            Assert.That(viewModel.IsSelectingEpisode, Is.False);
+            Assert.That(viewModel.IsGettingPsyched, Is.True);
+            Assert.That(viewModel.Difficulty, Is.EqualTo(GameDifficulty.Normal));
+            Assert.That(viewModel.Camera, Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public void GivenAttractModeCheckPlayerInputReturnsToTitle()
+    {
+        var map = CreateElevatorMap(0, "E1M1");
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        viewModel.SkipTitle();
+        viewModel.UpdateGame(0.7, default);
+        viewModel.StartAttractMode();
+
+        viewModel.UpdateGame(0.0, new PlayerInput(true, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsAutoPlaying, Is.False);
+            Assert.That(viewModel.IsShowingTitle, Is.True);
+            Assert.That(viewModel.Camera, Is.Null);
+        });
+    }
+
+    [Test]
+    public void GivenAttractModeRunsForMoreThanThreeMinutesCheckItRemainsActive()
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        for (var index = 0; index < size; index++)
+        {
+            walls[index] = 1;
+            walls[((size - 1) * size) + index] = 1;
+            walls[index * size] = 1;
+            walls[(index * size) + size - 1] = 1;
+        }
+        var objects = new ushort[size * size];
+        objects[(2 * size) + 2] = 20;
+        var map = new WolfensteinMap(0, "Endless demo", size, size, walls, objects);
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        viewModel.SkipTitle();
+        viewModel.UpdateGame(0.7, default);
+        viewModel.StartAttractMode();
+        viewModel.UpdateGame(2.3, default);
+        viewModel.UpdateGame(181.0, default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(viewModel.IsAutoPlaying, Is.True);
+            Assert.That(viewModel.IsShowingTitle, Is.False);
+        });
+    }
+
 #if DEBUG
     [TestCase(1, 1)]
     [TestCase(-1, 2)]
