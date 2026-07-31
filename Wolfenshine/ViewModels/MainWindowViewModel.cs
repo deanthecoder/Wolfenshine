@@ -97,6 +97,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private double m_endGameConfirmationTime;
     private bool m_endGameConfirmationCursorVisible = true;
     private bool m_isAutoPlaying;
+    private bool m_isAttractMode;
     private AutoPlayerController m_autoPlayer;
     private bool m_isPaused;
     private bool m_isEnhancedRendering;
@@ -227,6 +228,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool IsConfirmingEndGame => m_isConfirmingEndGame;
     public bool EndGameConfirmationCursorVisible => m_endGameConfirmationCursorVisible;
     public bool IsAutoPlaying => m_isAutoPlaying;
+    public bool IsAttractMode => m_isAttractMode;
     public bool IsPaused => m_isPaused;
     public bool HasGoldKey => m_gameSession?.HasGoldKey == true;
     public bool HasSilverKey => m_gameSession?.HasSilverKey == true;
@@ -260,7 +262,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void UpdateGame(double elapsedSeconds, PlayerInput input)
     {
-        if (m_isAutoPlaying && HasInput(input))
+        if (m_isAttractMode && HasInput(input))
         {
             ReturnToTitleScreen();
             return;
@@ -320,14 +322,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         RefreshAccessibleLights();
         foreach (var soundEvent in m_gameSession.DrainSoundEvents())
             m_audioPlayer?.Play(soundEvent, m_gameSession.Camera);
-        if (m_isAutoPlaying && m_gameSession.IsDying && m_gameSession.DeathFade >= 1.0)
+        if (m_isAttractMode && m_gameSession.IsDying && m_gameSession.DeathFade >= 1.0)
         {
             ReturnToTitleScreen();
             return;
         }
         if (m_gameSession.IsGameOver)
         {
-            if (m_isAutoPlaying)
+            if (m_isAttractMode)
                 ReturnToTitleScreen();
             else
                 ReturnToEpisodeSelection();
@@ -335,15 +337,20 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
         if (m_gameSession.IsReadyForNextLevel)
         {
-            if (m_isAutoPlaying)
+            if (m_isAttractMode)
                 ReturnToTitleScreen();
             else
+            {
+                StopDebugAutoPlay();
                 BeginLevelStats();
+            }
             return;
         }
         if (m_restartRevision != m_gameSession.RestartRevision)
         {
             m_restartRevision = m_gameSession.RestartRevision;
+            if (m_isAutoPlaying && !m_isAttractMode)
+                m_autoPlayer = new AutoPlayerController();
             m_audioPlayer?.PlayMusic(SelectedMap.Slot);
             OnPropertyChanged(nameof(Doors));
             OnPropertyChanged(nameof(PushWalls));
@@ -528,6 +535,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_selectedDifficultyIndex = (int)m_difficulty;
         m_episodeIdleTime = 0.0;
         m_autoPlayer = new AutoPlayerController();
+        m_isAttractMode = true;
         SetField(ref m_isSelectingEpisode, false, nameof(IsSelectingEpisode));
         SetField(ref m_isAutoPlaying, true, nameof(IsAutoPlaying));
         OnPropertyChanged(nameof(SelectedDifficultyIndex));
@@ -542,9 +550,36 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// </summary>
     public void StopAttractMode()
     {
-        if (m_isAutoPlaying)
+        if (m_isAttractMode)
             ReturnToTitleScreen();
     }
+
+#if DEBUG
+    /// <summary>
+    /// Hands the current game between the player and the autonomous controller.
+    /// </summary>
+    public bool ToggleDebugAutoPlay()
+    {
+        if (m_gameSession == null || m_isAttractMode || m_isShowingTitle || m_isSelectingEpisode ||
+            m_isSelectingDifficulty || m_isShowingLevelStats || m_isGettingPsyched || m_isConfirmingEndGame ||
+            m_isPaused || m_gameSession.IsDying || m_gameSession.IsCompletingLevel)
+        {
+            return false;
+        }
+        if (m_isAutoPlaying)
+        {
+            StopDebugAutoPlay();
+            return true;
+        }
+        m_autoPlayer ??= new AutoPlayerController();
+        m_autoPlayer.ReconsiderFromCurrentPosition();
+        m_isAttractMode = false;
+        SetField(ref m_isAutoPlaying, true, nameof(IsAutoPlaying));
+        StatusText = $"Autopilot · {SelectedMap.Name} · press D to resume manual control";
+        OnPropertyChanged(nameof(StatusText));
+        return true;
+    }
+#endif
 
     /// <summary>
     /// Begins fading the title screen immediately.
@@ -681,6 +716,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             m_audioPlayer?.SetPaused(false);
         m_isPaused = false;
         m_autoPlayer = null;
+        m_isAttractMode = false;
         SetField(ref m_isAutoPlaying, false, nameof(IsAutoPlaying));
         m_gameSession = null;
         var availableEpisodeCount = AvailableEpisodeCount;
@@ -732,6 +768,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SetField(ref m_titleOpacity, 1.0, nameof(TitleOpacity));
         SetField(ref m_isShowingTitle, true, nameof(IsShowingTitle));
         StatusText = "Wolfenstein 3D · press any key to continue";
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void StopDebugAutoPlay()
+    {
+        if (!m_isAutoPlaying || m_isAttractMode)
+            return;
+        SetField(ref m_isAutoPlaying, false, nameof(IsAutoPlaying));
+        StatusText = $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
+                     "1–4 select weapons · Space opens doors";
         OnPropertyChanged(nameof(StatusText));
     }
 

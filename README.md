@@ -70,7 +70,7 @@ Hold `Tab` in enhanced mode and Wolfenshine projects a flowing trail directly on
 
 The guide follows gameplay rules rather than drawing a straight line through the map. It first leads to the nearest obtainable gold or silver key, allowing ordinary doors while respecting locks. Once no reachable key remains, it continues to the elevator. Unopened secret walls remain secret; moving one can reveal a newly valid route.
 
-Because the trail is part of the rendered world, walls and doors hide what lies beyond them naturally. The route updates as the player moves, collects keys, opens passages, or shifts secret walls.
+Because the trail is part of the rendered world, walls and doors hide what lies beyond them naturally. Each press captures a stable route for the complete glow and fade, while the next press reflects newly collected keys, opened passages, and shifted secret walls.
 
 ## More than a rendering demo
 
@@ -207,7 +207,7 @@ Debug builds provide a few development conveniences that are omitted from Releas
 | `S` | Save the current level, position, and direction as a quick test location. |
 | `L` | Restart at the saved test location. |
 | `<` / `>` | Restart at the previous or next level, wrapping at either end of the available maps. |
-| `D` | Start attract mode immediately while on the episode-selection screen. |
+| `D` | Start attract mode on the episode screen, or toggle autopilot during a normal game. |
 
 The Shift+C comparison capture keeps its clean source images in the Git-ignored `local/screenshots/` directory and overwrites the tracked README comparison image only after both renderer captures succeed.
 

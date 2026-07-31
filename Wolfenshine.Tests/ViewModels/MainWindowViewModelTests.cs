@@ -284,6 +284,46 @@ public sealed class MainWindowViewModelTests
             Assert.That(viewModel.IsSelectingDifficulty, Is.False);
         });
     }
+
+    [Test]
+    public void GivenNormalGameCheckDebugAutoPlayCanBeEnabledAndReturnedToManualControl()
+    {
+        const int size = 5;
+        var walls = Enumerable.Repeat((ushort)107, size * size).ToArray();
+        for (var index = 0; index < size; index++)
+        {
+            walls[index] = 1;
+            walls[((size - 1) * size) + index] = 1;
+            walls[index * size] = 1;
+            walls[(index * size) + size - 1] = 1;
+        }
+        var objects = new ushort[size * size];
+        objects[(2 * size) + 2] = 20;
+        var map = new WolfensteinMap(0, "E1M1", size, size, walls, objects);
+        var mapSet = new WolfensteinMapSet(0xABCD, new[] { map });
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        StartNormalGame(viewModel);
+        var sessionCamera = viewModel.Camera;
+
+        var enabled = viewModel.ToggleDebugAutoPlay();
+        viewModel.UpdateGame(0.0, new PlayerInput(true, false, false, false));
+        var disabled = viewModel.ToggleDebugAutoPlay();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(enabled, Is.True);
+            Assert.That(disabled, Is.True);
+            Assert.That(viewModel.IsAutoPlaying, Is.False);
+            Assert.That(viewModel.IsAttractMode, Is.False);
+            Assert.That(viewModel.IsShowingTitle, Is.False);
+            Assert.That(viewModel.Camera.X, Is.EqualTo(sessionCamera.X));
+            Assert.That(viewModel.Camera.Y, Is.EqualTo(sessionCamera.Y));
+        });
+    }
 #endif
 
     [Test]

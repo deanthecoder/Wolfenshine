@@ -113,6 +113,7 @@ public sealed class EnhancedViewport : SoftwareViewport
     private int m_navigationRoutePushWallState;
     private bool m_navigationRouteHasGoldKey;
     private bool m_navigationRouteHasSilverKey;
+    private bool m_navigationRouteFrozen;
     private WolfensteinSpriteSet m_bloomSpriteSet;
     private WolfensteinPalette m_bloomPalette;
     private readonly Dictionary<int, BloomProfile> m_bloomProfiles = [];
@@ -602,6 +603,7 @@ public sealed class EnhancedViewport : SoftwareViewport
         if (!ReferenceEquals(m_navigationRouteSourceMap, Map))
         {
             m_navigationRouteSourceMap = Map;
+            m_navigationRouteFrozen = false;
             m_navigationRouteBitmap?.Dispose();
             m_navigationRouteBitmap = new SKBitmap(new SKImageInfo(
                 Map.Width,
@@ -611,6 +613,18 @@ public sealed class EnhancedViewport : SoftwareViewport
             m_navigationRoutePixels = new byte[Map.Width * Map.Height * 4];
             InvalidateNavigationRoute();
         }
+
+        if (NavigationGuideVisibility <= 0.0001)
+        {
+            if (m_navigationRouteFrozen)
+            {
+                m_navigationRouteFrozen = false;
+                InvalidateNavigationRoute();
+            }
+            return;
+        }
+        if (m_navigationRouteFrozen)
+            return;
 
         var playerX = (int)Math.Floor(Camera.X);
         var playerY = (int)Math.Floor(Camera.Y);
@@ -654,6 +668,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             preferredDirectionX,
             preferredDirectionY);
         BuildNavigationRoutePixels(route);
+        m_navigationRouteFrozen = true;
     }
 
     private void BuildNavigationRoutePixels(NavigationRoute route)
@@ -720,6 +735,10 @@ public sealed class EnhancedViewport : SoftwareViewport
             (0, 1) => 2,
             (-1, 0) => 3,
             (0, -1) => 4,
+            (1, 1) => 5,
+            (-1, 1) => 6,
+            (-1, -1) => 7,
+            (1, -1) => 8,
             _ => 0
         };
 

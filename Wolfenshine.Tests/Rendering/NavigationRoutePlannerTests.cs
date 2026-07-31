@@ -137,6 +137,41 @@ public sealed class NavigationRoutePlannerTests
         });
     }
 
+    [Test]
+    public void GivenOpenInsideCornerCheckRouteUsesDiagonalStep()
+    {
+        var map = CreateCornerMap(blockInsideCorner: false);
+
+        var route = Find(map, [], startX: 1, startY: 1);
+
+        Assert.That(
+            route.Points,
+            Is.EqualTo(new[]
+            {
+                new NavigationRoutePoint(1, 1),
+                new NavigationRoutePoint(2, 1),
+                new NavigationRoutePoint(3, 2)
+            }));
+    }
+
+    [Test]
+    public void GivenBlockedInsideCornerCheckRouteRetainsSquareBend()
+    {
+        var map = CreateCornerMap(blockInsideCorner: true);
+
+        var route = Find(map, [], startX: 1, startY: 1);
+
+        Assert.That(
+            route.Points,
+            Is.EqualTo(new[]
+            {
+                new NavigationRoutePoint(1, 1),
+                new NavigationRoutePoint(2, 1),
+                new NavigationRoutePoint(3, 1),
+                new NavigationRoutePoint(3, 2)
+            }));
+    }
+
     private static NavigationRoute Find(
         WolfensteinMap map,
         IReadOnlyList<WorldSprite> objects,
@@ -202,5 +237,21 @@ public sealed class NavigationRoutePlannerTests
             walls[(2 * width) + blockedX] = 1;
         walls[(2 * width) + 10] = 21;
         return new WolfensteinMap(0, "Open Navigation Corridor", width, height, walls, new ushort[width * height]);
+    }
+
+    private static WolfensteinMap CreateCornerMap(bool blockInsideCorner)
+    {
+        const int width = 6;
+        const int height = 5;
+        var walls = Enumerable.Repeat((ushort)1, width * height).ToArray();
+        for (var y = 1; y <= 3; y++)
+        {
+            for (var x = 1; x <= 3; x++)
+                walls[(y * width) + x] = 107;
+        }
+        if (blockInsideCorner)
+            walls[(2 * width) + 2] = 1;
+        walls[(2 * width) + 4] = 21;
+        return new WolfensteinMap(0, "Navigation Corner", width, height, walls, new ushort[width * height]);
     }
 }

@@ -99,18 +99,34 @@ public static class NavigationRoutePlanner
                         preferredDirectionX,
                         preferredDirectionY);
                     if (launchPoints.Count == 1)
-                        return route;
-                    return new NavigationRoute(
+                        return SmoothCorners(map, doors, pushWalls, route, hasGoldKey, hasSilverKey);
+                    var launchedRoute = new NavigationRoute(
                         launchPoints.Take(launchPoints.Count - 1).Concat(route.Points).ToArray(),
                         route.TargetType,
                         route.InitialDirectionX,
                         route.InitialDirectionY);
+                    return SmoothCorners(map, doors, pushWalls, launchedRoute, hasGoldKey, hasSilverKey);
                 }
             }
         }
 
-        return BuildRoute(map, parents, startX, startY, target.Value);
+        var directRoute = BuildRoute(map, parents, startX, startY, target.Value);
+        return SmoothCorners(map, doors, pushWalls, directRoute, hasGoldKey, hasSilverKey);
     }
+
+    private static NavigationRoute SmoothCorners(
+        WolfensteinMap map,
+        WolfensteinDoors doors,
+        WolfensteinPushWalls pushWalls,
+        NavigationRoute route,
+        bool hasGoldKey,
+        bool hasSilverKey) => route with
+    {
+        Points = NavigationRouteSmoother.SmoothCorners(
+            route.Points,
+            (x, y) => IsPassable(map, doors, pushWalls, x, y, hasGoldKey, hasSilverKey),
+            (x, y) => doors.Get(x, y) != null)
+    };
 
     private static void BuildSearch(
         WolfensteinMap map,

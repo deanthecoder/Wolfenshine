@@ -9,6 +9,7 @@
 // THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND.
 
 using Wolfenshine.Rendering;
+using Wolfenshine.Maps;
 
 namespace Wolfenshine.Game;
 
@@ -22,7 +23,6 @@ namespace Wolfenshine.Game;
 public sealed class AutoPlayerController
 {
     private const ushort ElevatorSwitchTile = 21;
-    private const double RouteRefreshInterval = 0.25;
     private const double WaypointDistance = 0.24;
     private const double AimTolerance = 0.085;
     private const double ConfirmedHitAimTolerance = 0.13;
@@ -33,11 +33,16 @@ public sealed class AutoPlayerController
     private const double DoorAimTolerance = 0.16;
     private const double StuckDetectionDuration = 0.9;
     private IReadOnlyList<NavigationRoutePoint> m_route = [];
+    private readonly HashSet<ushort> m_visitedAreas = [];
+    private readonly HashSet<(int X, int Y)> m_visitedDoors = [];
+    private readonly HashSet<ushort> m_exitAreas = [];
+    private WolfensteinMap m_historyMap;
     private int m_routeIndex;
-    private double m_routeRefreshTime;
     private WolfensteinActorState m_targetActor;
     private AutoPlayerObjective m_objective;
+    private WorldSprite? m_targetPickup;
     private (int X, int Y)? m_interactionTarget;
+    private (int X, int Y)? m_explorationDoor;
     private (int X, int Y)? m_pendingPushWall;
     private double m_pendingPushWallTime;
     private bool m_releaseUse;
@@ -54,14 +59,33 @@ public sealed class AutoPlayerController
     private double m_steeringTime;
     private double m_turnCoastTime;
     private int m_lastTurnDirection;
+    private bool m_exitCommitted;
 
     public AutoPlayerObjective Objective => m_objective;
+
+    /// <summary>
+    /// Discards transient steering decisions while retaining exploration history for a later handoff.
+    /// </summary>
+    public void ReconsiderFromCurrentPosition()
+    {
+        InvalidateRoute();
+        m_targetActor = null;
+        m_combatTarget = null;
+        m_pendingPushWall = null;
+        m_pendingPushWallTime = 0.0;
+        m_releaseUse = false;
+        m_recoveryTime = 0.0;
+        m_stuckTime = 0.0;
+        m_previousX = double.NaN;
+        m_previousY = double.NaN;
+    }
 
     public PlayerInput Update(GameSession session, double elapsedSeconds)
     {
         ArgumentNullException.ThrowIfNull(session);
         if (!double.IsFinite(elapsedSeconds) || elapsedSeconds < 0.0)
             throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
+        UpdateAreaHistory(session);
         m_steeringTime += elapsedSeconds;
         m_turnCoastTime = Math.Max(0.0, m_turnCoastTime - elapsedSeconds);
         if (session.IsDying || session.IsCompletingLevel)
@@ -92,8 +116,7 @@ public sealed class AutoPlayerController
         if (m_targetActor?.IsDead != false)
             m_targetActor = null;
 
-        m_routeRefreshTime -= elapsedSeconds;
-        if (m_route.Count == 0 || m_routeRefreshTime <= 0.0 || !IsCurrentRouteUseful(session))
+        if (m_route.Count == 0 || !IsCurrentRouteUseful(session))
             SelectObjective(session);
         var input = FollowRoute(session);
         UpdateStuckDetection(session, input, elapsedSeconds);
@@ -205,8 +228,9 @@ public sealed class AutoPlayerController
 
     private void SelectObjective(GameSession session)
     {
-        m_routeRefreshTime = RouteRefreshInterval;
         m_interactionTarget = null;
+        m_targetPickup = null;
+        m_explorationDoor = null;
         var actors = session.Actors.Where(actor => !actor.IsDead).ToArray();
         var actorApproaches = actors
             .SelectMany(actor => GetAdjacentTiles(session, (int)Math.Floor(actor.X), (int)Math.Floor(actor.Y)))
@@ -237,6 +261,10 @@ public sealed class AutoPlayerController
         if (TryRouteToPickup(session, IsTreasurePickup, AutoPlayerObjective.Treasure))
             return;
         if (TryRouteToSecret(session))
+            return;
+        if (m_exitCommitted && TryRouteToExit(session))
+            return;
+        if (TryRouteToUnvisitedArea(session))
             return;
 
         var camera = session.Camera;
@@ -274,12 +302,17 @@ public sealed class AutoPlayerController
     {
         var pickups = session.StaticObjects
             .Where(item => predicate(WolfensteinStaticObjects.GetPickupType(item.SpriteNumber)))
+            .ToArray();
+        var targets = pickups
             .Select(item => new NavigationRoutePoint((int)Math.Floor(item.X), (int)Math.Floor(item.Y)))
             .Distinct()
             .ToArray();
-        var route = AutoPlayerRoutePlanner.FindNearest(session, pickups, allowClosedDoors: false);
+        var route = AutoPlayerRoutePlanner.FindNearest(session, targets, allowClosedDoors: false);
         if (route.Count == 0)
             return false;
+        var destination = route[^1];
+        m_targetPickup = pickups.First(item =>
+            (int)Math.Floor(item.X) == destination.X && (int)Math.Floor(item.Y) == destination.Y);
         SetRoute(session, route, objective);
         return true;
     }
@@ -311,8 +344,134 @@ public sealed class AutoPlayerController
         return true;
     }
 
+    private bool TryRouteToUnvisitedArea(GameSession session)
+    {
+        IReadOnlyList<NavigationRoutePoint> bestRoute = [];
+        WolfensteinDoor bestDoor = null;
+        foreach (var door in session.Doors.Items)
+        {
+            if (m_visitedDoors.Contains((door.X, door.Y)))
+                continue;
+            var (first, second) = GetDoorSides(door);
+            var firstArea = session.Map.GetWall(first.X, first.Y);
+            var secondArea = session.Map.GetWall(second.X, second.Y);
+            var firstVisited = m_visitedAreas.Contains(firstArea);
+            var secondVisited = m_visitedAreas.Contains(secondArea);
+            if (!firstVisited && !secondVisited)
+                continue;
+            var destination = firstVisited && !secondVisited
+                ? second
+                : secondVisited && !firstVisited
+                    ? first
+                    : DistanceSquared(session.Camera.X, session.Camera.Y, first.X + 0.5, first.Y + 0.5) >
+                      DistanceSquared(session.Camera.X, session.Camera.Y, second.X + 0.5, second.Y + 0.5)
+                        ? first
+                        : second;
+            var targets = GetExplorationTargets(session, door, destination);
+            var route = AutoPlayerRoutePlanner.FindNearest(session, targets, allowClosedDoors: true);
+            if (route.Count == 0 || !route.Contains(new NavigationRoutePoint(door.X, door.Y)) ||
+                bestRoute.Count > 0 && route.Count >= bestRoute.Count)
+            {
+                continue;
+            }
+            bestRoute = route;
+            bestDoor = door;
+        }
+        if (bestRoute.Count == 0)
+            return false;
+        m_explorationDoor = (bestDoor.X, bestDoor.Y);
+        SetRoute(session, bestRoute, AutoPlayerObjective.Explore);
+        return true;
+    }
+
+    private bool TryRouteToExit(GameSession session)
+    {
+        var approaches = new List<NavigationRoutePoint>();
+        for (var y = 0; y < session.Map.Height; y++)
+        {
+            for (var x = 0; x < session.Map.Width; x++)
+            {
+                if (session.Map.GetWall(x, y) != ElevatorSwitchTile)
+                    continue;
+                approaches.Add(new NavigationRoutePoint(x - 1, y));
+                approaches.Add(new NavigationRoutePoint(x + 1, y));
+            }
+        }
+        var route = AutoPlayerRoutePlanner.FindNearest(session, approaches, allowClosedDoors: true);
+        if (route.Count == 0)
+            return false;
+        var end = route[^1];
+        m_interactionTarget = FindAdjacentExit(session, end.X, end.Y);
+        if (m_interactionTarget == null)
+            return false;
+        SetRoute(session, route, AutoPlayerObjective.Exit);
+        return true;
+    }
+
+    private static IReadOnlyList<NavigationRoutePoint> GetExplorationTargets(
+        GameSession session,
+        WolfensteinDoor door,
+        (int X, int Y) destination)
+    {
+        var directionX = destination.X - door.X;
+        var directionY = destination.Y - door.Y;
+        NavigationRoutePoint[] candidates =
+        [
+            new(destination.X, destination.Y),
+            new(destination.X + directionX, destination.Y + directionY),
+            new(destination.X - directionY, destination.Y + directionX),
+            new(destination.X + directionY, destination.Y - directionX)
+        ];
+        return candidates.Where(point => IsFloor(session, point.X, point.Y)).ToArray();
+    }
+
+    private void FindExitAreas(WolfensteinMap map)
+    {
+        m_exitAreas.Clear();
+        for (var y = 0; y < map.Height; y++)
+        {
+            for (var x = 1; x < map.Width - 1; x++)
+            {
+                if (map.GetWall(x, y) != ElevatorSwitchTile)
+                    continue;
+                if (map.GetWall(x - 1, y) >= 107)
+                    m_exitAreas.Add(map.GetWall(x - 1, y));
+                if (map.GetWall(x + 1, y) >= 107)
+                    m_exitAreas.Add(map.GetWall(x + 1, y));
+            }
+        }
+    }
+
+    private void UpdateAreaHistory(GameSession session)
+    {
+        if (!ReferenceEquals(m_historyMap, session.Map))
+        {
+            m_historyMap = session.Map;
+            m_visitedAreas.Clear();
+            m_visitedDoors.Clear();
+            FindExitAreas(session.Map);
+            m_exitCommitted = false;
+        }
+        var x = (int)Math.Floor(session.Camera.X);
+        var y = (int)Math.Floor(session.Camera.Y);
+        if (session.Doors.Get(x, y) != null)
+            m_visitedDoors.Add((x, y));
+        var area = session.Map.GetWall(x, y);
+        if (area < 107)
+            return;
+        if (m_exitAreas.Contains(area))
+            m_exitCommitted = true;
+        if (!m_visitedAreas.Add(area) || m_visitedAreas.Count == 1)
+            return;
+        if (m_objective != AutoPlayerObjective.Enemy)
+            InvalidateRoute();
+    }
+
     private PlayerInput FollowRoute(GameSession session)
     {
+        if (TryFollowVisiblePickup(session, out var pickupInput))
+            return pickupInput;
+
         while (m_routeIndex < m_route.Count)
         {
             var point = m_route[m_routeIndex];
@@ -326,7 +485,7 @@ public sealed class AutoPlayerController
         if (m_routeIndex >= m_route.Count)
             return OperateObjective(session);
 
-        var lookAheadIndex = AutoPlayerRoutePlanner.FindStraightLookAhead(
+        var lookAheadIndex = AutoPlayerRoutePlanner.FindVisibleLookAhead(
             session,
             m_route,
             m_routeIndex);
@@ -354,6 +513,27 @@ public sealed class AutoPlayerController
             run: m_route.Count - m_routeIndex > 2);
     }
 
+    private bool TryFollowVisiblePickup(GameSession session, out PlayerInput input)
+    {
+        input = default;
+        if (!IsPickupObjective(m_objective) || m_targetPickup is not { } pickup ||
+            !session.HasLineOfSightTo(pickup.X, pickup.Y) ||
+            !session.CanTravelDirectlyTo(pickup.X, pickup.Y))
+        {
+            return false;
+        }
+
+        var angle = GetAngleDelta(session.Camera, pickup.X, pickup.Y);
+        if (Math.Abs(angle) > 0.42)
+        {
+            input = SteerTowards(angle, moveForward: false, run: false);
+            return true;
+        }
+        var distance = Math.Sqrt(DistanceSquared(session.Camera.X, session.Camera.Y, pickup.X, pickup.Y));
+        input = SteerTowards(angle, moveForward: true, run: distance > 2.0);
+        return true;
+    }
+
     private PlayerInput OperateObjective(GameSession session)
     {
         if (m_objective == AutoPlayerObjective.Enemy)
@@ -362,8 +542,11 @@ public sealed class AutoPlayerController
             return default;
         }
         if (m_objective is AutoPlayerObjective.Health or AutoPlayerObjective.Weapon or
-            AutoPlayerObjective.Ammo or AutoPlayerObjective.Treasure or AutoPlayerObjective.Key)
+            AutoPlayerObjective.Ammo or AutoPlayerObjective.Treasure or AutoPlayerObjective.Explore or
+            AutoPlayerObjective.Key)
         {
+            if (m_objective == AutoPlayerObjective.Explore && m_explorationDoor is { } door)
+                m_visitedDoors.Add(door);
             InvalidateRoute();
             return default;
         }
@@ -403,6 +586,11 @@ public sealed class AutoPlayerController
     {
         if (m_objective == AutoPlayerObjective.Enemy && m_targetActor?.IsDead != false)
             return false;
+        if (IsPickupObjective(m_objective) &&
+            (m_targetPickup is not { } pickup || !session.StaticObjects.Contains(pickup)))
+        {
+            return false;
+        }
         if (m_routeIndex >= m_route.Count)
             return true;
         var point = m_route[m_routeIndex];
@@ -482,6 +670,11 @@ public sealed class AutoPlayerController
         return null;
     }
 
+    private static ((int X, int Y) First, (int X, int Y) Second) GetDoorSides(WolfensteinDoor door) =>
+        door.Orientation == DoorOrientation.Vertical
+            ? ((door.X - 1, door.Y), (door.X + 1, door.Y))
+            : ((door.X, door.Y - 1), (door.X, door.Y + 1));
+
     private static (int X, int Y)? FindAdjacentSecret(
         GameSession session,
         int x,
@@ -520,6 +713,10 @@ public sealed class AutoPlayerController
     private static bool IsTreasurePickup(WolfensteinPickupType type) => type is
         WolfensteinPickupType.Cross or WolfensteinPickupType.Chalice or WolfensteinPickupType.Bible or
         WolfensteinPickupType.Crown or WolfensteinPickupType.FullHeal;
+
+    private static bool IsPickupObjective(AutoPlayerObjective objective) => objective is
+        AutoPlayerObjective.Health or AutoPlayerObjective.Weapon or AutoPlayerObjective.Ammo or
+        AutoPlayerObjective.Treasure;
 
     private PlayerInput SteerTowards(double angle, bool moveForward, bool run)
     {
@@ -568,15 +765,15 @@ public sealed class AutoPlayerController
         // tile's center, so targeting it would make the controller double back before continuing along the real route.
         m_routeIndex = m_route.Count > 1 ? 1 : 0;
         m_objective = objective;
-        m_routeRefreshTime = RouteRefreshInterval;
     }
 
     private void InvalidateRoute()
     {
         m_route = [];
         m_routeIndex = 0;
-        m_routeRefreshTime = 0.0;
         m_interactionTarget = null;
+        m_targetPickup = null;
+        m_explorationDoor = null;
     }
 
     private bool HasPassedWaypoint(RaycastCamera camera, int routeIndex)
@@ -623,6 +820,7 @@ public enum AutoPlayerObjective
     Weapon,
     Ammo,
     Treasure,
+    Explore,
     Secret,
     Key,
     Exit

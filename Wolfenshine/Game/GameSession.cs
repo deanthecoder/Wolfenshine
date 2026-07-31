@@ -204,6 +204,24 @@ public sealed class GameSession
     /// </summary>
     public bool HasLineOfSightTo(double x, double y) => HasLineOfSight(Camera.X, Camera.Y, x, y);
 
+    /// <summary>
+    /// Determines whether the player's collision box can travel directly to a world position.
+    /// </summary>
+    public bool CanTravelDirectlyTo(double x, double y)
+    {
+        var deltaX = x - Camera.X;
+        var deltaY = y - Camera.Y;
+        var distance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+        var steps = Math.Max(1, (int)Math.Ceiling(distance * 10.0));
+        for (var step = 1; step <= steps; step++)
+        {
+            var progress = (double)step / steps;
+            if (!CanOccupy(Camera.X + (deltaX * progress), Camera.Y + (deltaY * progress)))
+                return false;
+        }
+        return true;
+    }
+
 #if DEBUG
     public bool ReloadDebugState()
     {

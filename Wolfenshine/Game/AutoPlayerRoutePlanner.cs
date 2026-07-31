@@ -74,37 +74,16 @@ public static class AutoPlayerRoutePlanner
         IReadOnlyList<NavigationRoutePoint> route)
     {
         ArgumentNullException.ThrowIfNull(session);
-        ArgumentNullException.ThrowIfNull(route);
-        if (route.Count < 3)
-            return route;
-
-        var smoothed = new List<NavigationRoutePoint> { route[0] };
-        for (var index = 1; index < route.Count - 1; index++)
-        {
-            var previous = smoothed[^1];
-            var corner = route[index];
-            var next = route[index + 1];
-            var isRightAngle = Math.Abs(next.X - previous.X) == 1 &&
-                               Math.Abs(next.Y - previous.Y) == 1;
-            var inner = new NavigationRoutePoint(
-                previous.X + next.X - corner.X,
-                previous.Y + next.Y - corner.Y);
-            if (isRightAngle && session.Doors.Get(corner.X, corner.Y) == null &&
-                session.Doors.Get(inner.X, inner.Y) == null &&
-                IsPassable(session, inner.X, inner.Y, allowClosedDoors: false))
-            {
-                continue;
-            }
-            smoothed.Add(corner);
-        }
-        smoothed.Add(route[^1]);
-        return smoothed;
+        return NavigationRouteSmoother.SmoothCorners(
+            route,
+            (x, y) => IsPassable(session, x, y, allowClosedDoors: false),
+            (x, y) => session.Doors.Get(x, y) != null);
     }
 
     /// <summary>
-    /// Finds the furthest waypoint in the current straight run, including a door at its end.
+    /// Finds the furthest currently visible waypoint, including a closed door at the end of a visible run.
     /// </summary>
-    public static int FindStraightLookAhead(
+    public static int FindVisibleLookAhead(
         GameSession session,
         IReadOnlyList<NavigationRoutePoint> route,
         int routeIndex)
@@ -113,26 +92,33 @@ public static class AutoPlayerRoutePlanner
         ArgumentNullException.ThrowIfNull(route);
         if (routeIndex <= 0 || routeIndex >= route.Count)
             return Math.Clamp(routeIndex, 0, Math.Max(0, route.Count - 1));
-        var previous = route[routeIndex - 1];
-        var current = route[routeIndex];
-        if (session.Doors.Get(current.X, current.Y) != null)
-            return routeIndex;
-        var directionX = current.X - previous.X;
-        var directionY = current.Y - previous.Y;
         var lookAhead = routeIndex;
-        for (var index = routeIndex + 1; index < route.Count; index++)
+        for (var index = routeIndex; index < route.Count; index++)
         {
-            var next = route[index];
-            if (next.X - current.X != directionX || next.Y - current.Y != directionY)
+            var candidate = route[index];
+            var door = session.Doors.Get(candidate.X, candidate.Y);
+            if (CanSeeWaypoint(session, candidate, door != null))
+                lookAhead = index;
+            if (door is { IsFullyOpen: false })
                 break;
-            if (!IsPassable(session, next.X, next.Y, allowClosedDoors: true))
-                break;
-            lookAhead = index;
-            if (session.Doors.Get(next.X, next.Y) != null)
-                break;
-            current = next;
         }
         return lookAhead;
+    }
+
+    private static bool CanSeeWaypoint(
+        GameSession session,
+        NavigationRoutePoint waypoint,
+        bool stopBeforeWaypoint)
+    {
+        var deltaX = waypoint.X + 0.5 - session.Camera.X;
+        var deltaY = waypoint.Y + 0.5 - session.Camera.Y;
+        var distance = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+        if (!stopBeforeWaypoint || distance <= 0.55)
+            return session.HasLineOfSightTo(waypoint.X + 0.5, waypoint.Y + 0.5);
+        var scale = (distance - 0.55) / distance;
+        return session.HasLineOfSightTo(
+            session.Camera.X + (deltaX * scale),
+            session.Camera.Y + (deltaY * scale));
     }
 
     private static IReadOnlyList<NavigationRoutePoint> BuildRoute(

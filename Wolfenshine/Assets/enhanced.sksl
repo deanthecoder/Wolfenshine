@@ -100,7 +100,7 @@ uniform shader wallMaterialMap;
 uniform shader areaAmbientMap;
 
 // One RGBA texel per map tile describes the current key-first route. Red and
-// green encode incoming/outgoing cardinal directions, blue stores route order,
+// green encode incoming/outgoing cardinal or diagonal directions, blue stores route order,
 // and a zero incoming direction marks an unused tile. The floor shader turns
 // this into curved arrows.
 uniform shader navigationRouteMap;
@@ -661,7 +661,16 @@ float2 navigationDirection(float encodedDirection)
         return float2(0.0, 1.0);
     if (direction < 3.5)
         return float2(-1.0, 0.0);
-    return float2(0.0, -1.0);
+    if (direction < 4.5)
+        return float2(0.0, -1.0);
+    float diagonal = 0.70710678;
+    if (direction < 5.5)
+        return float2(diagonal, diagonal);
+    if (direction < 6.5)
+        return float2(-diagonal, diagonal);
+    if (direction < 7.5)
+        return float2(-diagonal, -diagonal);
+    return float2(diagonal, -diagonal);
 }
 
 float distanceToNavigationSegment(float2 point, float2 start, float2 end)
@@ -694,8 +703,10 @@ float3 navigationGuideIllumination(float2 worldPosition, float4 route)
 
     float2 incoming = navigationDirection(route.r);
     float2 outgoing = navigationDirection(route.g);
-    float2 entry = incoming * -0.5;
-    float2 exit = outgoing * 0.5;
+    float incomingBoundaryScale = 0.5 / max(abs(incoming.x), abs(incoming.y));
+    float outgoingBoundaryScale = 0.5 / max(abs(outgoing.x), abs(outgoing.y));
+    float2 entry = incoming * -incomingBoundaryScale;
+    float2 exit = outgoing * outgoingBoundaryScale;
     float2 localPosition = fract(worldPosition) - 0.5;
     float routeIndex = floor((route.b * 255.0) + 0.5);
     float directionAlignment = dot(incoming, outgoing);

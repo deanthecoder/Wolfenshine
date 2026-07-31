@@ -58,7 +58,7 @@ public sealed class EndGameConfirmationViewport : Control
         if (Graphics == null || Palette == null)
             return;
         RenderFrame();
-        context.DrawImage(m_bitmap, Bounds);
+        context.DrawImage(m_bitmap, new Rect(Bounds.Size));
     }
 
     private void RenderFrame()
@@ -74,12 +74,18 @@ public sealed class EndGameConfirmationViewport : Control
         FillRectangle(windowLeft, windowTop, windowWidth, windowHeight, BackgroundColor);
         DrawOutline(windowLeft, windowTop, windowWidth, windowHeight);
 
-        var textLeft = windowLeft + 10;
         var textTop = windowTop + 5;
         for (var line = 0; line < s_lines.Length; line++)
-            DrawText(s_lines[line], textLeft, textTop + (line * lineHeight));
+        {
+            var lineLeft = windowLeft + ((windowWidth - MeasureText(s_lines[line])) / 2);
+            DrawText(s_lines[line], lineLeft, textTop + (line * lineHeight));
+        }
         if (ShowCursor)
-            DrawText("_", textLeft + MeasureText(s_lines[^1]), textTop + (2 * lineHeight));
+        {
+            var finalLineWidth = MeasureText(s_lines[^1]);
+            var finalLineLeft = windowLeft + ((windowWidth - finalLineWidth) / 2);
+            DrawText("_", finalLineLeft + finalLineWidth, textTop + (2 * lineHeight));
+        }
 
         m_bitmap ??= new WriteableBitmap(
             new PixelSize(ViewportWidth, ViewportHeight),

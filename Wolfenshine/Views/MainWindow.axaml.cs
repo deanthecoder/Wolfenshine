@@ -94,7 +94,7 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             return;
         }
-        if (DataContext is MainWindowViewModel { IsAutoPlaying: true } autoPlayViewModel)
+        if (DataContext is MainWindowViewModel { IsAttractMode: true } autoPlayViewModel)
         {
             autoPlayViewModel.StopAttractMode();
             ClearInput();
@@ -174,9 +174,10 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             return;
         }
-        if (e.Key == Key.D && DataContext is MainWindowViewModel attractModeViewModel &&
-            attractModeViewModel.StartAttractMode())
+        if (e.Key == Key.D && DataContext is MainWindowViewModel debugAutoPlayViewModel &&
+            (debugAutoPlayViewModel.StartAttractMode() || debugAutoPlayViewModel.ToggleDebugAutoPlay()))
         {
+            ClearInput();
             e.Handled = true;
             return;
         }

@@ -82,7 +82,7 @@ public sealed class AutoPlayerControllerTests
             new(5, 2)
         ];
 
-        var lookAhead = AutoPlayerRoutePlanner.FindStraightLookAhead(session, route, 1);
+        var lookAhead = AutoPlayerRoutePlanner.FindVisibleLookAhead(session, route, 1);
 
         Assert.That(lookAhead, Is.EqualTo(2));
         Assert.That(route[lookAhead], Is.EqualTo(new NavigationRoutePoint(3, 2)));
@@ -95,7 +95,27 @@ public sealed class AutoPlayerControllerTests
         var session = new GameSession(map, RaycastCamera.FromPlayerStart(map));
         NavigationRoutePoint[] route = [new(1, 2), new(2, 2), new(3, 2), new(4, 2), new(5, 2)];
 
-        var lookAhead = AutoPlayerRoutePlanner.FindStraightLookAhead(session, route, 1);
+        var lookAhead = AutoPlayerRoutePlanner.FindVisibleLookAhead(session, route, 1);
+
+        Assert.That(lookAhead, Is.EqualTo(route.Length - 1));
+    }
+
+    [Test]
+    public void GivenBentRouteAcrossOpenRoomCheckLookAheadTargetsItsLastVisiblePoint()
+    {
+        var map = CreateOpenMap(8, 6, 1, 1, playerMarker: 20);
+        var session = new GameSession(map, RaycastCamera.FromPlayerStart(map));
+        NavigationRoutePoint[] route =
+        [
+            new(1, 1),
+            new(2, 1),
+            new(2, 2),
+            new(3, 2),
+            new(3, 3),
+            new(5, 3)
+        ];
+
+        var lookAhead = AutoPlayerRoutePlanner.FindVisibleLookAhead(session, route, 1);
 
         Assert.That(lookAhead, Is.EqualTo(route.Length - 1));
     }
@@ -255,6 +275,91 @@ public sealed class AutoPlayerControllerTests
     }
 
     [Test]
+    public void GivenVisibleAmmoOffTheTileRouteCheckAutoPlayerHeadsStraightTowardsIt()
+    {
+        var map = CreateOpenMap(8, 6, 1, 1, playerMarker: 20, objectX: 5, objectY: 3, objectMarker: 49);
+        var session = new GameSession(map, RaycastCamera.FromPlayerStart(map));
+        var controller = new AutoPlayerController();
+
+        var input = controller.Update(session, 1.0 / 60.0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(controller.Objective, Is.EqualTo(AutoPlayerObjective.Ammo));
+            Assert.That(input.MoveForward, Is.False);
+            Assert.That(input.TurnRight, Is.True);
+        });
+    }
+
+    [Test]
+    public void GivenDoorToUnvisitedAreaCheckAutoPlayerExploresBeforeTakingExitRoute()
+    {
+        var map = CreateExplorationMap();
+        var session = new GameSession(map, RaycastCamera.FromPlayerStart(map));
+        var controller = new AutoPlayerController();
+
+        controller.Update(session, 1.0 / 60.0);
+
+        Assert.That(controller.Objective, Is.EqualTo(AutoPlayerObjective.Explore));
+    }
+
+    [Test]
+    public void GivenDoorWhoseSidesShareAreaCheckAutoPlayerStillExploresIt()
+    {
+        var map = CreateExplorationMap(useSharedArea: true);
+        var session = new GameSession(map, RaycastCamera.FromPlayerStart(map));
+        var controller = new AutoPlayerController();
+
+        controller.Update(session, 1.0 / 60.0);
+
+        Assert.That(controller.Objective, Is.EqualTo(AutoPlayerObjective.Explore));
+    }
+
+    [Test]
+    public void GivenPlayerHasReachedExitAreaCheckExitTakesPriorityOverUnvisitedDoor()
+    {
+        var map = CreateExitCommitmentMap();
+        var session = new GameSession(map, RaycastCamera.FromPlayerStart(map));
+        var controller = new AutoPlayerController();
+
+        controller.Update(session, 1.0 / 60.0);
+
+        Assert.That(controller.Objective, Is.EqualTo(AutoPlayerObjective.Exit));
+    }
+
+    [Test]
+    public void GivenPlayerHasReachedExitAreaWithAccessibleSecretCheckSecretIsPushedFirst()
+    {
+        var map = CreateExitCommitmentMap(hasSecret: true);
+        var session = new GameSession(map, RaycastCamera.FromPlayerStart(map));
+        var controller = new AutoPlayerController();
+
+        controller.Update(session, 1.0 / 60.0);
+
+        Assert.That(controller.Objective, Is.EqualTo(AutoPlayerObjective.Secret));
+    }
+
+    [Test]
+    public void GivenDistantUnvisitedDoorCheckExplorationIsNotDiscardedByDistance()
+    {
+        var map = CreateDistantExplorationMap();
+        var session = new GameSession(map, RaycastCamera.FromPlayerStart(map));
+        var controller = new AutoPlayerController();
+        var route = AutoPlayerRoutePlanner.FindNearest(
+            session,
+            [new NavigationRoutePoint(17, 2)],
+            allowClosedDoors: true);
+
+        controller.Update(session, 1.0 / 60.0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(route, Does.Contain(new NavigationRoutePoint(16, 2)));
+            Assert.That(controller.Objective, Is.EqualTo(AutoPlayerObjective.Explore));
+        });
+    }
+
+    [Test]
     public void GivenVisibleEnemyCheckAutoPlayerKillsItThroughWeaponInput()
     {
         var map = CreateOpenMap(7, 5, 2, 2, playerMarker: 20);
@@ -317,6 +422,61 @@ public sealed class AutoPlayerControllerTests
         var objects = new ushort[width * height];
         objects[(2 * width) + 1] = 20;
         return new WolfensteinMap(0, "Auto corridor", width, height, walls, objects);
+    }
+
+    private static WolfensteinMap CreateExplorationMap(bool useSharedArea = false)
+    {
+        const int width = 10;
+        const int height = 5;
+        var walls = CreateEnclosedWalls(width, height);
+        walls[(2 * width) + 1] = 107;
+        walls[(2 * width) + 2] = 107;
+        walls[(2 * width) + 3] = 90;
+        walls[(2 * width) + 4] = useSharedArea ? (ushort)107 : (ushort)108;
+        walls[(2 * width) + 5] = useSharedArea ? (ushort)107 : (ushort)108;
+        walls[(2 * width) + 6] = useSharedArea ? (ushort)90 : (ushort)108;
+        walls[(2 * width) + 7] = 108;
+        walls[(2 * width) + 8] = 21;
+        var objects = new ushort[width * height];
+        objects[(2 * width) + 1] = 20;
+        return new WolfensteinMap(0, "Auto exploration", width, height, walls, objects);
+    }
+
+    private static WolfensteinMap CreateExitCommitmentMap(bool hasSecret = false)
+    {
+        const int width = 7;
+        const int height = 6;
+        var walls = CreateEnclosedWalls(width, height);
+        walls[(2 * width) + 2] = 107;
+        walls[(2 * width) + 3] = 21;
+        walls[(3 * width) + 2] = 91;
+        walls[(4 * width) + 2] = 108;
+        var objects = new ushort[width * height];
+        objects[(2 * width) + 2] = 20;
+        if (hasSecret)
+        {
+            walls[(2 * width) + 1] = 1;
+            objects[(2 * width) + 1] = 98;
+            walls[(2 * width)] = 107;
+        }
+        return new WolfensteinMap(0, "Auto exit commitment", width, height, walls, objects);
+    }
+
+    private static WolfensteinMap CreateDistantExplorationMap()
+    {
+        const int width = 22;
+        const int height = 5;
+        var walls = CreateEnclosedWalls(width, height);
+        for (var x = 1; x <= 18; x++)
+            walls[(2 * width) + x] = 107;
+        walls[(2 * width) + 16] = 90;
+        walls[(2 * width) + 17] = 108;
+        walls[(2 * width) + 18] = 108;
+        walls[(2 * width) + 19] = 21;
+        walls[(2 * width) + 20] = 1;
+        var objects = new ushort[width * height];
+        objects[(2 * width) + 1] = 20;
+        return new WolfensteinMap(0, "Auto distant exploration", width, height, walls, objects);
     }
 
     private static WolfensteinMap CreateOpenMap(
