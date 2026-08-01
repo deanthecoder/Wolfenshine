@@ -22,7 +22,6 @@ using Wolfenshine.Resources;
 using Wolfenshine.ViewModels;
 #if DEBUG
 using System.Runtime.InteropServices;
-using Avalonia.VisualTree;
 using SkiaSharp;
 #endif
 
@@ -288,7 +287,7 @@ public sealed partial class MainWindow : Window
         GameViewport.Focus();
     }
 
-    private void OnDownloadSharewareClick(object sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+    private void OnDownloadSharewareClick(object sender, RoutedEventArgs e) =>
         OpenWithShell(WolfensteinDataInstaller.SharewareDownloadUrl);
 
     private void OnGameDataDragOver(object sender, DragEventArgs e)
@@ -508,7 +507,7 @@ public sealed partial class MainWindow : Window
             (float)(windowContentOffsetY + (bottomRight.Y * scale)));
         enhancedTriangle.Close();
         canvas.Save();
-        canvas.ClipPath(enhancedTriangle, SKClipOperation.Intersect, antialias: true);
+        canvas.ClipPath(enhancedTriangle, antialias: true);
         canvas.DrawBitmap(enhanced, 0.0f, 0.0f);
         canvas.Restore();
         return comparison;

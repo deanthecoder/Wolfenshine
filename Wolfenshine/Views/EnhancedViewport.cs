@@ -1488,7 +1488,7 @@ public sealed class EnhancedViewport : SoftwareViewport
             using var bloomShader = bloomOverlay.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
             var uniforms = new SKRuntimeEffectUniforms(effect)
             {
-                ["outputResolution"] = new[] { (float)renderTarget.Width, (float)renderTarget.Height },
+                ["outputResolution"] = new[] { renderTarget.Width, (float)renderTarget.Height },
                 ["wallColumns"] = wallColumns,
                 ["sceneLights"] = sceneLights,
                 ["sceneLightRadii"] = sceneLightRadii,

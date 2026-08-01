@@ -64,27 +64,17 @@ public static class SpriteOutlineSmoother
                 if (CountTrue(hasLeft, hasRight, hasAbove, hasBelow) != 2)
                     continue;
 
-                var diagonal = 0;
+                int diagonal;
                 if (hasLeft && hasAbove)
-                {
                     diagonal = GetOffset(x - 1, y - 1, width);
-                }
                 else if (hasAbove && hasRight)
-                {
                     diagonal = GetOffset(x + 1, y - 1, width);
-                }
                 else if (hasRight && hasBelow)
-                {
                     diagonal = GetOffset(x + 1, y + 1, width);
-                }
                 else if (hasBelow && hasLeft)
-                {
                     diagonal = GetOffset(x - 1, y + 1, width);
-                }
                 else
-                {
                     continue;
-                }
 
                 if (!IsOpaque(source, diagonal))
                     continue;
@@ -125,6 +115,8 @@ public static class SpriteOutlineSmoother
             }
         }
 
+        if (sampleCount == 0)
+            sampleCount = 1;
         destination[target] = (byte)(totalRed / sampleCount);
         destination[target + 1] = (byte)(totalGreen / sampleCount);
         destination[target + 2] = (byte)(totalBlue / sampleCount);

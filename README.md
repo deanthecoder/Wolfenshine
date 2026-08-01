@@ -52,7 +52,7 @@ Wolfenshine keeps the original-style renderer and enhanced renderer side by side
 - Colored, directional ceiling lights, chandeliers, lamps, treasure glow, and muzzle flashes.
 - Atmospheric doorway shafts that descend from bright rooms into darker ones, illuminate objects, and fade naturally with the viewing direction.
 - Focused overhead spotlights draw attention to uncollected weapons, keys, and full-heal pickups.
-- Filled wells and puddles project animated ceiling caustics, using an algorithm adapted from [Kali's Shadertoy shader](https://www.shadertoy.com/view/XtKfRG).
+- Filled wells and puddles project animated ceiling caustics, using an algorithm adapted from a [Shadertoy shader](https://www.shadertoy.com/view/XtKfRG).
 - Geometry-aware room ambience, doorway light spill, distance shading, and subtle fog.
 - Generated wall relief with material-specific specular response.
 - Bloom, ambient occlusion, enemy shadows, view bob, weapon sway, and momentum-based movement.
