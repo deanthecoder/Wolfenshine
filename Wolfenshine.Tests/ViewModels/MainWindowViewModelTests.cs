@@ -579,6 +579,29 @@ public sealed class MainWindowViewModelTests
     }
 
     [Test]
+    public void GivenAlternateElevatorCompletionCheckEpisodeSecretMapLoads()
+    {
+        var maps = Enumerable.Range(0, 10)
+            .Select(slot => CreateElevatorMap(
+                slot,
+                $"E1M{slot + 1}",
+                slot == 0 ? (ushort)107 : (ushort)140))
+            .ToArray();
+        var mapSet = new WolfensteinMapSet(0xABCD, maps);
+        using var tempDirectory = new TempDirectory();
+        DirectoryInfo directory = tempDirectory;
+        foreach (var fileName in WolfensteinResources.FileNames.Values)
+            File.WriteAllBytes(Path.Combine(directory.FullName, fileName), [1]);
+        var viewModel = new MainWindowViewModel(WolfensteinResources.Load(directory), mapSet);
+        StartNormalGame(viewModel);
+
+        CompleteLevel(viewModel);
+        ContinueFromStats(viewModel);
+
+        Assert.That(viewModel.SelectedMap, Is.SameAs(maps[9]));
+    }
+
+    [Test]
     public void GivenFinalLifeLostCheckEpisodeScreenReturnsAtFirstLevel()
     {
         var firstMap = CreateDogMap(0, "E1M1");
@@ -604,7 +627,7 @@ public sealed class MainWindowViewModelTests
         });
     }
 
-    private static WolfensteinMap CreateElevatorMap(int slot, string name)
+    private static WolfensteinMap CreateElevatorMap(int slot, string name, ushort playerFloorTile = 140)
     {
         const int size = 5;
         var walls = Enumerable.Repeat((ushort)140, size * size).ToArray();
@@ -616,6 +639,7 @@ public sealed class MainWindowViewModelTests
             walls[(index * size) + size - 1] = 1;
         }
         walls[(2 * size) + 3] = 21;
+        walls[(2 * size) + 2] = playerFloorTile;
         var objects = new ushort[size * size];
         objects[(2 * size) + 2] = 20;
         return new WolfensteinMap(slot, name, size, size, walls, objects);

@@ -801,7 +801,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         var currentIndex = Array.FindIndex(episodeMaps, map => ReferenceEquals(map, SelectedMap));
         var nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % episodeMaps.Length;
-        var nextMap = episodeMaps[nextIndex];
+        var secretMapSlot = firstSlot + 9;
+        var nextMap = m_gameSession.IsSecretLevelExit
+            ? episodeMaps.FirstOrDefault(map => map.Slot == secretMapSlot) ?? episodeMaps[nextIndex]
+            : episodeMaps[nextIndex];
         var playerState = m_gameSession.CapturePlayerState();
         StartMap(nextMap, playerState, startFaded: true);
         NotifyMapChanged();

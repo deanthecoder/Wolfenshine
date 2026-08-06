@@ -51,6 +51,7 @@ public sealed class GameSession
     private const double DeathFadeDuration = 70.0 / OriginalTicksPerSecond;
     private const double DeathDuration = 100.0 / OriginalTicksPerSecond;
     private const ushort ElevatorSwitchTile = 21;
+    private const ushort AlternateElevatorFloorTile = 107;
     private const double LevelFadeDuration = 0.5;
     private const double WallHitSoundInterval = 0.2;
     private const double EnemyMuzzleFlashDuration = 6.0 / OriginalTicksPerSecond;
@@ -161,6 +162,10 @@ public sealed class GameSession
     public bool IsDying { get; private set; }
     public bool IsGameOver { get; private set; }
     public bool IsCompletingLevel => m_isCompletingLevel;
+    /// <summary>
+    /// Indicates that the activated elevator stands on the alternate floor marker from the map data.
+    /// </summary>
+    public bool IsSecretLevelExit { get; private set; }
     public bool IsReadyForNextLevel => m_isCompletingLevel && m_levelFade >= 1.0;
     public bool IsWeaponFlashFrame => Weapon != PlayerWeapon.Knife &&
                                       (WeaponFrame == 2 ||
@@ -538,6 +543,9 @@ public sealed class GameSession
         if (directionX != 0 && Map.GetWall(pushWallX, pushWallY) == ElevatorSwitchTile)
         {
             ElevatorSwitch = new WolfensteinElevatorSwitch(pushWallX, pushWallY);
+            IsSecretLevelExit = Map.GetWall(
+                (int)Math.Floor(Camera.X),
+                (int)Math.Floor(Camera.Y)) == AlternateElevatorFloorTile;
             m_isCompletingLevel = true;
             m_levelFade = 0.0;
             PlaySound(WolfensteinSoundEffect.LevelDone);
@@ -1436,6 +1444,7 @@ public sealed class GameSession
         Doors = WolfensteinDoors.FromMap(Map);
         PushWalls = new WolfensteinPushWalls(Map);
         ElevatorSwitch = null;
+        IsSecretLevelExit = false;
         m_actors = CreateActorStates();
         m_staticObjects.Clear();
         m_staticObjects.AddRange(WolfensteinStaticObjects.FromMap(Map));

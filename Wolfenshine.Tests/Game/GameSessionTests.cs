@@ -1036,6 +1036,24 @@ public sealed class GameSessionTests
         Assert.That(session.IsCompletingLevel, Is.False);
     }
 
+    [TestCase(107, true)]
+    [TestCase(108, false)]
+    public void GivenElevatorUsedCheckAlternateFloorMarkerSelectsSecretExit(
+        int playerFloorTile,
+        bool expectedSecretExit)
+    {
+        var session = CreateElevatorSession(
+            directionX: 1.0,
+            directionY: 0.0,
+            switchX: 3,
+            switchY: 2,
+            playerFloorTile: (ushort)playerFloorTile);
+
+        session.Update(0.0, new PlayerInput(false, false, false, false, Use: true));
+
+        Assert.That(session.IsSecretLevelExit, Is.EqualTo(expectedSecretExit));
+    }
+
     private static GameSession CreateSession()
     {
         const int size = 5;
@@ -1058,7 +1076,8 @@ public sealed class GameSessionTests
         double directionX,
         double directionY,
         int switchX,
-        int switchY)
+        int switchY,
+        ushort playerFloorTile = 140)
     {
         const int size = 5;
         var walls = Enumerable.Repeat((ushort)140, size * size).ToArray();
@@ -1070,6 +1089,7 @@ public sealed class GameSessionTests
             walls[(index * size) + size - 1] = 1;
         }
         walls[(switchY * size) + switchX] = 21;
+        walls[(2 * size) + 2] = playerFloorTile;
         var map = new WolfensteinMap(0, "Elevator", size, size, walls, new ushort[size * size]);
         var planeX = -directionY * 0.66;
         var planeY = directionX * 0.66;
