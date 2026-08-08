@@ -47,10 +47,16 @@ public sealed partial class MainWindow : Window
     private bool m_moveBackward;
     private bool m_turnLeft;
     private bool m_turnRight;
+    private bool m_wMoveForward;
+    private bool m_sMoveBackward;
+    private bool m_aTurnLeft;
+    private bool m_dTurnRight;
     private bool m_use;
     private bool m_run;
     private bool m_attack;
     private bool m_strafe;
+    private bool m_strafeLeft;
+    private bool m_strafeRight;
     private bool m_showNavigationGuide;
     private bool m_pauseKeyDown;
     private bool m_rendererKeyDown;
@@ -173,7 +179,7 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             return;
         }
-        if (e.Key == Key.D && DataContext is MainWindowViewModel debugAutoPlayViewModel &&
+        if (e.Key == Key.F4 && DataContext is MainWindowViewModel debugAutoPlayViewModel &&
             (debugAutoPlayViewModel.StartAttractMode() || debugAutoPlayViewModel.ToggleDebugAutoPlay()))
         {
             ClearInput();
@@ -209,7 +215,7 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             return;
         }
-        if (e.Key == Key.S)
+        if (e.Key == Key.F5)
         {
             if (DataContext is MainWindowViewModel viewModel)
                 viewModel.SaveDebugPosition();
@@ -615,15 +621,17 @@ public sealed partial class MainWindow : Window
         viewModel.UpdateGame(
             elapsedSeconds,
             new PlayerInput(
-                m_moveForward,
-                m_moveBackward,
-                m_turnLeft,
-                m_turnRight,
+                m_moveForward || m_wMoveForward,
+                m_moveBackward || m_sMoveBackward,
+                m_turnLeft || m_aTurnLeft,
+                m_turnRight || m_dTurnRight,
                 m_use,
                 m_run,
                 m_attack,
                 m_weaponSelection,
-                m_strafe));
+                m_strafe,
+                m_strafeLeft,
+                m_strafeRight));
         UpdateViewBob(elapsedSeconds, viewModel);
         UpdateNavigationGuide(elapsedSeconds, viewModel);
         m_weaponSelection = null;
@@ -730,14 +738,32 @@ public sealed partial class MainWindow : Window
             case Key.Up:
                 m_moveForward = isDown;
                 return true;
+            case Key.W:
+                m_wMoveForward = isDown;
+                return true;
             case Key.Down:
                 m_moveBackward = isDown;
+                return true;
+            case Key.S:
+                m_sMoveBackward = isDown;
                 return true;
             case Key.Left:
                 m_turnLeft = isDown;
                 return true;
+            case Key.A:
+                m_aTurnLeft = isDown;
+                return true;
             case Key.Right:
                 m_turnRight = isDown;
+                return true;
+            case Key.D:
+                m_dTurnRight = isDown;
+                return true;
+            case Key.Q:
+                m_strafeLeft = isDown;
+                return true;
+            case Key.E:
+                m_strafeRight = isDown;
                 return true;
             case Key.Space:
             case Key.Enter:
@@ -785,10 +811,16 @@ public sealed partial class MainWindow : Window
         m_moveBackward = false;
         m_turnLeft = false;
         m_turnRight = false;
+        m_wMoveForward = false;
+        m_sMoveBackward = false;
+        m_aTurnLeft = false;
+        m_dTurnRight = false;
         m_use = false;
         m_run = false;
         m_attack = false;
         m_strafe = false;
+        m_strafeLeft = false;
+        m_strafeRight = false;
         m_showNavigationGuide = false;
         m_pauseKeyDown = false;
         m_rendererKeyDown = false;

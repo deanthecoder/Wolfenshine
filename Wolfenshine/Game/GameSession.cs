@@ -287,7 +287,8 @@ public sealed class GameSession
 
         var horizontal = (input.TurnRight ? 1.0 : 0.0) - (input.TurnLeft ? 1.0 : 0.0);
         var turn = input.Strafe ? 0.0 : horizontal;
-        var strafe = input.Strafe ? horizontal : 0.0;
+        var directStrafe = (input.StrafeRight ? 1.0 : 0.0) - (input.StrafeLeft ? 1.0 : 0.0);
+        var strafe = Math.Clamp((input.Strafe ? horizontal : 0.0) + directStrafe, -1.0, 1.0);
         var movement = (input.MoveForward ? 1.0 : 0.0) - (input.MoveBackward ? 1.0 : 0.0);
         if (!useMomentumMovement)
             ResetMovementMomentum();
@@ -1418,7 +1419,8 @@ public sealed class GameSession
 
     private static bool HasInput(PlayerInput input) =>
         input.MoveForward || input.MoveBackward || input.TurnLeft || input.TurnRight ||
-        input.Use || input.Run || input.Attack || input.Strafe || input.WeaponSelection != null;
+        input.Use || input.Run || input.Attack || input.Strafe || input.StrafeLeft || input.StrafeRight ||
+        input.WeaponSelection != null;
 
     private bool UpdateLevelFade(double elapsedSeconds)
     {

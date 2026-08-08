@@ -85,6 +85,8 @@ Wolfenshine includes the game systems that make the renderer worth exploring:
 - Original title, episode and difficulty selection, HUD, animated face, pause display, and intermission presentation.
 - An autonomous attract mode starts after 30 seconds at episode selection and plays through the real input system.
 
+Use `W`/`S` to move, `A`/`D` to turn, and `Q`/`E` to strafe. The original-style arrow controls and Alt-strafing remain available too.
+
 ![Difficulty selection](img/difficulty-selection.png)
 
 ## Play Wolfenshine
@@ -212,10 +214,10 @@ Debug builds provide a few development conveniences that are omitted from Releas
 | `Shift+C` | Capture authentic and enhanced frames and rebuild `img/renderer-comparison.png` with a diagonal split. |
 | `R` | Restore health and ammunition and unlock all weapons. |
 | `M` | Toggle the textured map overview. |
-| `S` | Save the current level, position, and direction as a quick test location. |
+| `F5` | Save the current level, position, and direction as a quick test location. |
 | `L` | Restart at the saved test location. |
 | `<` / `>` | Restart at the previous or next level, wrapping at either end of the available maps. |
-| `D` | Start attract mode on the episode screen, or toggle autopilot during a normal game. |
+| `F4` | Start attract mode on the episode screen, or toggle autopilot during a normal game. |
 
 The Shift+C comparison capture keeps its clean source images in the Git-ignored `local/screenshots/` directory and overwrites the tracked README comparison image only after both renderer captures succeed.
 

@@ -404,8 +404,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_audioPlayer?.SetPaused(m_isPaused);
         StatusText = m_isPaused
             ? "Paused · press P to continue"
-            : $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
-              "1–4 select weapons · Space opens doors";
+            : CreateGameplayStatus(SelectedMap.Name);
         OnPropertyChanged(nameof(StatusText));
     }
 
@@ -505,8 +504,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (!m_isConfirmingEndGame)
             return;
         SetField(ref m_isConfirmingEndGame, false, nameof(IsConfirmingEndGame));
-        StatusText = $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
-                     "1–4 select weapons · Space opens doors";
+        StatusText = CreateGameplayStatus(SelectedMap.Name);
         OnPropertyChanged(nameof(StatusText));
     }
 
@@ -776,8 +774,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (!m_isAutoPlaying || m_isAttractMode)
             return;
         SetField(ref m_isAutoPlaying, false, nameof(IsAutoPlaying));
-        StatusText = $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
-                     "1–4 select weapons · Space opens doors";
+        StatusText = CreateGameplayStatus(SelectedMap.Name);
         OnPropertyChanged(nameof(StatusText));
     }
 
@@ -912,7 +909,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private static bool HasInput(PlayerInput input) =>
         input.MoveForward || input.MoveBackward || input.TurnLeft || input.TurnRight ||
-        input.Use || input.Run || input.Attack || input.Strafe || input.WeaponSelection != null;
+        input.Use || input.Run || input.Attack || input.Strafe || input.StrafeLeft || input.StrafeRight ||
+        input.WeaponSelection != null;
+
+    private static string CreateGameplayStatus(string mapName) =>
+        $"{mapName} · WASD/arrows move and turn · Q/E strafes · Shift runs · Command fires · " +
+        "1–4 select weapons · Space opens doors";
 
     private void NotifyMapChanged()
     {
@@ -971,8 +973,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         m_isWeaponFlashFrame = false;
         m_playerSpeed = 0.0;
         m_weaponSprite = Sprites?.GetWeaponFrame(m_gameSession.Weapon, m_gameSession.WeaponFrame) ?? m_weaponSprite;
-        StatusText = $"{map.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
-                     "1–4 select weapons · Space opens doors";
+        StatusText = CreateGameplayStatus(map.Name);
         UpdateHud();
         if (startFaded)
             BeginGetPsyched();
@@ -1002,8 +1003,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(PresentationViewportWidth));
         StatusText = m_isAutoPlaying
             ? $"Attract mode · {SelectedMap.Name} · press any key to return"
-            : $"{SelectedMap.Name} · arrows move and turn · Alt strafes · Shift runs · Command fires · " +
-              "1–4 select weapons · Space opens doors";
+            : CreateGameplayStatus(SelectedMap.Name);
         OnPropertyChanged(nameof(StatusText));
     }
 

@@ -255,6 +255,27 @@ public sealed class GameSessionTests
     }
 
     [Test]
+    public void GivenDirectStrafeRightInputCheckPlayerMovesSidewaysWithoutTurning()
+    {
+        var session = CreateSession();
+
+        session.Update(0.1, new PlayerInput(
+            false,
+            false,
+            false,
+            false,
+            StrafeRight: true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Camera.X, Is.EqualTo(3.06076).Within(0.0001));
+            Assert.That(session.Camera.Y, Is.EqualTo(2.5).Within(0.0001));
+            Assert.That(session.Camera.DirectionX, Is.EqualTo(0.0).Within(0.0001));
+            Assert.That(session.Camera.DirectionY, Is.EqualTo(-1.0).Within(0.0001));
+        });
+    }
+
+    [Test]
     public void GivenMovementReleasedCheckMomentumCarriesPlayerAndFrictionSlowsThem()
     {
         var session = CreateSession();

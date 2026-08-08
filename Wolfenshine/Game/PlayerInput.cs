@@ -25,4 +25,6 @@ public readonly record struct PlayerInput(
     bool Run = false,
     bool Attack = false,
     PlayerWeapon? WeaponSelection = null,
-    bool Strafe = false);
+    bool Strafe = false,
+    bool StrafeLeft = false,
+    bool StrafeRight = false);
