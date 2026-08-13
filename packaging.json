@@ -6,6 +6,12 @@
   "Executable": "Wolfenshine",
   "Project": "Wolfenshine/Wolfenshine.csproj",
   "Version": "0.1",
+  "PublishArgs": [
+    "-c",
+    "Release",
+    "--self-contained",
+    "true"
+  ],
   "Win": {
     "InnoScript": "Installer/templates/inno.iss",
     "IconIco": "Wolfenshine/Assets/Wolfenshine.ico",
